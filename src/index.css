@@ -1,0 +1,29 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-charcoal: #121212;
+  --color-gold: #D4AF37;
+  --color-ice: #F0F8FF;
+  --color-border-subtle: #2A2A2A;
+  
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  body {
+    @apply bg-charcoal text-white font-sans antialiased;
+  }
+}
+
+@layer utilities {
+  .glass-panel {
+    @apply bg-white/[0.02] backdrop-blur-[15px] border border-border-subtle rounded-2xl;
+  }
+  .glass-panel-hover {
+    @apply hover:bg-white/[0.04] transition-colors duration-300;
+  }
+  .text-gold-gradient {
+    @apply bg-gradient-to-r from-[#D4AF37] to-[#F3E5AB] bg-clip-text text-transparent;
+  }
+}
