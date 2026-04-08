@@ -1,39 +1,46 @@
 import React, { useState } from 'react';
 import { 
   Search, Lock, Unlock, TrendingUp, Mail, Filter, 
-  ShieldCheck, Activity, MapPin, ChevronRight, Eye, Star, CheckCircle
+  ShieldCheck, Activity, MapPin, ChevronRight, Eye, Star, CheckCircle, Settings
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { Player, MOCK_PLAYERS, MOCK_SCOUT, checkDataAccess } from '../core/domain';
 import { 
-  Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer
+  Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer,
+  LineChart, Line, XAxis, YAxis, Tooltip as RechartsTooltip
 } from 'recharts';
+import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../core/i18n/LanguageContext';
+import Logo from '../components/Logo';
 
 type ScoutTab = 'hub' | 'pipeline' | 'contact';
 
 export default function Cantera4Scout() {
   const [activeTab, setActiveTab] = useState<ScoutTab>('hub');
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
+  const navigate = useNavigate();
   const { t } = useLanguage();
 
   return (
-    <div className="min-h-screen bg-[#121212] text-white font-sans selection:bg-[#D4AF37]/30 pb-20">
+    <div className="min-h-screen bg-white dark:bg-charcoal text-charcoal dark:text-white font-sans selection:bg-gold/30 pb-32 transition-colors duration-300">
       {/* Top Bar */}
-      <header className="sticky top-0 z-30 bg-[#121212]/90 backdrop-blur-md border-b border-[#2A2A2A] px-6 py-4 flex justify-between items-center">
+      <header className="sticky top-0 z-30 bg-white/90 dark:bg-charcoal/90 backdrop-blur-md border-b border-border-subtle px-6 py-4 flex justify-between items-center transition-colors duration-300">
         <div className="flex items-center gap-3">
           <Eye className="text-[#A1C4FD]" size={24} />
-          <h1 className="text-xl font-bold tracking-tight">{t('scout.terminal')}</h1>
+          <Logo size="md" />
         </div>
         <div className="flex items-center gap-4">
           <div className="text-right hidden md:block">
-            <p className="text-xs text-gray-500 uppercase tracking-widest">{t('scout.agency')}</p>
-            <p className="text-sm font-medium">{MOCK_SCOUT.name}</p>
+            <p className="text-xs text-charcoal/40 dark:text-gray-500 uppercase tracking-widest transition-colors">{t('scout.agency')}</p>
+            <p className="text-sm font-medium text-charcoal dark:text-white transition-colors">{MOCK_SCOUT.name}</p>
           </div>
-          <div className="w-8 h-8 rounded-full bg-[#2A2A2A] flex items-center justify-center border border-[#D4AF37]">
+          <div className="w-8 h-8 rounded-full bg-black/5 dark:bg-[#2A2A2A] flex items-center justify-center border border-[#D4AF37] transition-colors">
             <span className="text-xs font-bold text-[#D4AF37]">PRO</span>
           </div>
+          <button onClick={() => navigate('/settings')} className="text-charcoal/40 dark:text-gray-400 hover:text-charcoal dark:hover:text-white transition-colors">
+            <Settings size={20} />
+          </button>
         </div>
       </header>
 
@@ -41,17 +48,29 @@ export default function Cantera4Scout() {
         <AnimatePresence mode="wait">
           {activeTab === 'hub' && !selectedPlayer && (
             <motion.div key="hub" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-6">
-              {/* Search Bar */}
-              <div className="relative">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={20} />
-                <input 
-                  type="text" 
-                  placeholder={t('scout.search_placeholder')} 
-                  className="w-full bg-white/[0.02] border border-[#2A2A2A] rounded-xl py-4 pl-12 pr-4 text-white focus:outline-none focus:border-[#A1C4FD] transition-colors"
-                />
-                <button className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-[#A1C4FD]">
-                  <Filter size={20} />
-                </button>
+              {/* Search Bar & Filters */}
+              <div className="space-y-4">
+                <div className="relative">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-charcoal/40 dark:text-gray-500 transition-colors" size={20} />
+                  <input 
+                    type="text" 
+                    placeholder={t('scout.search_placeholder')} 
+                    className="w-full bg-black/5 dark:bg-white/[0.02] border border-border-subtle dark:border-[#2A2A2A] rounded-xl py-4 pl-12 pr-4 text-charcoal dark:text-white focus:outline-none focus:border-[#A1C4FD] transition-colors"
+                  />
+                  <button className="absolute right-4 top-1/2 -translate-y-1/2 text-charcoal/40 dark:text-gray-500 hover:text-[#A1C4FD] transition-colors">
+                    <Filter size={20} />
+                  </button>
+                </div>
+                
+                {/* Quick Filter Chips */}
+                <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                  <button className="px-4 py-1.5 rounded-full bg-[#A1C4FD] text-charcoal font-bold text-xs whitespace-nowrap">All Players</button>
+                  <button className="px-4 py-1.5 rounded-full bg-black/5 dark:bg-white/5 border border-border-subtle hover:border-[#A1C4FD]/50 text-charcoal dark:text-white text-xs font-medium whitespace-nowrap transition-colors">U19</button>
+                  <button className="px-4 py-1.5 rounded-full bg-black/5 dark:bg-white/5 border border-border-subtle hover:border-[#A1C4FD]/50 text-charcoal dark:text-white text-xs font-medium whitespace-nowrap transition-colors">U16</button>
+                  <button className="px-4 py-1.5 rounded-full bg-black/5 dark:bg-white/5 border border-border-subtle hover:border-[#A1C4FD]/50 text-charcoal dark:text-white text-xs font-medium whitespace-nowrap transition-colors">Midfielders</button>
+                  <button className="px-4 py-1.5 rounded-full bg-black/5 dark:bg-white/5 border border-border-subtle hover:border-[#A1C4FD]/50 text-charcoal dark:text-white text-xs font-medium whitespace-nowrap transition-colors">Forwards</button>
+                  <button className="px-4 py-1.5 rounded-full bg-black/5 dark:bg-white/5 border border-border-subtle hover:border-[#A1C4FD]/50 text-charcoal dark:text-white text-xs font-medium whitespace-nowrap transition-colors flex items-center gap-1"><Star size={12} className="text-gold" /> Verified Only</button>
+                </div>
               </div>
 
               {/* Feed */}
@@ -65,7 +84,7 @@ export default function Cantera4Scout() {
 
           {selectedPlayer && (
             <motion.div key="detail" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
-              <button onClick={() => setSelectedPlayer(null)} className="text-gray-500 hover:text-white mb-6 flex items-center gap-2 text-sm">
+              <button onClick={() => setSelectedPlayer(null)} className="text-charcoal/40 dark:text-gray-500 hover:text-charcoal dark:hover:text-white mb-6 flex items-center gap-2 text-sm transition-colors">
                 <ChevronRight className="rotate-180" size={16} /> {t('scout.back')}
               </button>
               <PlayerDeepDive player={selectedPlayer} />
@@ -75,13 +94,13 @@ export default function Cantera4Scout() {
           {activeTab === 'pipeline' && !selectedPlayer && (
             <motion.div key="pipe" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-6">
               <h2 className="text-2xl font-bold text-[#A1C4FD]">{t('scout.market_pipeline')}</h2>
-              <p className="text-sm text-gray-400">{t('scout.pipeline_desc')}</p>
+              <p className="text-sm text-charcoal/50 dark:text-gray-400 transition-colors">{t('scout.pipeline_desc')}</p>
               
               <div className="p-4 rounded-xl border border-[#D4AF37]/30 bg-[#D4AF37]/5 flex items-start gap-4 mb-8">
                 <Star className="text-[#D4AF37] shrink-0 mt-1" size={20} />
                 <div>
                   <p className="font-bold text-[#D4AF37]">{t('scout.rating_update')}</p>
-                  <p className="text-sm text-gray-300 mt-1">Mateo Silva {t('scout.rating_desc')}</p>
+                  <p className="text-sm text-charcoal/70 dark:text-gray-300 mt-1 transition-colors">Mateo Silva {t('scout.rating_desc')}</p>
                 </div>
               </div>
 
@@ -96,11 +115,11 @@ export default function Cantera4Scout() {
       </div>
 
       {/* Bottom Nav */}
-      <div className="fixed bottom-0 w-full bg-[#121212]/95 backdrop-blur-xl border-t border-[#2A2A2A] z-40">
-        <div className="flex justify-around items-center h-16 max-w-md mx-auto">
-          <NavBtn icon={<Search />} label={t('scout.discovery')} active={activeTab === 'hub' && !selectedPlayer} onClick={() => { setActiveTab('hub'); setSelectedPlayer(null); }} />
-          <NavBtn icon={<TrendingUp />} label={t('scout.pipeline')} active={activeTab === 'pipeline' && !selectedPlayer} onClick={() => { setActiveTab('pipeline'); setSelectedPlayer(null); }} />
-          <NavBtn icon={<Mail />} label={t('scout.contact')} active={activeTab === 'contact'} onClick={() => setActiveTab('contact')} />
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[95%] max-w-md bg-white/80 dark:bg-charcoal/80 backdrop-blur-xl border border-border-subtle/50 rounded-full shadow-2xl z-50 px-2 py-2 transition-all duration-300">
+        <div className="flex justify-around items-center h-14">
+          <NavBtn icon={<Search />} label={t('nav.scout')} active={activeTab === 'hub' && !selectedPlayer} onClick={() => { setActiveTab('hub'); setSelectedPlayer(null); }} />
+          <NavBtn icon={<TrendingUp />} label={t('nav.pipe')} active={activeTab === 'pipeline' && !selectedPlayer} onClick={() => { setActiveTab('pipeline'); setSelectedPlayer(null); }} />
+          <NavBtn icon={<Mail />} label={t('nav.inbox')} active={activeTab === 'contact'} onClick={() => setActiveTab('contact')} />
         </div>
       </div>
     </div>
@@ -112,12 +131,12 @@ function NavBtn({ icon, label, active, onClick }: any) {
     <button 
       onClick={onClick} 
       className={cn(
-        "flex flex-col items-center gap-1 p-2 transition-colors",
-        active ? "text-[#A1C4FD]" : "text-gray-600 hover:text-gray-400"
+        "flex flex-col items-center justify-center gap-0.5 px-6 py-1 rounded-full transition-all duration-300",
+        active ? "text-[#A1C4FD] bg-[#A1C4FD]/10 scale-110" : "text-charcoal/60 dark:text-gray-600 hover:text-charcoal/80 dark:hover:text-gray-400"
       )}
     >
       {React.cloneElement(icon, { size: 20 })}
-      <span className="text-[10px] uppercase tracking-wider">{label}</span>
+      <span className="text-[10px] font-bold uppercase tracking-tighter">{label}</span>
     </button>
   );
 }
@@ -129,11 +148,11 @@ function PlayerSnippet({ player, onClick }: { player: Player, onClick: () => voi
   return (
     <div 
       onClick={onClick}
-      className="p-5 rounded-xl border border-[#2A2A2A] bg-white/[0.01] hover:bg-white/[0.03] transition-all cursor-pointer group relative overflow-hidden"
+      className="p-5 rounded-xl border border-border-subtle dark:border-[#2A2A2A] bg-black/[0.01] dark:bg-white/[0.01] hover:bg-black/[0.03] dark:hover:bg-white/[0.03] transition-all cursor-pointer group relative overflow-hidden"
     >
       <div className="flex justify-between items-start mb-4">
         <div>
-          <h3 className="font-bold text-lg group-hover:text-[#A1C4FD] transition-colors flex items-center gap-2">
+          <h3 className="font-bold text-lg text-charcoal dark:text-white group-hover:text-[#A1C4FD] transition-colors flex items-center gap-2">
             {player.name}
             {player.isValidated && (
               <ShieldCheck 
@@ -146,25 +165,33 @@ function PlayerSnippet({ player, onClick }: { player: Player, onClick: () => voi
               />
             )}
           </h3>
-          <p className="text-xs text-gray-500 font-mono mt-1">{player.position} • {player.age} {t('cv.age').toLowerCase()}</p>
+          <p className="text-xs text-charcoal/50 dark:text-gray-500 font-mono transition-colors">{player.position} • {player.age} {t('cv.age').toLowerCase()}</p>
         </div>
-        <div className="p-2 rounded-lg bg-[#2A2A2A]">
-          {hasAccess ? <Unlock size={16} className="text-[#A1C4FD]" /> : <Lock size={16} className="text-[#D4AF37]" />}
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={(e) => { e.stopPropagation(); /* Add to shortlist logic */ }}
+            className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 text-charcoal/40 dark:text-gray-500 hover:text-[#A1C4FD] transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>
+          </button>
+          <div className="p-2 rounded-lg bg-black/5 dark:bg-[#2A2A2A] transition-colors">
+            {hasAccess ? <Unlock size={16} className="text-[#A1C4FD]" /> : <Lock size={16} className="text-[#D4AF37]" />}
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-2 text-center border-t border-[#2A2A2A] pt-4">
+      <div className="grid grid-cols-3 gap-2 text-center border-t border-border-subtle dark:border-[#2A2A2A] pt-4 transition-colors">
         <div>
-          <p className="text-[10px] text-gray-500 uppercase">{t('scout.matches')}</p>
-          <p className="font-mono text-sm">{player.baseMetrics.matchesPlayed}</p>
+          <p className="text-[10px] text-charcoal/40 dark:text-gray-500 uppercase transition-colors">{t('scout.matches')}</p>
+          <p className="font-mono text-sm text-charcoal dark:text-white transition-colors">{player.baseMetrics.matchesPlayed}</p>
         </div>
         <div>
-          <p className="text-[10px] text-gray-500 uppercase">{t('scout.goals')}</p>
-          <p className="font-mono text-sm">{player.baseMetrics.goals}</p>
+          <p className="text-[10px] text-charcoal/40 dark:text-gray-500 uppercase transition-colors">{t('scout.goals')}</p>
+          <p className="font-mono text-sm text-charcoal dark:text-white transition-colors">{player.baseMetrics.goals}</p>
         </div>
         <div>
-          <p className="text-[10px] text-gray-500 uppercase">{t('scout.assists')}</p>
-          <p className="font-mono text-sm">{player.baseMetrics.assists}</p>
+          <p className="text-[10px] text-charcoal/40 dark:text-gray-500 uppercase transition-colors">{t('scout.assists')}</p>
+          <p className="font-mono text-sm text-charcoal dark:text-white transition-colors">{player.baseMetrics.assists}</p>
         </div>
       </div>
     </div>
@@ -191,14 +218,14 @@ function PlayerDeepDive({ player }: { player: Player }) {
         <div className="w-24 h-24 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/30 flex items-center justify-center mx-auto mb-6">
           <Lock size={40} className="text-[#D4AF37]" />
         </div>
-        <h2 className="text-3xl font-bold">{t('scout.paywall_title')}</h2>
-        <p className="text-gray-400 max-w-md mx-auto">
+        <h2 className="text-3xl font-bold text-charcoal dark:text-white transition-colors">{t('scout.paywall_title')}</h2>
+        <p className="text-charcoal/50 dark:text-gray-400 max-w-md mx-auto transition-colors">
           {player.name} {t('scout.paywall_desc')}
         </p>
         
         <div className="p-6 rounded-2xl border border-[#D4AF37] bg-gradient-to-b from-[#D4AF37]/10 to-transparent text-left max-w-sm mx-auto">
           <h3 className="font-bold text-lg mb-2 text-[#D4AF37]">{t('scout.unlock_title')}</h3>
-          <ul className="text-sm text-gray-300 space-y-2 mb-6">
+          <ul className="text-sm text-charcoal/70 dark:text-gray-300 space-y-2 mb-6 transition-colors">
             <li className="flex items-center gap-2"><CheckCircle size={14} className="text-[#D4AF37]" /> {t('scout.unlock_item1')}</li>
             <li className="flex items-center gap-2"><CheckCircle size={14} className="text-[#D4AF37]" /> {t('scout.unlock_item2')}</li>
             <li className="flex items-center gap-2"><CheckCircle size={14} className="text-[#D4AF37]" /> {t('scout.unlock_item3')}</li>
@@ -206,7 +233,7 @@ function PlayerDeepDive({ player }: { player: Player }) {
           <button 
             onClick={handleUnlock}
             disabled={isUnlocking}
-            className="w-full py-3 bg-[#D4AF37] text-[#121212] font-bold rounded-xl hover:bg-[#b5952f] transition-colors flex justify-center items-center gap-2"
+            className="w-full py-3 bg-gold text-white dark:text-charcoal font-bold rounded-xl hover:bg-gold/80 transition-colors flex justify-center items-center gap-2"
           >
             {isUnlocking ? <span className="animate-pulse">{t('scout.processing')}</span> : t('scout.unlock_button')}
           </button>
@@ -291,17 +318,40 @@ function PlayerDeepDive({ player }: { player: Player }) {
         </div>
 
         {/* Radar Chart */}
-        <div className="p-6 rounded-2xl border border-[#2A2A2A] bg-white/[0.01] md:col-span-2 flex flex-col items-center">
+        <div className="p-6 rounded-2xl border border-[#2A2A2A] bg-white/[0.01] md:col-span-2">
           <h3 className="text-sm text-gray-500 uppercase tracking-widest mb-6 w-full text-left">{t('scout.technical_deepdive')}</h3>
-          <div className="w-full max-w-md h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <RadarChart cx="50%" cy="50%" outerRadius="70%" data={radarData}>
-                <PolarGrid stroke="#2A2A2A" />
-                <PolarAngleAxis dataKey="subject" tick={{ fill: '#A1C4FD', opacity: 0.8, fontSize: 12 }} />
-                <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
-                <Radar name="Player" dataKey="A" stroke="#A1C4FD" strokeWidth={2} fill="#A1C4FD" fillOpacity={0.2} />
-              </RadarChart>
-            </ResponsiveContainer>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="w-full h-[250px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <RadarChart cx="50%" cy="50%" outerRadius="70%" data={radarData}>
+                  <PolarGrid stroke="#2A2A2A" />
+                  <PolarAngleAxis dataKey="subject" tick={{ fill: '#A1C4FD', opacity: 0.8, fontSize: 12 }} />
+                  <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
+                  <Radar name="Player" dataKey="A" stroke="#A1C4FD" strokeWidth={2} fill="#A1C4FD" fillOpacity={0.2} />
+                </RadarChart>
+              </ResponsiveContainer>
+            </div>
+            
+            <div className="w-full h-[250px] flex flex-col justify-center">
+              <h4 className="text-xs text-gray-500 uppercase tracking-widest mb-4 text-center">OVR Evolution (Last 5 Matches)</h4>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={[
+                  { match: 'M1', rating: 82 },
+                  { match: 'M2', rating: 85 },
+                  { match: 'M3', rating: 84 },
+                  { match: 'M4', rating: 88 },
+                  { match: 'M5', rating: 86 },
+                ]}>
+                  <XAxis dataKey="match" tick={{ fill: '#888', fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <YAxis domain={['dataMin - 5', 'dataMax + 5']} hide />
+                  <RechartsTooltip 
+                    contentStyle={{ backgroundColor: '#1A1A1A', border: '1px solid #333', borderRadius: '8px' }}
+                    itemStyle={{ color: '#A1C4FD' }}
+                  />
+                  <Line type="monotone" dataKey="rating" stroke="#A1C4FD" strokeWidth={3} dot={{ fill: '#A1C4FD', r: 4 }} activeDot={{ r: 6 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         </div>
       </div>

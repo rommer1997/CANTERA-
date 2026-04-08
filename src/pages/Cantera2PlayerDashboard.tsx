@@ -11,6 +11,8 @@ import {
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { useLanguage } from '../core/i18n/LanguageContext';
+import Logo from '../components/Logo';
+import BackButton from '../components/BackButton';
 import TutorialService, { TourStep } from '../components/TutorialService';
 import { useNavigate } from 'react-router-dom';
 import { MOCK_OPPORTUNITIES, Opportunity } from '../core/domain';
@@ -103,17 +105,17 @@ const mockPlayer: PlayerProfile = {
     { 
       id: '1', type: 'video', title: 'feed.assist', time: 'feed.time', 
       content: 'feed.content1', 
-      likes: 1240, comments: 84, image: 'https://images.unsplash.com/photo-1518605368461-1e1e38ce1f58?q=80&w=800&h=600&auto=format&fit=crop' 
+      likes: 1240, comments: 84, image: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=800&auto=format&fit=crop' 
     },
     { 
       id: '2', type: 'image', title: 'feed.motm', time: 'feed.time_day', 
       content: 'feed.content2', 
-      likes: 3890, comments: 156, image: 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?q=80&w=800&h=600&auto=format&fit=crop' 
+      likes: 3890, comments: 156, image: 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?q=80&w=800&auto=format&fit=crop' 
     },
     { 
       id: '3', type: 'video', title: 'feed.training', time: 'feed.time_days', 
       content: 'feed.content3', 
-      likes: 850, comments: 32, image: 'https://images.unsplash.com/photo-1553778263-73a83bab9b0c?q=80&w=800&h=600&auto=format&fit=crop' 
+      likes: 850, comments: 32, image: 'https://images.unsplash.com/photo-1517466787929-bc90951d0974?q=80&w=800&auto=format&fit=crop' 
     },
     { 
       id: '4', type: 'text', title: 'feed.update', time: 'feed.time_week', 
@@ -130,6 +132,14 @@ const radarData = [
   { subject: 'DRI', A: mockPlayer.stats.dribbling, fullMark: 100 },
   { subject: 'DEF', A: mockPlayer.stats.defending, fullMark: 100 },
   { subject: 'PHY', A: mockPlayer.stats.physical, fullMark: 100 },
+];
+
+const historyData = [
+  { month: 'Aug', ovr: 81 },
+  { month: 'Sep', ovr: 82 },
+  { month: 'Oct', ovr: 83 },
+  { month: 'Nov', ovr: 84 },
+  { month: 'Dec', ovr: 84 },
 ];
 
 type TabType = 'feed' | 'dashboard' | 'opportunities' | 'profile';
@@ -199,18 +209,26 @@ export default function Cantera2PlayerDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-charcoal text-ice pb-24 font-sans selection:bg-gold/30">
+    <div className="min-h-screen bg-white dark:bg-charcoal text-charcoal dark:text-ice pb-32 font-sans selection:bg-gold/30 transition-colors duration-300">
       
       {/* Top App Bar (Mobile Social Style) */}
-      <div className="sticky top-0 z-30 bg-charcoal/80 backdrop-blur-md border-b border-border-subtle px-4 py-3 flex justify-between items-center">
-        <h1 className="text-xl font-bold tracking-tight text-gold-gradient">CANTERA</h1>
+      <div className="sticky top-0 z-30 bg-white/80 dark:bg-charcoal/80 backdrop-blur-md border-b border-border-subtle px-4 py-3 flex justify-between items-center transition-colors duration-300">
+        <div className="flex items-center gap-3">
+          <BackButton />
+          <Logo size="md" />
+        </div>
         <div className="flex items-center gap-4">
-          <button id="tour-guardian" className="flex items-center gap-1 text-ice/60 hover:text-gold transition-colors bg-white/5 px-2 py-1 rounded-lg border border-border-subtle">
+          <button id="tour-guardian" className="flex items-center gap-1 text-charcoal/60 dark:text-ice/60 hover:text-gold transition-colors bg-black/5 dark:bg-white/5 px-2 py-1 rounded-lg border border-border-subtle">
             <Shield size={16} /> <span className="text-xs font-medium">{t('profile.guardian')}</span>
           </button>
-          <button className="text-ice/60 hover:text-gold transition-colors"><Activity size={20} /></button>
-          <button className="text-ice/60 hover:text-gold transition-colors"><MessageCircle size={20} /></button>
-          <button onClick={() => navigate('/settings')} className="text-ice/60 hover:text-gold transition-colors"><Settings size={20} /></button>
+          <button className="text-charcoal/60 dark:text-ice/60 hover:text-gold transition-colors" aria-label="My QR Code">
+            <div className="p-1.5 rounded-md bg-black/5 dark:bg-white/5 border border-border-subtle">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="5" height="5" x="3" y="3" rx="1"/><rect width="5" height="5" x="16" y="3" rx="1"/><rect width="5" height="5" x="3" y="16" rx="1"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/><path d="M21 21v.01"/><path d="M12 7v3a2 2 0 0 1-2 2H7"/><path d="M3 12h.01"/><path d="M12 3h.01"/><path d="M12 16v.01"/><path d="M16 12h1"/><path d="M21 12v.01"/><path d="M12 21v-1"/></svg>
+            </div>
+          </button>
+          <button className="text-charcoal/60 dark:text-ice/60 hover:text-gold transition-colors"><Activity size={20} /></button>
+          <button className="text-charcoal/60 dark:text-ice/60 hover:text-gold transition-colors"><MessageCircle size={20} /></button>
+          <button onClick={() => navigate('/settings')} className="text-charcoal/60 dark:text-ice/60 hover:text-gold transition-colors"><Settings size={20} /></button>
         </div>
       </div>
 
@@ -242,23 +260,23 @@ export default function Cantera2PlayerDashboard() {
       />
 
       {/* Bottom Navigation Bar */}
-      <div className="fixed bottom-0 w-full bg-charcoal/95 backdrop-blur-xl border-t border-border-subtle z-40 pb-safe">
-        <div className="flex justify-around items-center h-16 max-w-md mx-auto relative px-2">
-          <NavButton icon={<Home size={24} />} isActive={activeTab === 'feed'} onClick={() => setActiveTab('feed')} />
-          <NavButton icon={<LayoutDashboard size={24} />} isActive={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[95%] max-w-md bg-white/80 dark:bg-charcoal/80 backdrop-blur-xl border border-border-subtle/50 rounded-full shadow-2xl z-50 px-2 py-2 transition-all duration-300">
+        <div className="flex justify-around items-center h-14 relative">
+          <NavButton icon={<Home size={24} />} label={t('nav.home')} isActive={activeTab === 'feed'} onClick={() => setActiveTab('feed')} />
+          <NavButton icon={<LayoutDashboard size={24} />} label={t('nav.dash')} isActive={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
           
           {/* Publish FAB */}
-          <div className="relative -top-6">
+          <div className="relative -top-8">
             <button 
               onClick={() => setIsPublishOpen(true)}
-              className="w-14 h-14 bg-gold rounded-full flex items-center justify-center text-charcoal shadow-[0_4px_20px_rgba(212,175,55,0.4)] hover:scale-105 transition-transform"
+              className="w-14 h-14 bg-gold rounded-full flex items-center justify-center text-charcoal shadow-[0_8px_25px_rgba(212,175,55,0.4)] hover:scale-110 active:scale-95 transition-all"
             >
               <Plus size={28} strokeWidth={2.5} />
             </button>
           </div>
 
-          <NavButton icon={<Trophy size={24} />} isActive={activeTab === 'opportunities'} onClick={() => setActiveTab('opportunities')} />
-          <NavButton icon={<User size={24} />} isActive={activeTab === 'profile'} onClick={() => setActiveTab('profile')} />
+          <NavButton icon={<Trophy size={24} />} label={t('nav.opps')} isActive={activeTab === 'opportunities'} onClick={() => setActiveTab('opportunities')} />
+          <NavButton icon={<User size={24} />} label={t('nav.profile')} isActive={activeTab === 'profile'} onClick={() => setActiveTab('profile')} />
         </div>
       </div>
 
@@ -273,23 +291,26 @@ export default function Cantera2PlayerDashboard() {
 
 // --- Components ---
 
-function NavButton({ icon, isActive, onClick }: { icon: React.ReactNode, isActive: boolean, onClick: () => void }) {
+function NavButton({ icon, label, isActive, onClick }: { icon: React.ReactNode, label: string, isActive: boolean, onClick: () => void }) {
   return (
     <button 
       onClick={onClick} 
+      aria-label={label}
       className={cn(
-        "p-2 rounded-xl transition-all duration-300 flex flex-col items-center gap-1",
-        isActive ? "text-gold" : "text-ice/40 hover:text-ice/80"
+        "flex flex-col items-center justify-center gap-0.5 px-3 py-1 rounded-full transition-all duration-300 relative",
+        isActive ? "text-gold bg-gold/10 scale-110" : "text-charcoal/40 dark:text-ice/40 hover:text-charcoal/80 dark:hover:text-ice/80"
       )}
     >
-      {icon}
-      {isActive && <motion.div layoutId="nav-indicator" className="w-1 h-1 bg-gold rounded-full absolute bottom-2" />}
+      {React.cloneElement(icon as React.ReactElement, { size: 20 })}
+      <span className="text-[9px] font-bold uppercase tracking-tighter">{label}</span>
+      {isActive && <motion.div layoutId="nav-indicator" className="w-1 h-1 bg-gold rounded-full absolute -bottom-1" />}
     </button>
   );
 }
 
 // --- Screen 1: Social Feed ---
 function ScreenFeed() {
+  const { t } = useLanguage();
   return (
     <div className="space-y-6 p-4">
       {mockPlayer.feed.map((post) => (
@@ -298,28 +319,33 @@ function ScreenFeed() {
           <div className="p-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full overflow-hidden border border-gold/30">
-                <img src="https://images.unsplash.com/photo-1511886929837-354d827aae26?q=80&w=400&h=400&auto=format&fit=crop" alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                <img src="https://picsum.photos/seed/player1/400/400" alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
               </div>
               <div>
                 <div className="flex items-center gap-1">
-                  <p className="font-semibold text-sm">{mockPlayer.name}</p>
+                  <p className="font-semibold text-sm text-charcoal dark:text-ice">{mockPlayer.name}</p>
                   {mockPlayer.verification_status && <ShieldCheck size={14} className="text-gold" />}
                 </div>
-                <p className="text-xs text-ice/50">{post.time}</p>
+                <p className="text-xs text-charcoal/50 dark:text-ice/50">{t(post.time)}</p>
               </div>
             </div>
-            <button className="text-ice/40 hover:text-ice"><Activity size={18} /></button>
+            <button className="text-charcoal/40 dark:text-ice/40 hover:text-gold transition-colors"><Activity size={18} /></button>
           </div>
 
           {/* Post Content */}
           <div className="px-4 pb-3">
-            <p className="text-sm text-ice/90 leading-relaxed">{post.content}</p>
+            <p className="text-sm text-charcoal/90 dark:text-ice/90 leading-relaxed">{t(post.content)}</p>
           </div>
 
           {/* Post Media */}
           {post.image && (
-            <div className="relative w-full aspect-video bg-black">
-              <img src={post.image} alt="Post media" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+            <div className="relative w-full max-h-[500px] bg-black/5 dark:bg-black/20 overflow-hidden flex items-center justify-center">
+              <img 
+                src={post.image} 
+                alt="Post media" 
+                className="w-full h-full object-contain max-h-[500px]" 
+                referrerPolicy="no-referrer" 
+              />
               {post.type === 'video' && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/20">
                   <div className="w-12 h-12 rounded-full bg-charcoal/80 backdrop-blur-sm flex items-center justify-center text-gold border border-gold/30">
@@ -333,13 +359,13 @@ function ScreenFeed() {
           {/* Post Actions */}
           <div className="p-4 flex items-center justify-between border-t border-border-subtle/50">
             <div className="flex items-center gap-6">
-              <button className="flex items-center gap-2 text-ice/60 hover:text-red-400 transition-colors">
+              <button className="flex items-center gap-2 text-charcoal/60 dark:text-ice/60 hover:text-red-400 transition-colors">
                 <Heart size={20} /> <span className="text-sm font-medium">{post.likes}</span>
               </button>
-              <button className="flex items-center gap-2 text-ice/60 hover:text-ice transition-colors">
+              <button className="flex items-center gap-2 text-charcoal/60 dark:text-ice/60 hover:text-charcoal dark:hover:text-ice transition-colors">
                 <MessageCircle size={20} /> <span className="text-sm font-medium">{post.comments}</span>
               </button>
-              <button className="flex items-center gap-2 text-ice/60 hover:text-ice transition-colors">
+              <button className="flex items-center gap-2 text-charcoal/60 dark:text-ice/60 hover:text-charcoal dark:hover:text-ice transition-colors">
                 <Share2 size={20} />
               </button>
             </div>
@@ -360,22 +386,22 @@ function ScreenDashboard({ t }: { t: (k: string) => string }) {
   return (
     <div className="p-4 space-y-6">
       {/* OVR Card */}
-      <div className="glass-panel p-6 flex items-center justify-between bg-gradient-to-br from-white/[0.05] to-transparent">
+      <div className="glass-panel p-6 flex items-center justify-between bg-gradient-to-br from-black/[0.02] dark:from-white/[0.05] to-transparent">
         <div>
-          <p className="text-xs text-ice/50 uppercase tracking-widest mb-1">Overall Rating</p>
+          <p className="text-xs text-charcoal/50 dark:text-ice/50 uppercase tracking-widest mb-1">Overall Rating</p>
           <p className="text-5xl font-bold text-gold-gradient">{calculatedRating}</p>
         </div>
         <div className="space-y-2 text-right">
-          <div className="text-xs"><span className="text-ice/50">{t('c2.dash.referee')}</span> <span className="font-mono text-gold">{mockPlayer.validation_breakdown.referee}</span></div>
-          <div className="text-xs"><span className="text-ice/50">{t('c2.dash.coach')}</span> <span className="font-mono text-gold">{mockPlayer.validation_breakdown.coach}</span></div>
-          <div className="text-xs"><span className="text-ice/50">{t('c2.dash.community')}</span> <span className="font-mono text-gold">{mockPlayer.validation_breakdown.community}</span></div>
+          <div className="text-xs"><span className="text-charcoal/50 dark:text-ice/50">{t('c2.dash.referee')}</span> <span className="font-mono text-gold">{mockPlayer.validation_breakdown.referee}</span></div>
+          <div className="text-xs"><span className="text-charcoal/50 dark:text-ice/50">{t('c2.dash.coach')}</span> <span className="font-mono text-gold">{mockPlayer.validation_breakdown.coach}</span></div>
+          <div className="text-xs"><span className="text-charcoal/50 dark:text-ice/50">{t('c2.dash.community')}</span> <span className="font-mono text-gold">{mockPlayer.validation_breakdown.community}</span></div>
         </div>
       </div>
 
       {/* Radar Chart */}
       <div className="glass-panel p-6" id="tour-radar">
         <div className="flex items-center justify-between mb-2">
-          <h3 className="text-sm font-semibold tracking-widest uppercase text-ice/80">{t('c2.dash.tech')}</h3>
+          <h3 className="text-sm font-semibold tracking-widest uppercase text-charcoal/80 dark:text-ice/80">{t('c2.dash.tech')}</h3>
           <button id="tour-compare" className="text-xs text-gold border border-gold/30 px-2 py-1 rounded hover:bg-gold/10 transition-colors">
             {t('dash.compare')}
           </button>
@@ -392,22 +418,56 @@ function ScreenDashboard({ t }: { t: (k: string) => string }) {
         </div>
       </div>
 
+      {/* Historical OVR Line Chart */}
+      <div className="glass-panel p-6">
+        <h3 className="text-sm font-semibold tracking-widest uppercase text-charcoal/80 dark:text-ice/80 mb-6">OVR History</h3>
+        <div className="h-[200px] -ml-4">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={historyData}>
+              <XAxis dataKey="month" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
+              <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} domain={['dataMin - 2', 'dataMax + 2']} />
+              <RechartsTooltip 
+                contentStyle={{ backgroundColor: '#1A1A1A', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
+                itemStyle={{ color: '#D4AF37' }}
+              />
+              <Line type="monotone" dataKey="ovr" stroke="#D4AF37" strokeWidth={3} dot={{ fill: '#D4AF37', strokeWidth: 2 }} activeDot={{ r: 6, fill: '#D4AF37' }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
       {/* Career History */}
       <div className="glass-panel p-6">
-        <h3 className="text-sm font-semibold tracking-widest uppercase text-ice/80 mb-6">{t('c2.dash.recent')}</h3>
+        <h3 className="text-sm font-semibold tracking-widest uppercase text-charcoal/80 dark:text-ice/80 mb-6">{t('c2.dash.recent')}</h3>
+        
+        {/* OVR Evolution Chart */}
+        <div className="h-[150px] mb-6 -ml-4">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={mockPlayer.recent_matches}>
+              <XAxis dataKey="date" tick={{ fill: '#888', fontSize: 10 }} axisLine={false} tickLine={false} />
+              <YAxis domain={['dataMin - 5', 'dataMax + 5']} hide />
+              <RechartsTooltip 
+                contentStyle={{ backgroundColor: '#1A1A1A', border: '1px solid #333', borderRadius: '8px' }}
+                itemStyle={{ color: '#D4AF37' }}
+              />
+              <Line type="monotone" dataKey="rating" stroke="#D4AF37" strokeWidth={3} dot={{ fill: '#D4AF37', r: 4 }} activeDot={{ r: 6 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+
         <div className="space-y-3">
           {mockPlayer.recent_matches.map((match, i) => (
-            <div key={i} className="flex items-center justify-between p-3 rounded-xl border border-border-subtle bg-white/[0.01]">
+            <div key={i} className="flex items-center justify-between p-3 rounded-xl border border-border-subtle bg-black/[0.01] dark:bg-white/[0.01]">
               <div className="flex flex-col">
-                <span className="font-medium text-sm">{match.opponent}</span>
-                <span className="text-xs font-mono text-ice/40">{match.date}</span>
+                <span className="font-medium text-sm text-charcoal dark:text-ice">{match.opponent}</span>
+                <span className="text-xs font-mono text-charcoal/40 dark:text-ice/40">{match.date}</span>
               </div>
               <div className="flex items-center gap-4">
                 <span className={cn(
                   "text-xs font-bold w-8 text-center",
-                  match.result.startsWith('W') ? "text-green-400" : match.result.startsWith('L') ? "text-red-400" : "text-ice/50"
+                  match.result.startsWith('W') ? "text-green-600 dark:text-green-400" : match.result.startsWith('L') ? "text-red-600 dark:text-red-400" : "text-charcoal/50 dark:text-ice/50"
                 )}>{match.result}</span>
-                <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center border border-border-subtle">
+                <div className="w-8 h-8 rounded-lg bg-black/5 dark:bg-white/5 flex items-center justify-center border border-border-subtle">
                   <span className="font-mono text-xs text-gold">{match.rating}</span>
                 </div>
               </div>
@@ -431,8 +491,8 @@ function ScreenOpportunities({ t }: { t: (k: string) => string }) {
     <div className="p-4 space-y-6">
       <div className="flex flex-col gap-4 mb-2">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold text-white">{t('c2.opp.title')}</h2>
-          <button className="text-ice/40 hover:text-gold transition-colors">
+          <h2 className="text-xl font-bold text-charcoal dark:text-white">{t('c2.opp.title')}</h2>
+          <button className="text-charcoal/40 dark:text-ice/40 hover:text-gold transition-colors">
             <FilterIcon size={20} />
           </button>
         </div>
@@ -448,7 +508,7 @@ function ScreenOpportunities({ t }: { t: (k: string) => string }) {
               onClick={() => setFilter(f.id as any)}
               className={cn(
                 "whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-medium border transition-all", 
-                filter === f.id ? "bg-gold text-charcoal border-gold shadow-[0_0_15px_rgba(212,175,55,0.3)]" : "bg-white/5 text-ice/40 border-border-subtle"
+                filter === f.id ? "bg-gold text-charcoal border-gold shadow-[0_0_15px_rgba(212,175,55,0.3)]" : "bg-black/5 dark:bg-white/5 text-charcoal/40 dark:text-ice/40 border-border-subtle"
               )}
             >
               {f.label}
@@ -464,32 +524,42 @@ function ScreenOpportunities({ t }: { t: (k: string) => string }) {
             <div className="absolute top-0 right-0 w-24 h-24 bg-gold/5 blur-3xl -mr-12 -mt-12 group-hover:bg-gold/10 transition-colors" />
             
             <div className="flex justify-between items-start mb-4 relative z-10">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center border border-border-subtle text-gold font-bold text-sm shadow-inner">
-                  {opp.creator.logo}
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center border border-border-subtle text-gold font-bold text-sm shadow-inner overflow-hidden shrink-0">
+                  {opp.creator.logo ? (
+                    <img 
+                      src={opp.creator.logo} 
+                      alt={opp.creator.name} 
+                      className="w-full h-full object-cover" 
+                      referrerPolicy="no-referrer" 
+                    />
+                  ) : (
+                    opp.creator.name.substring(0, 2).toUpperCase()
+                  )}
                 </div>
-                <div>
-                  <h3 className="font-bold text-ice group-hover:text-gold transition-colors text-base">{opp.title}</h3>
-                  <p className="text-xs text-ice/40 flex items-center gap-1 mt-0.5">
-                    <Briefcase size={12} className="text-gold/60" /> {opp.creator.name} • <span className="text-gold/80 font-medium">{opp.type}</span>
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-bold text-charcoal dark:text-ice group-hover:text-gold transition-colors text-base truncate">{opp.title}</h3>
+                  <p className="text-xs text-charcoal/40 dark:text-ice/40 flex items-center gap-1 mt-0.5 truncate">
+                    <Briefcase size={12} className="text-gold/60 shrink-0" /> 
+                    <span className="truncate">{opp.creator.name}</span> • <span className="text-gold/80 font-medium shrink-0">{opp.type}</span>
                   </p>
                 </div>
               </div>
               {opp.creator.isAuthorized && (
-                <div className="bg-gold/10 text-gold p-1.5 rounded-full border border-gold/20 shadow-[0_0_10px_rgba(212,175,55,0.1)]">
+                <div className="bg-gold/10 text-gold p-1.5 rounded-full border border-gold/20 shadow-[0_0_10px_rgba(212,175,55,0.1)] shrink-0 ml-2">
                   <ShieldCheck size={16} className="fill-gold/10" />
                 </div>
               )}
             </div>
 
-            <p className="text-sm text-ice/70 mb-5 line-clamp-2 leading-relaxed relative z-10">{opp.description}</p>
+            <p className="text-sm text-charcoal/70 dark:text-ice/70 mb-5 line-clamp-2 leading-relaxed relative z-10">{opp.description}</p>
 
             <div className="grid grid-cols-2 gap-4 mb-6 relative z-10">
-              <div className="flex items-center gap-2 text-xs text-ice/50 bg-white/5 p-2 rounded-lg border border-border-subtle/30">
+              <div className="flex items-center gap-2 text-xs text-charcoal/50 dark:text-ice/50 bg-black/5 dark:bg-white/5 p-2 rounded-lg border border-border-subtle/30">
                 <MapPin size={14} className="text-gold" /> 
                 <span className="truncate">{opp.location}</span>
               </div>
-              <div className="flex items-center gap-2 text-xs text-ice/50 bg-white/5 p-2 rounded-lg border border-border-subtle/30">
+              <div className="flex items-center gap-2 text-xs text-charcoal/50 dark:text-ice/50 bg-black/5 dark:bg-white/5 p-2 rounded-lg border border-border-subtle/30">
                 <Clock size={14} className="text-gold" /> 
                 <span>{opp.date}</span>
               </div>
@@ -498,7 +568,7 @@ function ScreenOpportunities({ t }: { t: (k: string) => string }) {
             <div className="pt-4 border-t border-border-subtle/30 flex items-center justify-between relative z-10">
               <div className="flex flex-wrap gap-2">
                 {opp.requirements.minRating && (
-                  <div className="flex items-center gap-1 px-2 py-1 rounded bg-white/5 text-[10px] text-ice/40 border border-border-subtle">
+                  <div className="flex items-center gap-1 px-2 py-1 rounded bg-black/5 dark:bg-white/5 text-[10px] text-charcoal/40 dark:text-ice/40 border border-border-subtle">
                     <TrendingUp size={10} className="text-gold/50" />
                     OVR {opp.requirements.minRating}+
                   </div>
@@ -526,7 +596,7 @@ function ScreenOpportunities({ t }: { t: (k: string) => string }) {
           </div>
           <div>
             <p className="text-sm font-bold text-gold">{t('c2.opp.proTip')}</p>
-            <p className="text-xs text-ice/60 leading-relaxed">
+            <p className="text-xs text-charcoal/60 dark:text-ice/60 leading-relaxed">
               {t('c2.opp.proTipDesc')}
             </p>
           </div>
@@ -604,50 +674,49 @@ function ScreenProfile({ onEdit, t, profileTab, setProfileTab, onOpenVerificatio
             mockPlayer.verification_tier === 'DIAMOND' ? "border-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.3)]" :
             "border-gold shadow-[0_0_20px_rgba(212,175,55,0.2)]"
           )}>
-            <img src="https://images.unsplash.com/photo-1511886929837-354d827aae26?q=80&w=400&h=400&auto=format&fit=crop" alt="Avatar" className="w-full h-full rounded-full object-cover" referrerPolicy="no-referrer" />
+            <img src="https://picsum.photos/seed/player1/400/400" alt="Avatar" className="w-full h-full rounded-full object-cover" referrerPolicy="no-referrer" />
           </div>
         </div>
-        
         <div className="text-center mb-6">
           <div className="flex items-center justify-center gap-2 mb-1">
-            <h2 className="text-2xl font-bold">{mockPlayer.name}</h2>
+            <h2 className="text-2xl font-bold text-charcoal dark:text-white">{mockPlayer.name}</h2>
             {mockPlayer.verification_status && (
               <div id="tour-pro-badge">
                 <VerificationBadge tier={mockPlayer.verification_tier} onClick={onOpenVerification} />
               </div>
             )}
           </div>
-          <p className="text-sm text-ice/60 mb-3">{mockPlayer.position}</p>
-          <p className="text-sm text-ice/80 leading-relaxed max-w-xs mx-auto mb-4">{mockPlayer.bio}</p>
+          <p className="text-sm text-charcoal/60 dark:text-ice/60 mb-3">{mockPlayer.position}</p>
+          <p className="text-sm text-charcoal/80 dark:text-ice/80 leading-relaxed max-w-xs mx-auto mb-4">{mockPlayer.bio}</p>
           
           <div className="flex items-center justify-center gap-8 py-4 border-y border-border-subtle/30 w-full max-w-sm">
             <div className="flex flex-col items-center">
-              <p className="text-lg font-bold text-white">{mockPlayer.followers}</p>
-              <p className="text-[10px] uppercase tracking-widest text-ice/40 font-semibold">Followers</p>
+              <p className="text-lg font-bold text-charcoal dark:text-white">{mockPlayer.followers}</p>
+              <p className="text-[10px] uppercase tracking-widest text-charcoal/40 dark:text-ice/40 font-semibold">Followers</p>
             </div>
             <div className="w-px h-8 bg-border-subtle/30" />
             <div className="flex flex-col items-center">
-              <p className="text-lg font-bold text-white">{formattedLikes}</p>
-              <p className="text-[10px] uppercase tracking-widest text-ice/40 font-semibold">Likes</p>
+              <p className="text-lg font-bold text-charcoal dark:text-white">{formattedLikes}</p>
+              <p className="text-[10px] uppercase tracking-widest text-charcoal/40 dark:text-ice/40 font-semibold">Likes</p>
             </div>
             <div className="w-px h-8 bg-border-subtle/30" />
             <div className="flex flex-col items-center">
-              <p className="text-lg font-bold text-white">{mockPlayer.posts_count}</p>
-              <p className="text-[10px] uppercase tracking-widest text-ice/40 font-semibold">Posts</p>
+              <p className="text-lg font-bold text-charcoal dark:text-white">{mockPlayer.posts_count}</p>
+              <p className="text-[10px] uppercase tracking-widest text-charcoal/40 dark:text-ice/40 font-semibold">Posts</p>
             </div>
           </div>
         </div>
 
-        <div className="flex flex-wrap justify-center gap-4 mb-6 text-xs text-ice/50">
-          <span className="flex items-center gap-1 bg-white/5 px-3 py-1.5 rounded-full border border-border-subtle"><MapPin size={12} /> {mockPlayer.location}</span>
-          <span className="flex items-center gap-1 bg-white/5 px-3 py-1.5 rounded-full border border-border-subtle"><Calendar size={12} /> {t('c2.cv.joined')} 2024</span>
+        <div className="flex flex-wrap justify-center gap-4 mb-6 text-xs text-charcoal/50 dark:text-ice/50">
+          <span className="flex items-center gap-1 bg-black/5 dark:bg-white/5 px-3 py-1.5 rounded-full border border-border-subtle transition-colors"><MapPin size={12} /> {mockPlayer.location}</span>
+          <span className="flex items-center gap-1 bg-black/5 dark:bg-white/5 px-3 py-1.5 rounded-full border border-border-subtle transition-colors"><Calendar size={12} /> {t('c2.cv.joined')} 2024</span>
         </div>
 
         <div className="flex gap-3 w-full max-w-sm">
-          <button onClick={onEdit} className="flex-1 py-2 bg-white/10 hover:bg-white/15 transition-colors rounded-lg text-sm font-medium border border-border-subtle">
+          <button onClick={onEdit} className="flex-1 py-2 bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 transition-colors rounded-lg text-sm font-medium border border-border-subtle text-charcoal dark:text-ice">
             Edit Profile
           </button>
-          <button className="flex-1 py-2 bg-white/10 hover:bg-white/15 transition-colors rounded-lg text-sm font-medium border border-border-subtle">
+          <button className="flex-1 py-2 bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 transition-colors rounded-lg text-sm font-medium border border-border-subtle text-charcoal dark:text-ice">
             Share Profile
           </button>
         </div>
@@ -657,13 +726,13 @@ function ScreenProfile({ onEdit, t, profileTab, setProfileTab, onOpenVerificatio
       <div className="flex border-t border-border-subtle">
         <button 
           onClick={() => setProfileTab('posts')}
-          className={cn("flex-1 py-3 text-sm font-medium flex justify-center items-center gap-2 border-b-2 transition-colors", profileTab === 'posts' ? "border-gold text-gold" : "border-transparent text-ice/50")}
+          className={cn("flex-1 py-3 text-sm font-medium flex justify-center items-center gap-2 border-b-2 transition-colors", profileTab === 'posts' ? "border-gold text-gold" : "border-transparent text-charcoal/50 dark:text-ice/50")}
         >
           <LayoutDashboard size={18} /> Posts
         </button>
         <button 
           onClick={() => setProfileTab('cv')}
-          className={cn("flex-1 py-3 text-sm font-medium flex justify-center items-center gap-2 border-b-2 transition-colors", profileTab === 'cv' ? "border-gold text-gold" : "border-transparent text-ice/50")}
+          className={cn("flex-1 py-3 text-sm font-medium flex justify-center items-center gap-2 border-b-2 transition-colors", profileTab === 'cv' ? "border-gold text-gold" : "border-transparent text-charcoal/50 dark:text-ice/50")}
         >
           <FileText size={18} /> Digital CV
         </button>
@@ -808,7 +877,7 @@ function EditProfileModal({ isOpen, onClose }: { isOpen: boolean, onClose: () =>
           {/* Avatar Edit */}
           <div className="flex flex-col items-center gap-4">
             <div className="relative">
-              <img src="https://images.unsplash.com/photo-1511886929837-354d827aae26?q=80&w=400&h=400&auto=format&fit=crop" alt="Avatar" className="w-24 h-24 rounded-full object-cover border-2 border-border-subtle opacity-50" referrerPolicy="no-referrer" />
+              <img src="https://picsum.photos/seed/player1/400/400" alt="Avatar" className="w-24 h-24 rounded-full object-cover border-2 border-border-subtle opacity-50" referrerPolicy="no-referrer" />
               <div className="absolute inset-0 flex items-center justify-center">
                 <Camera size={24} className="text-white" />
               </div>

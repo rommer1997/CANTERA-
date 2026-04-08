@@ -1,6 +1,8 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 @import "tailwindcss";
 
+@variant dark (&:where(.dark, .dark *));
+
 @theme {
   --color-charcoal: #121212;
   --color-gold: #D4AF37;
@@ -12,16 +14,16 @@
 
 @layer base {
   body {
-    @apply bg-charcoal text-white font-sans antialiased;
+    @apply bg-white text-charcoal dark:bg-charcoal dark:text-white font-sans antialiased transition-colors duration-300;
   }
 }
 
 @layer utilities {
   .glass-panel {
-    @apply bg-white/[0.02] backdrop-blur-[15px] border border-border-subtle rounded-2xl;
+    @apply bg-black/[0.02] dark:bg-white/[0.02] backdrop-blur-[15px] border border-gray-200 dark:border-border-subtle rounded-2xl;
   }
   .glass-panel-hover {
-    @apply hover:bg-white/[0.04] transition-colors duration-300;
+    @apply hover:bg-black/[0.04] dark:hover:bg-white/[0.04] transition-colors duration-300;
   }
   .text-gold-gradient {
     @apply bg-gradient-to-r from-[#D4AF37] to-[#F3E5AB] bg-clip-text text-transparent;

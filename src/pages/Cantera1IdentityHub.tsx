@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { User, Search, ShieldCheck, Shield, ArrowRight, Mail, PlayCircle, ChevronLeft } from 'lucide-react';
+import { User, Search, ShieldCheck, Shield, ArrowRight, Mail, PlayCircle, ChevronLeft, Moon, Sun } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useLanguage } from '../core/i18n/LanguageContext';
+import { useTheme } from '../core/ThemeContext';
+import { useAppStore } from '../store/useAppStore';
+import Logo from '../components/Logo';
 
 // --- Types ---
 type RoleType = 'player' | 'referee' | 'scout' | 'guardian';
@@ -20,7 +23,9 @@ interface RoleCardProps {
 export default function Cantera1IdentityHub() {
   const navigate = useNavigate();
   const { language, setLanguage, t } = useLanguage();
+  const { theme, toggleTheme } = useTheme();
   const [selectedRole, setSelectedRole] = useState<RoleType | null>(null);
+  const setUser = useAppStore((state) => state.setUser);
 
   const handleRoleSelection = (role: RoleType) => {
     setSelectedRole(role);
@@ -29,16 +34,48 @@ export default function Cantera1IdentityHub() {
   const handleDemoLogin = () => {
     switch (selectedRole) {
       case 'player':
+        setUser({
+          name: 'Mateo Silva',
+          email: 'mateo.silva@example.com',
+          role: 'PLAYER',
+          bio: 'CM @ Real Madrid Academy | 🇪🇸 U19 National Team | Vision & Control | Chasing the dream ⚽️',
+          avatar: 'https://picsum.photos/seed/player1/200/200',
+          plan: 'PRO PLAN'
+        });
         navigate('/player/PLY-8472');
         break;
       case 'referee':
+        setUser({
+          name: 'Carlos Rodriguez',
+          email: 'carlos.ref@rfef.es',
+          role: 'REFEREE',
+          bio: 'Elite Referee • RFEF | 8 years of experience in youth and professional categories | Committed to fair play and integrity.',
+          avatar: 'https://picsum.photos/seed/ref1/200/200',
+          plan: 'DIAMOND PRO'
+        });
         navigate('/c3');
         break;
       case 'scout':
+        setUser({
+          name: 'Scout Arsenal F.C.',
+          email: 'scout@arsenal.com',
+          role: 'SCOUT',
+          bio: 'Head of Youth Recruitment @ Arsenal F.C. | Searching for the next generation of global talent.',
+          avatar: 'https://picsum.photos/seed/scout1/200/200',
+          plan: 'ENTERPRISE PLAN'
+        });
         navigate('/c4');
         break;
       case 'guardian':
-        alert('Redirigiendo a CANTERA 5: Guardian Oversight (DEMO)...');
+        setUser({
+          name: 'Elena Silva',
+          email: 'elena.silva@example.com',
+          role: 'GUARDIAN',
+          bio: 'Parent of Mateo Silva | Managing youth sports career and academic balance.',
+          avatar: 'https://picsum.photos/seed/guardian1/200/200',
+          plan: 'FAMILY PROTECT'
+        });
+        navigate('/guardian');
         break;
     }
   };
@@ -51,24 +88,31 @@ export default function Cantera1IdentityHub() {
   };
 
   return (
-    <div className="min-h-screen bg-charcoal text-ice flex flex-col items-center justify-center p-4 md:p-8 font-sans selection:bg-gold/30 relative overflow-hidden">
+    <div className="min-h-screen bg-white dark:bg-charcoal text-charcoal dark:text-ice flex flex-col items-center justify-center p-4 md:p-8 font-sans selection:bg-gold/30 relative overflow-hidden transition-colors duration-300">
       
       {/* Background Ambient Effects */}
       <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-gold/5 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-ice/5 rounded-full blur-[120px] pointer-events-none" />
 
-      {/* Language Toggle */}
-      <div className="absolute top-6 right-6 z-50">
+      {/* Language & Theme Toggles */}
+      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 md:left-auto md:right-6 md:translate-x-0 z-50 flex items-center gap-3">
+        <button 
+          onClick={toggleTheme}
+          className="p-2 rounded-full bg-black/5 dark:bg-white/5 text-charcoal/50 dark:text-ice/50 hover:text-gold transition-colors border border-transparent hover:border-gold/20"
+        >
+          {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+        </button>
+
         <div className="glass-panel p-1 flex items-center rounded-full">
           <button 
             onClick={() => setLanguage('es')}
-            className={cn("px-3 py-1 rounded-full text-xs font-medium transition-colors", language === 'es' ? "bg-white/10 text-gold" : "text-ice/50 hover:text-ice")}
+            className={cn("px-3 py-1 rounded-full text-xs font-medium transition-colors", language === 'es' ? "bg-black/10 dark:bg-white/10 text-gold" : "text-charcoal/50 dark:text-ice/50 hover:text-charcoal dark:hover:text-ice")}
           >
             ES
           </button>
           <button 
             onClick={() => setLanguage('en')}
-            className={cn("px-3 py-1 rounded-full text-xs font-medium transition-colors", language === 'en' ? "bg-white/10 text-gold" : "text-ice/50 hover:text-ice")}
+            className={cn("px-3 py-1 rounded-full text-xs font-medium transition-colors", language === 'en' ? "bg-black/10 dark:bg-white/10 text-gold" : "text-charcoal/50 dark:text-ice/50 hover:text-charcoal dark:hover:text-ice")}
           >
             EN
           </button>
@@ -78,16 +122,15 @@ export default function Cantera1IdentityHub() {
       <div className="max-w-2xl w-full space-y-12 z-10">
         
         {/* Header */}
-        <div className="text-center space-y-4">
+        <div className="text-center space-y-4 flex flex-col items-center">
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
+            className="flex flex-col items-center"
           >
-            <h1 className="text-4xl md:text-5xl font-bold tracking-tighter md:tracking-tight mb-2 text-gold-gradient">
-              {t('c1.title')}
-            </h1>
-            <p className="text-ice/50 uppercase tracking-widest text-sm font-medium">
+            <Logo size="xl" className="mb-6" />
+            <p className="text-charcoal/50 dark:text-ice/50 uppercase tracking-widest text-sm font-medium">
               {t('c1.subtitle')}
             </p>
           </motion.div>
@@ -96,7 +139,7 @@ export default function Cantera1IdentityHub() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.6, delay: 0.2 }}
-            className="text-ice/70 max-w-md mx-auto text-sm"
+            className="text-charcoal/70 dark:text-ice/70 max-w-md mx-auto text-sm"
           >
             {t('c1.desc')}
           </motion.p>
@@ -193,7 +236,7 @@ export default function Cantera1IdentityHub() {
                       <div className="w-full border-t border-border-subtle"></div>
                     </div>
                     <div className="relative flex justify-center text-xs">
-                      <span className="bg-charcoal px-2 text-ice/40 uppercase tracking-widest">O</span>
+                      <span className="bg-white dark:bg-charcoal px-2 text-charcoal/40 dark:text-ice/40 uppercase tracking-widest transition-colors">O</span>
                     </div>
                   </div>
 
@@ -218,17 +261,7 @@ export default function Cantera1IdentityHub() {
           </AnimatePresence>
         </div>
 
-        {/* Footer info */}
-        <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.6, delay: 0.9 }}
-          className="text-center text-xs text-ice/30 flex items-center justify-center gap-2"
-        >
-          <Shield size={12} />
-          <span>{t('c1.footer')}</span>
-        </motion.div>
-
+        {/* Footer info removed as requested */}
       </div>
     </div>
   );
@@ -249,20 +282,20 @@ function RoleCard({ id, title, description, icon, delay, onSelect }: RoleCardPro
         <div className="absolute inset-0 bg-gradient-to-r from-gold/0 via-gold/5 to-gold/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 ease-in-out" />
 
         <div className="flex items-center gap-5 relative z-10">
-          <div className="p-3 rounded-xl bg-white/5 text-ice/60 group-hover:text-gold group-hover:bg-gold/10 transition-colors duration-300">
+          <div className="p-3 rounded-xl bg-black/5 dark:bg-white/5 text-charcoal/60 dark:text-ice/60 group-hover:text-gold group-hover:bg-gold/10 transition-colors duration-300">
             {icon}
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-ice group-hover:text-white transition-colors">
+            <h3 className="text-lg font-semibold text-charcoal dark:text-ice group-hover:text-gold dark:group-hover:text-white transition-colors">
               {title}
             </h3>
-            <p className="text-sm text-ice/50 mt-1">
+            <p className="text-sm text-charcoal/50 dark:text-ice/50 mt-1">
               {description}
             </p>
           </div>
         </div>
 
-        <div className="relative z-10 text-ice/30 group-hover:text-gold transition-colors duration-300 transform group-hover:translate-x-1">
+        <div className="relative z-10 text-charcoal/30 dark:text-ice/30 group-hover:text-gold transition-colors duration-300 transform group-hover:translate-x-1">
           <ArrowRight size={20} />
         </div>
       </div>

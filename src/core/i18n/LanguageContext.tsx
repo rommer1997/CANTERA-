@@ -182,6 +182,8 @@ const translations: Record<Language, Record<string, string>> = {
     's3.active': 'Activo',
     's3.more': 'más',
     's3.manage_applicants': 'Gestionar Postulantes',
+    's3.view_details': 'Ver Detalles',
+    's3.my_event': 'MI EVENTO',
     's3.admin_approval': 'Aprobación Administrativa',
     's3.verified_pool': 'Pool de Talento Verificado',
     's3.crm_integration': 'Integración Directa CRM',
@@ -222,6 +224,21 @@ const translations: Record<Language, Record<string, string>> = {
     'settings.fullname': 'Nombre Completo',
     'settings.email': 'Correo Electrónico',
     'settings.phone': 'Número de Teléfono',
+    // Navigation Shorthands
+    'nav.home': 'Inicio',
+    'nav.dash': 'Panel',
+    'nav.opps': 'Becas',
+    'nav.profile': 'Perfil',
+    'nav.matches': 'Partidos',
+    'nav.live': 'Vivo',
+    'nav.eval': 'Eval',
+    'nav.docs': 'Docs',
+    'nav.scout': 'Ojeo',
+    'nav.pipe': 'Pipe',
+    'nav.events': 'Eventos',
+    'nav.inbox': 'Chat',
+    'nav.oversight': 'Control',
+    'nav.approvals': 'Vistos',
     'ref.match_center': 'Centro de Partidos',
     'ref.live_console': 'Consola en Vivo',
     'ref.evaluation': 'Evaluación Profesional',
@@ -486,6 +503,8 @@ const translations: Record<Language, Record<string, string>> = {
     's3.active': 'Active',
     's3.more': 'more',
     's3.manage_applicants': 'Manage Applicants',
+    's3.view_details': 'View Details',
+    's3.my_event': 'MY EVENT',
     's3.admin_approval': 'Administrative Approval',
     's3.verified_pool': 'Verified Talent Pool',
     's3.crm_integration': 'Direct CRM Integration',
@@ -526,6 +545,21 @@ const translations: Record<Language, Record<string, string>> = {
     'settings.fullname': 'Full Name',
     'settings.email': 'Email Address',
     'settings.phone': 'Phone Number',
+    // Navigation Shorthands
+    'nav.home': 'Home',
+    'nav.dash': 'Dash',
+    'nav.opps': 'Opps',
+    'nav.profile': 'Profile',
+    'nav.matches': 'Matches',
+    'nav.live': 'Live',
+    'nav.eval': 'Eval',
+    'nav.docs': 'Docs',
+    'nav.scout': 'Scout',
+    'nav.pipe': 'Pipe',
+    'nav.events': 'Events',
+    'nav.inbox': 'Chat',
+    'nav.oversight': 'Oversight',
+    'nav.approvals': 'Approvals',
     'ref.match_center': 'Match Center',
     'ref.live_console': 'Live Console',
     'ref.evaluation': 'Professional Evaluation',
@@ -622,7 +656,14 @@ const translations: Record<Language, Record<string, string>> = {
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [language, setLanguage] = useState<Language>('es'); // Default to Spanish
+  const [language, setLanguage] = useState<Language>(() => {
+    // Auto-detect browser language
+    if (typeof window !== 'undefined' && window.navigator) {
+      const browserLang = window.navigator.language.toLowerCase();
+      if (browserLang.startsWith('en')) return 'en';
+    }
+    return 'es'; // Default to Spanish
+  });
 
   const t = (key: string): string => {
     return translations[language][key] || key;

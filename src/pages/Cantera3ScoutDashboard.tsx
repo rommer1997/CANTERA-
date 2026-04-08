@@ -8,6 +8,8 @@ import { useNavigate } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import { MOCK_OPPORTUNITIES, Opportunity } from '../core/domain';
 import { useLanguage } from '../core/i18n/LanguageContext';
+import Logo from '../components/Logo';
+import BackButton from '../components/BackButton';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // --- MOCK DATA ---
@@ -23,7 +25,7 @@ const MOCK_PLAYERS = [
     tier: 'DIAMOND_PRO',
     years: 4,
     validations: 128,
-    image: "https://images.unsplash.com/photo-1579952363873-27f3bade9f55?q=80&w=400&h=400&auto=format&fit=crop", 
+    image: "https://images.unsplash.com/photo-1551958219-acbc608c6377?q=80&w=400&auto=format&fit=crop", 
     topTraits: ["Vision", "Passing"],
     status: "scouted"
   },
@@ -38,7 +40,7 @@ const MOCK_PLAYERS = [
     tier: 'DIAMOND',
     years: 3,
     validations: 85,
-    image: "https://images.unsplash.com/photo-1511886929837-354d827aae26?q=80&w=400&h=400&auto=format&fit=crop", 
+    image: "https://images.unsplash.com/photo-1543351611-58f69d7c1781?q=80&w=400&auto=format&fit=crop", 
     topTraits: ["Tackling", "Strength"],
     status: "shortlisted"
   },
@@ -53,7 +55,7 @@ const MOCK_PLAYERS = [
     tier: 'NONE',
     years: 1,
     validations: 12,
-    image: "https://images.unsplash.com/photo-1526232761682-d26e03ac148e?q=80&w=400&h=400&auto=format&fit=crop", 
+    image: "https://images.unsplash.com/photo-1518604666860-9ed391f76460?q=80&w=400&auto=format&fit=crop", 
     topTraits: ["Pace", "Dribbling"],
     status: "new"
   },
@@ -68,7 +70,7 @@ const MOCK_PLAYERS = [
     tier: 'GOLD',
     years: 2,
     validations: 45,
-    image: "https://images.unsplash.com/photo-1551280857-2b9bbe5240f5?q=80&w=400&h=400&auto=format&fit=crop", 
+    image: "https://images.unsplash.com/photo-1560272564-c83b66b1ad12?q=80&w=400&auto=format&fit=crop", 
     topTraits: ["Finishing", "Positioning"],
     status: "new"
   },
@@ -85,43 +87,41 @@ export default function Cantera3ScoutDashboard() {
   const { t } = useLanguage();
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] text-white font-sans pb-20 md:pb-0 md:pl-20">
+    <div className="min-h-screen bg-white dark:bg-charcoal text-charcoal dark:text-ice font-sans pb-20 md:pb-0 md:pl-20 transition-colors duration-300">
       
       {/* --- DESKTOP SIDEBAR / MOBILE BOTTOM NAV --- */}
-      <nav className="fixed bottom-0 w-full bg-[#121212]/90 backdrop-blur-md border-t border-white/10 z-50 md:left-0 md:top-0 md:w-20 md:h-full md:border-t-0 md:border-r flex md:flex-col justify-around md:justify-start md:pt-8 items-center p-4 md:gap-8">
-        <button 
-          onClick={() => setActiveTab('discover')}
-          className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'discover' ? 'text-[#D4AF37]' : 'text-gray-500 hover:text-gray-300'}`}
-        >
-          <LayoutGrid size={24} />
-          <span className="text-[10px] uppercase tracking-wider md:hidden">{t('s3.discover')}</span>
-        </button>
-        <button 
-          onClick={() => setActiveTab('shortlist')}
-          className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'shortlist' ? 'text-[#D4AF37]' : 'text-gray-500 hover:text-gray-300'}`}
-        >
-          <ListTodo size={24} />
-          <span className="text-[10px] uppercase tracking-wider md:hidden">{t('s3.pipeline')}</span>
-        </button>
-        <button 
-          onClick={() => setActiveTab('messages')}
-          className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'messages' ? 'text-[#D4AF37]' : 'text-gray-500 hover:text-gray-300'}`}
-        >
-          <MessageSquare size={24} />
-          <span className="text-[10px] uppercase tracking-wider md:hidden">{t('s3.inbox')}</span>
-        </button>
-        <button 
-          onClick={() => setActiveTab('opportunities')}
-          className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'opportunities' ? 'text-[#D4AF37]' : 'text-gray-500 hover:text-gray-300'}`}
-        >
-          <Trophy size={24} />
-          <span className="text-[10px] uppercase tracking-wider md:hidden">{t('s3.events')}</span>
-        </button>
+      <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[95%] max-w-md bg-white/80 dark:bg-charcoal/80 backdrop-blur-xl border border-border-subtle/50 rounded-full shadow-2xl z-50 px-2 py-2 flex md:flex-col justify-around md:justify-start md:pt-8 items-center md:gap-8 transition-all duration-300 md:bottom-auto md:left-0 md:top-0 md:w-20 md:h-full md:rounded-none md:translate-x-0 md:border-r md:border-t-0 md:bg-white/90 md:dark:bg-charcoal/90">
+        <NavBtn 
+          icon={<LayoutGrid size={24} />} 
+          label={t('nav.scout')} 
+          active={activeTab === 'discover'} 
+          onClick={() => setActiveTab('discover')} 
+        />
+        <NavBtn 
+          icon={<ListTodo size={24} />} 
+          label={t('nav.pipe')} 
+          active={activeTab === 'shortlist'} 
+          onClick={() => setActiveTab('shortlist')} 
+        />
+        <NavBtn 
+          icon={<MessageSquare size={24} />} 
+          label={t('nav.inbox')} 
+          active={activeTab === 'messages'} 
+          onClick={() => setActiveTab('messages')} 
+        />
+        <NavBtn 
+          icon={<Trophy size={24} />} 
+          label={t('nav.events')} 
+          active={activeTab === 'opportunities'} 
+          onClick={() => setActiveTab('opportunities')} 
+        />
         <div className="md:mt-auto md:mb-8">
-          <button className="flex flex-col items-center gap-1 text-gray-500 hover:text-gray-300 transition-colors">
-            <UserCircle size={24} />
-            <span className="text-[10px] uppercase tracking-wider md:hidden">{t('s3.profile')}</span>
-          </button>
+          <NavBtn 
+            icon={<UserCircle size={24} />} 
+            label={t('nav.profile')} 
+            active={activeTab === 'profile'} 
+            onClick={() => setActiveTab('profile')} 
+          />
         </div>
       </nav>
 
@@ -130,13 +130,16 @@ export default function Cantera3ScoutDashboard() {
         
         {/* Header */}
         <header className="flex justify-between items-center mb-8 pt-4">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-gold-gradient">{t('s3.title')}</h1>
-            <p className="text-sm text-gray-400 mt-1">{t('s3.subtitle')}</p>
+          <div className="flex items-center gap-4">
+            <BackButton />
+            <div>
+              <Logo size="lg" />
+              <p className="text-sm text-charcoal/40 dark:text-gray-400 mt-1">{t('s3.subtitle')}</p>
+            </div>
           </div>
           <div className="flex items-center gap-4">
             <div className="text-right hidden sm:block">
-              <p className="text-sm font-medium">Arsenal F.C.</p>
+              <p className="text-sm font-medium text-charcoal dark:text-white">Arsenal F.C.</p>
               <div className="flex items-center gap-2 justify-end">
                 <p className="text-[10px] text-gold font-bold">€2.5M {t('s3.portfolio')}</p>
                 <div className="px-1.5 py-0.5 rounded bg-cyan-400/10 border border-cyan-400/30 text-cyan-400 text-[8px] font-black tracking-tighter">
@@ -144,10 +147,21 @@ export default function Cantera3ScoutDashboard() {
                 </div>
               </div>
             </div>
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-800 to-gray-900 border border-white/10 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-full bg-black/5 dark:bg-gradient-to-br dark:from-gray-800 dark:to-gray-900 border border-border-subtle flex items-center justify-center">
               <ShieldCheck size={20} className="text-[#D4AF37]" />
             </div>
-            <button onClick={() => navigate('/settings')} className="text-gray-400 hover:text-white transition-colors">
+            <button onClick={() => navigate('/settings', { 
+              state: { 
+                user: {
+                  name: 'Scout Arsenal F.C.',
+                  email: 'scout@arsenal.com',
+                  role: 'SCOUT',
+                  bio: 'Head of Youth Recruitment @ Arsenal F.C. | Searching for the next generation of global talent.',
+                  avatar: 'https://picsum.photos/seed/scout1/200/200',
+                  plan: 'ENTERPRISE PLAN'
+                }
+              }
+            })} className="text-charcoal/40 dark:text-gray-400 hover:text-charcoal dark:hover:text-white transition-colors">
               <Settings size={20} />
             </button>
           </div>
@@ -156,18 +170,18 @@ export default function Cantera3ScoutDashboard() {
         {/* Search & Filters */}
         <div className="flex flex-col sm:flex-row gap-4 mb-8">
           <div className="relative flex-1">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={20} />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-charcoal/40 dark:text-gray-500" size={20} />
             <input 
               type="text" 
               placeholder={t('s3.search')}
-              className="w-full bg-[#1A1A1A] border border-white/10 rounded-xl py-3 pl-12 pr-4 text-sm focus:outline-none focus:border-[#D4AF37]/50 transition-colors"
+              className="w-full bg-black/5 dark:bg-[#1A1A1A] border border-border-subtle rounded-xl py-3 pl-12 pr-4 text-sm focus:outline-none focus:border-[#D4AF37]/50 transition-colors text-charcoal dark:text-white"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
           <button 
             onClick={() => setIsFilterOpen(true)}
-            className="flex items-center justify-center gap-2 bg-[#1A1A1A] border border-white/10 rounded-xl py-3 px-6 hover:bg-white/5 transition-colors"
+            className="flex items-center justify-center gap-2 bg-black/5 dark:bg-[#1A1A1A] border border-border-subtle rounded-xl py-3 px-6 hover:bg-black/10 dark:hover:bg-white/5 transition-colors text-charcoal dark:text-white"
           >
             <SlidersHorizontal size={18} />
             <span className="text-sm font-medium">{t('s3.filters')}</span>
@@ -203,31 +217,31 @@ export default function Cantera3ScoutDashboard() {
             
             {/* Dashboard Stats */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="bg-[#121212] border border-white/5 rounded-2xl p-5 flex items-center gap-4 hover:border-white/10 transition-colors">
-                <div className="w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400">
+              <div className="bg-black/5 dark:bg-charcoal border border-border-subtle rounded-2xl p-5 flex items-center gap-4 hover:border-charcoal/20 dark:hover:border-white/10 transition-colors">
+                <div className="w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-600 dark:text-blue-400">
                   <Search size={24} />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-white">1,248</p>
-                  <p className="text-xs text-gray-500 uppercase tracking-wider">{t('s3.stats.total_scouted')}</p>
+                  <p className="text-2xl font-bold text-charcoal dark:text-white">1,248</p>
+                  <p className="text-xs text-charcoal/50 dark:text-gray-500 uppercase tracking-wider">{t('s3.stats.total_scouted')}</p>
                 </div>
               </div>
-              <div className="bg-[#121212] border border-white/5 rounded-2xl p-5 flex items-center gap-4 hover:border-white/10 transition-colors">
-                <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-400">
+              <div className="bg-black/5 dark:bg-charcoal border border-border-subtle rounded-2xl p-5 flex items-center gap-4 hover:border-charcoal/20 dark:hover:border-white/10 transition-colors">
+                <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
                   <ListTodo size={24} />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-white">42</p>
-                  <p className="text-xs text-gray-500 uppercase tracking-wider">{t('s3.stats.shortlisted')}</p>
+                  <p className="text-2xl font-bold text-charcoal dark:text-white">42</p>
+                  <p className="text-xs text-charcoal/50 dark:text-gray-500 uppercase tracking-wider">{t('s3.stats.shortlisted')}</p>
                 </div>
               </div>
-              <div className="bg-[#121212] border border-white/5 rounded-2xl p-5 flex items-center gap-4 hover:border-white/10 transition-colors">
+              <div className="bg-black/5 dark:bg-charcoal border border-border-subtle rounded-2xl p-5 flex items-center gap-4 hover:border-charcoal/20 dark:hover:border-white/10 transition-colors">
                 <div className="w-12 h-12 rounded-full bg-[#D4AF37]/10 flex items-center justify-center text-[#D4AF37]">
                   <Trophy size={24} />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-white">3</p>
-                  <p className="text-xs text-gray-500 uppercase tracking-wider">{t('s3.stats.active_events')}</p>
+                  <p className="text-2xl font-bold text-charcoal dark:text-white">3</p>
+                  <p className="text-xs text-charcoal/50 dark:text-gray-500 uppercase tracking-wider">{t('s3.stats.active_events')}</p>
                 </div>
               </div>
             </div>
@@ -240,7 +254,7 @@ export default function Cantera3ScoutDashboard() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {MOCK_PLAYERS.map((player) => (
-                <div key={player.id} className="group bg-[#121212] border border-white/5 rounded-2xl overflow-hidden hover:border-white/20 transition-all duration-300">
+                <div key={player.id} className="group bg-white dark:bg-charcoal border border-gray-200 dark:border-white/5 rounded-2xl overflow-hidden hover:border-gold/20 transition-all duration-300">
                   {/* Card Header / Image */}
                   <div className="relative h-48 overflow-hidden">
                     <img 
@@ -249,7 +263,7 @@ export default function Cantera3ScoutDashboard() {
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       referrerPolicy="no-referrer"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#121212] via-transparent to-transparent" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-white dark:from-charcoal via-transparent to-transparent" />
                     
                     {/* Badges */}
                     <div className="absolute top-3 left-3 flex flex-col gap-2">
@@ -330,51 +344,72 @@ export default function Cantera3ScoutDashboard() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {MOCK_OPPORTUNITIES.filter(opp => opp.creator.id === 'SCT-999').map(opp => (
-                <div key={opp.id} className="bg-[#121212] border border-white/5 rounded-2xl p-6 hover:border-[#D4AF37]/30 transition-all group">
-                  <div className="flex justify-between items-start mb-6">
-                    <div className="flex flex-col gap-2">
-                      <span className="w-fit bg-[#D4AF37]/10 text-[#D4AF37] text-[10px] font-bold px-2.5 py-1 rounded border border-[#D4AF37]/20 uppercase tracking-widest">
-                        {opp.type}
-                      </span>
-                      <h3 className="text-xl font-bold group-hover:text-[#D4AF37] transition-colors">{opp.title}</h3>
+              {MOCK_OPPORTUNITIES.map(opp => (
+                <div key={opp.id} className="bg-white dark:bg-charcoal border border-gray-200 dark:border-white/5 rounded-2xl p-6 hover:border-gold/30 transition-all group flex flex-col h-full">
+                  <div className="flex justify-between items-start mb-6 gap-4">
+                    <div className="flex items-center gap-4 min-w-0 flex-1">
+                      <div className="w-12 h-12 rounded-xl bg-black/5 dark:bg-white/5 flex items-center justify-center border border-gray-200 dark:border-white/5 text-gold font-bold text-sm shadow-inner overflow-hidden shrink-0">
+                        {opp.creator.logo ? (
+                          <img 
+                            src={opp.creator.logo} 
+                            alt={opp.creator.name} 
+                            className="w-full h-full object-cover" 
+                            referrerPolicy="no-referrer" 
+                          />
+                        ) : (
+                          opp.creator.name.substring(0, 2).toUpperCase()
+                        )}
+                      </div>
+                      <div className="flex flex-col gap-1 min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="w-fit bg-[#D4AF37]/10 text-[#D4AF37] text-[10px] font-bold px-2.5 py-1 rounded border border-[#D4AF37]/20 uppercase tracking-widest shrink-0">
+                            {opp.type}
+                          </span>
+                          {opp.creator.id === 'SCT-999' && (
+                            <span className="bg-emerald-500/10 text-emerald-500 text-[8px] font-bold px-1.5 py-0.5 rounded border border-emerald-500/20 uppercase tracking-tighter shrink-0">
+                              {t('s3.my_event')}
+                            </span>
+                          )}
+                        </div>
+                        <h3 className="text-lg font-bold group-hover:text-[#D4AF37] transition-colors line-clamp-2 leading-tight" title={opp.title}>{opp.title}</h3>
+                      </div>
                     </div>
-                    <div className="text-right">
+                    <div className="text-right shrink-0">
                       <p className="text-xs text-gray-500 font-mono">{opp.date}</p>
                       <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-tighter mt-1">{t('s3.active')}</p>
                     </div>
                   </div>
                   
-                  <p className="text-sm text-gray-400 mb-8 line-clamp-2 leading-relaxed">{opp.description}</p>
+                  <p className="text-sm text-charcoal/60 dark:text-gray-400 mb-8 line-clamp-2 leading-relaxed flex-1">{opp.description}</p>
                   
                   <div className="grid grid-cols-2 gap-4 mb-8">
-                    <div className="bg-white/5 p-3 rounded-xl border border-white/5">
+                    <div className="bg-black/5 dark:bg-white/5 p-3 rounded-xl border border-gray-200 dark:border-white/5">
                       <p className="text-[10px] text-gray-500 uppercase tracking-widest mb-1">{t('s3.applicants')}</p>
-                      <p className="text-lg font-bold text-white">{opp.applicants.length + 12}</p>
+                      <p className="text-lg font-bold text-charcoal dark:text-white">{opp.applicants.length + (opp.creator.id === 'SCT-999' ? 12 : 0)}</p>
                     </div>
-                    <div className="bg-white/5 p-3 rounded-xl border border-white/5">
+                    <div className="bg-black/5 dark:bg-white/5 p-3 rounded-xl border border-gray-200 dark:border-white/5">
                       <p className="text-[10px] text-gray-500 uppercase tracking-widest mb-1">{t('s3.views')}</p>
-                      <p className="text-lg font-bold text-white">1.2K</p>
+                      <p className="text-lg font-bold text-charcoal dark:text-white">{opp.creator.id === 'SCT-999' ? '1.2K' : '850'}</p>
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between pt-6 border-t border-white/5">
+                  <div className="flex items-center justify-between pt-6 border-t border-gray-200 dark:border-white/5">
                     <div className="flex items-center gap-2">
                       <div className="flex -space-x-2">
                         {[
-                          "https://images.unsplash.com/photo-1511886929837-354d827aae26?q=80&w=40&h=40&auto=format&fit=crop",
-                          "https://images.unsplash.com/photo-1579952363873-27f3bade9f55?q=80&w=40&h=40&auto=format&fit=crop",
-                          "https://images.unsplash.com/photo-1526232761682-d26e03ac148e?q=80&w=40&h=40&auto=format&fit=crop"
+                          "https://picsum.photos/seed/avatar1/40/40",
+                          "https://picsum.photos/seed/avatar2/40/40",
+                          "https://picsum.photos/seed/avatar3/40/40"
                         ].map((img, i) => (
-                          <div key={i} className="w-6 h-6 rounded-full border-2 border-[#121212] overflow-hidden">
+                          <div key={i} className="w-6 h-6 rounded-full border-2 border-white dark:border-charcoal overflow-hidden">
                             <img src={img} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                           </div>
                         ))}
                       </div>
-                      <span className="text-[10px] text-gray-500 font-medium">+{9} {t('s3.more')}</span>
+                      <span className="text-[10px] text-gray-500 font-medium">+{opp.creator.id === 'SCT-999' ? 9 : 4} {t('s3.more')}</span>
                     </div>
                     <button className="text-[#D4AF37] text-sm font-bold hover:underline flex items-center gap-1 group/btn">
-                      {t('s3.manage_applicants')} <ChevronRight size={16} className="group-hover/btn:translate-x-1 transition-transform" />
+                      {opp.creator.id === 'SCT-999' ? t('s3.manage_applicants') : t('s3.view_details')} <ChevronRight size={16} className="group-hover/btn:translate-x-1 transition-transform" />
                     </button>
                   </div>
                 </div>
@@ -446,7 +481,7 @@ export default function Cantera3ScoutDashboard() {
                     </span>
                   </div>
                   
-                  <div className="space-y-4 min-h-[500px] bg-[#121212]/50 rounded-2xl p-3 border border-white/5">
+                  <div className="space-y-4 min-h-[500px] bg-black/5 dark:bg-charcoal/50 rounded-2xl p-3 border border-gray-200 dark:border-white/5">
                     {MOCK_PLAYERS.filter(p => p.status === status).map((player) => (
                       <div key={player.id} className="bg-[#1A1A1A] border border-white/10 rounded-xl p-4 hover:border-[#D4AF37]/50 transition-colors cursor-grab active:cursor-grabbing">
                         <div className="flex items-start justify-between mb-3">
@@ -506,6 +541,23 @@ export default function Cantera3ScoutDashboard() {
   );
 }
 
+function NavBtn({ icon, label, active, onClick, disabled }: any) {
+  return (
+    <button 
+      onClick={onClick} 
+      disabled={disabled}
+      className={cn(
+        "flex flex-col items-center justify-center gap-0.5 px-3 py-1 rounded-full transition-all duration-300",
+        active ? "text-[#D4AF37] bg-gold/10 scale-110" : "text-charcoal/50 dark:text-gray-500 hover:text-charcoal dark:hover:text-gray-300",
+        disabled && "opacity-20 cursor-not-allowed"
+      )}
+    >
+      {React.cloneElement(icon, { size: 20 })}
+      <span className="text-[9px] font-bold uppercase tracking-tighter md:hidden">{label}</span>
+    </button>
+  );
+}
+
 function FilterModal({ isOpen, onClose, t }: { isOpen: boolean, onClose: () => void, t: (k: string) => string }) {
   if (!isOpen) return null;
 
@@ -524,10 +576,10 @@ function FilterModal({ isOpen, onClose, t }: { isOpen: boolean, onClose: () => v
           exit={{ x: '100%' }}
           transition={{ type: 'spring', damping: 25, stiffness: 200 }}
           onClick={(e) => e.stopPropagation()}
-          className="w-full max-w-sm h-full bg-[#121212] border-l border-white/10 flex flex-col"
+          className="w-full max-w-sm h-full bg-white dark:bg-charcoal border-l border-gray-200 dark:border-white/10 flex flex-col transition-colors duration-300"
         >
-          <div className="p-6 border-b border-white/10 flex justify-between items-center">
-            <h3 className="text-xl font-bold text-white">{t('s3.advanced_filters')}</h3>
+          <div className="p-6 border-b border-gray-200 dark:border-white/10 flex justify-between items-center">
+            <h3 className="text-xl font-bold text-charcoal dark:text-white">{t('s3.advanced_filters')}</h3>
             <button onClick={onClose} className="p-2 text-gray-500 hover:text-white transition-colors">
               <X size={20} />
             </button>
@@ -539,9 +591,9 @@ function FilterModal({ isOpen, onClose, t }: { isOpen: boolean, onClose: () => v
             <div className="space-y-3">
               <label className="text-xs text-gray-500 uppercase tracking-wider font-bold">{t('s3.filter.age')}</label>
               <div className="flex items-center gap-4">
-                <input type="number" placeholder="Min" className="w-full bg-[#1A1A1A] border border-white/10 rounded-lg py-2 px-3 text-sm focus:outline-none focus:border-[#D4AF37]/50" />
+                <input type="number" placeholder="Min" className="w-full bg-black/5 dark:bg-[#1A1A1A] border border-gray-200 dark:border-white/10 rounded-lg py-2 px-3 text-sm text-charcoal dark:text-white focus:outline-none focus:border-gold/50 transition-colors" />
                 <span className="text-gray-500">-</span>
-                <input type="number" placeholder="Max" className="w-full bg-[#1A1A1A] border border-white/10 rounded-lg py-2 px-3 text-sm focus:outline-none focus:border-[#D4AF37]/50" />
+                <input type="number" placeholder="Max" className="w-full bg-black/5 dark:bg-[#1A1A1A] border border-gray-200 dark:border-white/10 rounded-lg py-2 px-3 text-sm text-charcoal dark:text-white focus:outline-none focus:border-gold/50 transition-colors" />
               </div>
             </div>
 
@@ -550,7 +602,7 @@ function FilterModal({ isOpen, onClose, t }: { isOpen: boolean, onClose: () => v
               <label className="text-xs text-gray-500 uppercase tracking-wider font-bold">{t('s3.filter.position')}</label>
               <div className="flex flex-wrap gap-2">
                 {['GK', 'DEF', 'MID', 'FWD'].map(pos => (
-                  <button key={pos} className="px-4 py-2 rounded-lg border border-white/10 bg-[#1A1A1A] text-sm hover:border-[#D4AF37]/50 transition-colors">
+                  <button key={pos} className="px-4 py-2 rounded-lg border border-gray-200 dark:border-white/10 bg-black/5 dark:bg-[#1A1A1A] text-sm text-charcoal dark:text-white hover:border-gold/50 transition-colors">
                     {pos}
                   </button>
                 ))}
@@ -572,9 +624,9 @@ function FilterModal({ isOpen, onClose, t }: { isOpen: boolean, onClose: () => v
               <label className="text-xs text-gray-500 uppercase tracking-wider font-bold">{t('s3.filter.tier')}</label>
               <div className="space-y-2">
                 {['GOLD', 'DIAMOND', 'DIAMOND_PRO'].map(tier => (
-                  <label key={tier} className="flex items-center gap-3 p-3 rounded-lg border border-white/10 bg-[#1A1A1A] cursor-pointer hover:border-[#D4AF37]/30 transition-colors">
-                    <input type="checkbox" className="accent-[#D4AF37] w-4 h-4" />
-                    <span className="text-sm">{t(`tier.${tier.toLowerCase()}`)}</span>
+                  <label key={tier} className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 dark:border-white/10 bg-black/5 dark:bg-[#1A1A1A] cursor-pointer hover:border-gold/30 transition-colors">
+                    <input type="checkbox" className="accent-gold w-4 h-4" />
+                    <span className="text-sm text-charcoal dark:text-white">{t(`tier.${tier.toLowerCase()}`)}</span>
                   </label>
                 ))}
               </div>

@@ -152,7 +152,7 @@ export const MOCK_PLAYERS: Player[] = [
       tutorEmail: 'tutor.mateo@example.com',
       refereeTechnicalRating: 88,
       refereeFairPlayRating: 95,
-      detailedHeatmap: 'heatmap_data_001'
+      detailedHeatmap: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=800&auto=format&fit=crop'
     }
   },
   {
@@ -171,7 +171,7 @@ export const MOCK_PLAYERS: Player[] = [
       tutorEmail: 'tutor.lucas@example.com',
       refereeTechnicalRating: 75,
       refereeFairPlayRating: 80,
-      detailedHeatmap: 'heatmap_data_002'
+      detailedHeatmap: 'https://images.unsplash.com/photo-1517466787929-bc90951d0974?q=80&w=800&auto=format&fit=crop'
     }
   }
 ];
@@ -203,7 +203,7 @@ export const MOCK_OPPORTUNITIES: Opportunity[] = [
       name: 'Global Elite Scouting',
       role: 'SCOUT',
       isAuthorized: true,
-      logo: 'GES'
+      logo: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=100&auto=format&fit=crop'
     },
     description: 'Pruebas exclusivas para mediocampistas destacados. Camino directo a academias europeas.',
     location: 'Barcelona, España',
@@ -227,7 +227,7 @@ export const MOCK_OPPORTUNITIES: Opportunity[] = [
       name: 'Nike Football',
       role: 'BRAND',
       isAuthorized: true,
-      logo: 'NIKE'
+      logo: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?q=80&w=100&auto=format&fit=crop'
     },
     description: 'Demuestra tus habilidades frente a más de 50 ojeadores de todo el mundo.',
     location: 'Londres, Reino Unido',
@@ -249,7 +249,7 @@ export const MOCK_OPPORTUNITIES: Opportunity[] = [
       name: 'RMA Staff',
       role: 'STAFF',
       isAuthorized: true,
-      logo: 'RMA'
+      logo: 'https://images.unsplash.com/photo-1522778119026-d647f0596c20?q=80&w=100&auto=format&fit=crop'
     },
     description: 'Día oficial de ojeo para el sistema juvenil del Real Madrid.',
     location: 'Madrid, España',
