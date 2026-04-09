@@ -6,7 +6,7 @@ import {
 import { 
   Home, LayoutDashboard, Plus, Globe, User, Heart, MessageCircle, Share2, 
   Camera, Video, X, ShieldCheck, MapPin, Calendar, Activity, Award, 
-  ChevronRight, TrendingUp, FileText, Edit3, Trophy, CheckCircle2, Play, Image as ImageIcon, Shield, Settings, Briefcase, Map, Filter as FilterIcon, Clock
+  ChevronRight, TrendingUp, FileText, Edit3, Trophy, CheckCircle2, Play, Image as ImageIcon, Shield, Settings, Briefcase, Map, Filter as FilterIcon, Clock, Bell
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -167,16 +167,11 @@ export default function Cantera2PlayerDashboard() {
   const [isTourActive, setIsTourActive] = useState(false);
   const [tourStepIndex, setTourStepIndex] = useState(0);
 
-  useEffect(() => {
-    const hasCompletedTour = localStorage.getItem('cantera_tour_completed');
-    if (!hasCompletedTour) {
-      // Start tour after a short delay
-      setTimeout(() => {
-        setIsTourActive(true);
-        setActiveTab('dashboard');
-      }, 500);
-    }
-  }, []);
+  const startTour = () => {
+    setIsTourActive(true);
+    setTourStepIndex(0);
+    setActiveTab('dashboard');
+  };
 
   const handleTourNext = () => {
     const nextStep = tourStepIndex + 1;
@@ -221,13 +216,20 @@ export default function Cantera2PlayerDashboard() {
           <button id="tour-guardian" className="flex items-center gap-1 text-charcoal/60 dark:text-ice/60 hover:text-gold transition-colors bg-black/5 dark:bg-white/5 px-2 py-1 rounded-lg border border-border-subtle">
             <Shield size={16} /> <span className="text-xs font-medium">{t('profile.guardian')}</span>
           </button>
+          <button onClick={startTour} className="text-charcoal/60 dark:text-ice/60 hover:text-gold transition-colors" aria-label="Start Tour">
+            <div className="p-1.5 rounded-md bg-black/5 dark:bg-white/5 border border-border-subtle flex items-center justify-center">
+              <span className="text-xs font-bold">?</span>
+            </div>
+          </button>
           <button className="text-charcoal/60 dark:text-ice/60 hover:text-gold transition-colors" aria-label="My QR Code">
             <div className="p-1.5 rounded-md bg-black/5 dark:bg-white/5 border border-border-subtle">
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="5" height="5" x="3" y="3" rx="1"/><rect width="5" height="5" x="16" y="3" rx="1"/><rect width="5" height="5" x="3" y="16" rx="1"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/><path d="M21 21v.01"/><path d="M12 7v3a2 2 0 0 1-2 2H7"/><path d="M3 12h.01"/><path d="M12 3h.01"/><path d="M12 16v.01"/><path d="M16 12h1"/><path d="M21 12v.01"/><path d="M12 21v-1"/></svg>
             </div>
           </button>
-          <button className="text-charcoal/60 dark:text-ice/60 hover:text-gold transition-colors"><Activity size={20} /></button>
-          <button className="text-charcoal/60 dark:text-ice/60 hover:text-gold transition-colors"><MessageCircle size={20} /></button>
+          <button className="relative text-charcoal/60 dark:text-ice/60 hover:text-gold transition-colors">
+            <Bell size={20} />
+            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-charcoal"></span>
+          </button>
           <button onClick={() => navigate('/settings')} className="text-charcoal/60 dark:text-ice/60 hover:text-gold transition-colors"><Settings size={20} /></button>
         </div>
       </div>
@@ -311,6 +313,12 @@ function NavButton({ icon, label, isActive, onClick }: { icon: React.ReactNode, 
 // --- Screen 1: Social Feed ---
 function ScreenFeed() {
   const { t } = useLanguage();
+  const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({});
+
+  const toggleLike = (id: string) => {
+    setLikedPosts(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
   return (
     <div className="space-y-6 p-4">
       {mockPlayer.feed.map((post) => (
@@ -359,8 +367,12 @@ function ScreenFeed() {
           {/* Post Actions */}
           <div className="p-4 flex items-center justify-between border-t border-border-subtle/50">
             <div className="flex items-center gap-6">
-              <button className="flex items-center gap-2 text-charcoal/60 dark:text-ice/60 hover:text-red-400 transition-colors">
-                <Heart size={20} /> <span className="text-sm font-medium">{post.likes}</span>
+              <button 
+                onClick={() => toggleLike(post.id)}
+                className={cn("flex items-center gap-2 transition-colors", likedPosts[post.id] ? "text-red-500" : "text-charcoal/60 dark:text-ice/60 hover:text-red-400")}
+              >
+                <Heart size={20} fill={likedPosts[post.id] ? "currentColor" : "none"} /> 
+                <span className="text-sm font-medium">{post.likes + (likedPosts[post.id] ? 1 : 0)}</span>
               </button>
               <button className="flex items-center gap-2 text-charcoal/60 dark:text-ice/60 hover:text-charcoal dark:hover:text-ice transition-colors">
                 <MessageCircle size={20} /> <span className="text-sm font-medium">{post.comments}</span>
@@ -517,9 +529,9 @@ function ScreenOpportunities({ t }: { t: (k: string) => string }) {
         </div>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-6">
         {filteredOpportunities.map((opp) => (
-          <div key={opp.id} className="glass-panel p-5 border border-border-subtle hover:border-gold/30 transition-all group relative overflow-hidden">
+          <div key={opp.id} className="glass-panel p-6 rounded-2xl border border-border-subtle hover:border-gold/30 transition-all group relative overflow-hidden">
             {/* Background Accent */}
             <div className="absolute top-0 right-0 w-24 h-24 bg-gold/5 blur-3xl -mr-12 -mt-12 group-hover:bg-gold/10 transition-colors" />
             

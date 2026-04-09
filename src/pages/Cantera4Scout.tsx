@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   Search, Lock, Unlock, TrendingUp, Mail, Filter, 
-  ShieldCheck, Activity, MapPin, ChevronRight, Eye, Star, CheckCircle, Settings
+  ShieldCheck, Activity, MapPin, ChevronRight, Eye, Star, CheckCircle, Settings, Bell
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -38,6 +38,10 @@ export default function Cantera4Scout() {
           <div className="w-8 h-8 rounded-full bg-black/5 dark:bg-[#2A2A2A] flex items-center justify-center border border-[#D4AF37] transition-colors">
             <span className="text-xs font-bold text-[#D4AF37]">PRO</span>
           </div>
+          <button className="relative text-charcoal/40 dark:text-gray-400 hover:text-charcoal dark:hover:text-white transition-colors">
+            <Bell size={20} />
+            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-charcoal"></span>
+          </button>
           <button onClick={() => navigate('/settings')} className="text-charcoal/40 dark:text-gray-400 hover:text-charcoal dark:hover:text-white transition-colors">
             <Settings size={20} />
           </button>

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Calendar, Clock, Play, Square, AlertTriangle, FileSignature, 
   CheckCircle, ShieldCheck, Activity, ChevronRight, User, Settings,
-  Award, BarChart3, Globe, Shield, MapPin, Search, Star, Trophy
+  Award, BarChart3, Globe, Shield, MapPin, Search, Star, Trophy, Bell
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -20,8 +20,31 @@ export default function Cantera3Referee() {
   const [events, setEvents] = useState<MatchEvent[]>([]);
   const [timer, setTimer] = useState(0);
   const [isAvailable, setIsAvailable] = useState(true);
+  const [selectedMatchPlayer, setSelectedMatchPlayer] = useState<{id: string, name: string, number: number, team: string} | null>(null);
+  const [playerRatings, setPlayerRatings] = useState<Record<string, number>>({});
   const navigate = useNavigate();
   const { t } = useLanguage();
+
+  const MATCH_PLAYERS = {
+    home: {
+      name: 'Real Madrid U19',
+      color: 'bg-white text-charcoal border-gray-200',
+      players: [
+        { id: 'PLY-001', name: 'Mateo Silva', number: 10, position: 'CM' },
+        { id: 'PLY-002', name: 'Carlos Ruiz', number: 7, position: 'RW' },
+        { id: 'PLY-003', name: 'Hugo Sanchez', number: 9, position: 'ST' },
+      ]
+    },
+    away: {
+      name: 'FC Barcelona U19',
+      color: 'bg-[#004D98] text-white border-[#A50044]',
+      players: [
+        { id: 'PLY-004', name: 'Pedri Gonzalez', number: 8, position: 'CM' },
+        { id: 'PLY-005', name: 'Ansu Fati', number: 10, position: 'LW' },
+        { id: 'PLY-006', name: 'Ronald Araujo', number: 4, position: 'CB' },
+      ]
+    }
+  };
 
   // Timer logic for Live Console
   useEffect(() => {
@@ -39,12 +62,13 @@ export default function Cantera3Referee() {
   };
 
   const handleAddEvent = (type: MatchEvent['type']) => {
+    if (!selectedMatchPlayer) return;
     const newEvent: MatchEvent = {
       id: Math.random().toString(),
       type,
       time: formatTime(timer),
-      playerId: 'PLY-001',
-      playerName: 'Mateo Silva' // Mocked for speed
+      playerId: selectedMatchPlayer.id,
+      playerName: selectedMatchPlayer.name
     };
     setEvents([newEvent, ...events]);
   };
@@ -65,6 +89,10 @@ export default function Cantera3Referee() {
             <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
             <span className="text-[#A1C4FD] hidden md:inline">{t('ref.system_online')}</span>
           </div>
+          <button className="relative text-charcoal/40 dark:text-gray-400 hover:text-charcoal dark:hover:text-white transition-colors">
+            <Bell size={20} />
+            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-charcoal"></span>
+          </button>
           <button onClick={() => navigate('/settings')} className="text-charcoal/40 dark:text-gray-400 hover:text-charcoal dark:hover:text-white transition-colors">
             <Settings size={20} />
           </button>
@@ -160,25 +188,108 @@ export default function Cantera3Referee() {
                 </div>
               </div>
 
-              {/* Action Grid (High Contrast) */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <button onClick={() => handleAddEvent('GOAL')} className="h-24 rounded-xl border border-border-subtle dark:border-[#2A2A2A] bg-black/5 dark:bg-white/[0.02] hover:bg-black/10 dark:hover:bg-white/[0.05] flex flex-col items-center justify-center gap-2 transition-colors text-charcoal dark:text-white">
-                  <div className="w-8 h-8 rounded-full bg-charcoal dark:bg-white text-white dark:text-black flex items-center justify-center font-bold">G</div>
-                  <span className="text-sm font-medium">{t('ref.goal')}</span>
-                </button>
-                <button onClick={() => handleAddEvent('YELLOW_CARD')} className="h-24 rounded-xl border border-border-subtle dark:border-[#2A2A2A] bg-black/5 dark:bg-white/[0.02] hover:bg-[#eab308]/10 flex flex-col items-center justify-center gap-2 transition-colors text-charcoal dark:text-white">
-                  <div className="w-6 h-8 bg-[#eab308] rounded-sm" />
-                  <span className="text-sm font-medium">{t('ref.yellow_card')}</span>
-                </button>
-                <button onClick={() => handleAddEvent('RED_CARD')} className="h-24 rounded-xl border border-border-subtle dark:border-[#2A2A2A] bg-black/5 dark:bg-white/[0.02] hover:bg-red-500/10 flex flex-col items-center justify-center gap-2 transition-colors text-charcoal dark:text-white">
-                  <div className="w-6 h-8 bg-red-500 rounded-sm" />
-                  <span className="text-sm font-medium">{t('ref.red_card')}</span>
-                </button>
-                <button onClick={() => handleAddEvent('SUBSTITUTION')} className="h-24 rounded-xl border border-border-subtle dark:border-[#2A2A2A] bg-black/5 dark:bg-white/[0.02] hover:bg-black/10 dark:hover:bg-white/[0.05] flex flex-col items-center justify-center gap-2 transition-colors text-charcoal dark:text-white">
-                  <Activity size={24} className="text-[#A1C4FD]" />
-                  <span className="text-sm font-medium">{t('ref.substitution')}</span>
-                </button>
+              {/* Match Teams & Players */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Home Team */}
+                <div className="space-y-3">
+                  <div className={cn("p-3 rounded-xl border font-bold text-center", MATCH_PLAYERS.home.color)}>
+                    {MATCH_PLAYERS.home.name}
+                  </div>
+                  {MATCH_PLAYERS.home.players.map(p => (
+                    <button 
+                      key={p.id}
+                      onClick={() => setSelectedMatchPlayer({...p, team: MATCH_PLAYERS.home.name})}
+                      className={cn(
+                        "w-full p-3 rounded-xl border flex items-center justify-between transition-all",
+                        selectedMatchPlayer?.id === p.id 
+                          ? "border-[#A1C4FD] bg-[#A1C4FD]/10" 
+                          : "border-border-subtle dark:border-[#2A2A2A] bg-black/5 dark:bg-white/[0.02] hover:bg-black/10 dark:hover:bg-white/[0.05]"
+                      )}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="w-8 h-8 rounded-full bg-charcoal dark:bg-white text-white dark:text-black flex items-center justify-center font-bold text-xs">{p.number}</span>
+                        <span className="font-medium text-charcoal dark:text-white">{p.name}</span>
+                      </div>
+                      <span className="text-xs text-charcoal/50 dark:text-gray-500 font-mono">{p.position}</span>
+                    </button>
+                  ))}
+                </div>
+                {/* Away Team */}
+                <div className="space-y-3">
+                  <div className={cn("p-3 rounded-xl border font-bold text-center", MATCH_PLAYERS.away.color)}>
+                    {MATCH_PLAYERS.away.name}
+                  </div>
+                  {MATCH_PLAYERS.away.players.map(p => (
+                    <button 
+                      key={p.id}
+                      onClick={() => setSelectedMatchPlayer({...p, team: MATCH_PLAYERS.away.name})}
+                      className={cn(
+                        "w-full p-3 rounded-xl border flex items-center justify-between transition-all",
+                        selectedMatchPlayer?.id === p.id 
+                          ? "border-[#A1C4FD] bg-[#A1C4FD]/10" 
+                          : "border-border-subtle dark:border-[#2A2A2A] bg-black/5 dark:bg-white/[0.02] hover:bg-black/10 dark:hover:bg-white/[0.05]"
+                      )}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="w-8 h-8 rounded-full bg-charcoal dark:bg-white text-white dark:text-black flex items-center justify-center font-bold text-xs">{p.number}</span>
+                        <span className="font-medium text-charcoal dark:text-white">{p.name}</span>
+                      </div>
+                      <span className="text-xs text-charcoal/50 dark:text-gray-500 font-mono">{p.position}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
+
+              {/* Action Panel (Only visible if a player is selected) */}
+              {selectedMatchPlayer ? (
+                <div className="p-6 rounded-2xl border border-[#A1C4FD]/30 bg-[#A1C4FD]/5 space-y-6">
+                  <div className="flex justify-between items-center border-b border-[#A1C4FD]/20 pb-4">
+                    <div>
+                      <h3 className="text-xl font-bold text-charcoal dark:text-white flex items-center gap-2">
+                        <span className="bg-charcoal dark:bg-white text-white dark:text-black px-2 py-0.5 rounded text-sm">#{selectedMatchPlayer.number}</span>
+                        {selectedMatchPlayer.name}
+                      </h3>
+                      <p className="text-xs text-charcoal/50 dark:text-gray-400 mt-1">{selectedMatchPlayer.team}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-charcoal/50 dark:text-gray-400 uppercase tracking-widest mb-1">Live Rating</p>
+                      <div className="flex items-center gap-2">
+                        <input 
+                          type="range" 
+                          min="1" max="10" 
+                          value={playerRatings[selectedMatchPlayer.id] || 5}
+                          onChange={(e) => setPlayerRatings({...playerRatings, [selectedMatchPlayer.id]: parseInt(e.target.value)})}
+                          className="w-24 accent-[#A1C4FD]"
+                        />
+                        <span className="font-mono font-bold text-[#A1C4FD] text-lg w-6 text-center">{playerRatings[selectedMatchPlayer.id] || 5}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <button onClick={() => handleAddEvent('GOAL')} className="h-20 rounded-xl border border-border-subtle dark:border-[#2A2A2A] bg-white dark:bg-charcoal hover:bg-black/5 dark:hover:bg-white/5 flex flex-col items-center justify-center gap-1 transition-colors text-charcoal dark:text-white">
+                      <div className="w-6 h-6 rounded-full bg-charcoal dark:bg-white text-white dark:text-black flex items-center justify-center font-bold text-xs">G</div>
+                      <span className="text-xs font-medium">{t('ref.goal')}</span>
+                    </button>
+                    <button onClick={() => handleAddEvent('YELLOW_CARD')} className="h-20 rounded-xl border border-[#eab308]/30 bg-[#eab308]/10 hover:bg-[#eab308]/20 flex flex-col items-center justify-center gap-1 transition-colors text-charcoal dark:text-white">
+                      <div className="w-4 h-6 bg-[#eab308] rounded-sm" />
+                      <span className="text-xs font-medium">{t('ref.yellow_card')}</span>
+                    </button>
+                    <button onClick={() => handleAddEvent('RED_CARD')} className="h-20 rounded-xl border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 flex flex-col items-center justify-center gap-1 transition-colors text-charcoal dark:text-white">
+                      <div className="w-4 h-6 bg-red-500 rounded-sm" />
+                      <span className="text-xs font-medium">{t('ref.red_card')}</span>
+                    </button>
+                    <button onClick={() => handleAddEvent('SUBSTITUTION')} className="h-20 rounded-xl border border-border-subtle dark:border-[#2A2A2A] bg-white dark:bg-charcoal hover:bg-black/5 dark:hover:bg-white/5 flex flex-col items-center justify-center gap-1 transition-colors text-charcoal dark:text-white">
+                      <Activity size={20} className="text-[#A1C4FD]" />
+                      <span className="text-xs font-medium">{t('ref.substitution')}</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-8 rounded-2xl border border-dashed border-border-subtle dark:border-[#2A2A2A] text-center text-charcoal/40 dark:text-gray-500">
+                  Select a player above to evaluate or add events.
+                </div>
+              )}
 
               {/* Event Log */}
               <div className="p-6 rounded-xl border border-border-subtle dark:border-[#2A2A2A] bg-black/[0.01] dark:bg-white/[0.01] min-h-[200px] transition-colors">

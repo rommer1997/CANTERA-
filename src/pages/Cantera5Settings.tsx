@@ -139,6 +139,15 @@ export default function Cantera5Settings() {
                     className="w-full bg-black/[0.02] dark:bg-white/[0.02] border border-gray-200 dark:border-[#2A2A2A] rounded-xl p-3 text-charcoal dark:text-white focus:outline-none focus:border-[#D4AF37] transition-colors resize-none"
                   />
                 </div>
+
+                {userData.role === 'PLAYER' && (
+                  <div className="pt-4 space-y-4">
+                    <h3 className="text-sm font-bold text-charcoal dark:text-white">Social & Media</h3>
+                    <InputField label="Instagram Username" defaultValue="@mateosilva10" />
+                    <InputField label="X (Twitter) Username" defaultValue="@msilva_10" />
+                    <InputField label="Highlight Video URL (YouTube/Vimeo)" defaultValue="https://youtube.com/watch?v=..." />
+                  </div>
+                )}
               </div>
 
               <button className="w-full py-4 bg-[#D4AF37] text-black font-bold rounded-xl hover:bg-[#b5952f] transition-colors mt-8">

@@ -95,24 +95,24 @@ export default function Cantera1IdentityHub() {
       <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-ice/5 rounded-full blur-[120px] pointer-events-none" />
 
       {/* Language & Theme Toggles */}
-      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 md:left-auto md:right-6 md:translate-x-0 z-50 flex items-center gap-3">
+      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 md:left-auto md:right-6 md:translate-x-0 z-50 flex items-center gap-4">
         <button 
           onClick={toggleTheme}
-          className="p-2 rounded-full bg-black/5 dark:bg-white/5 text-charcoal/50 dark:text-ice/50 hover:text-gold transition-colors border border-transparent hover:border-gold/20"
+          className="p-3 rounded-full bg-black/5 dark:bg-white/5 text-charcoal/70 dark:text-ice/70 hover:text-gold transition-colors border border-transparent hover:border-gold/20"
         >
-          {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+          {theme === 'dark' ? <Sun size={24} /> : <Moon size={24} />}
         </button>
 
-        <div className="glass-panel p-1 flex items-center rounded-full">
+        <div className="glass-panel p-1.5 flex items-center rounded-full">
           <button 
             onClick={() => setLanguage('es')}
-            className={cn("px-3 py-1 rounded-full text-xs font-medium transition-colors", language === 'es' ? "bg-black/10 dark:bg-white/10 text-gold" : "text-charcoal/50 dark:text-ice/50 hover:text-charcoal dark:hover:text-ice")}
+            className={cn("px-4 py-2 rounded-full text-sm font-bold transition-colors", language === 'es' ? "bg-black/10 dark:bg-white/10 text-gold" : "text-charcoal/70 dark:text-ice/70 hover:text-charcoal dark:hover:text-ice")}
           >
             ES
           </button>
           <button 
             onClick={() => setLanguage('en')}
-            className={cn("px-3 py-1 rounded-full text-xs font-medium transition-colors", language === 'en' ? "bg-black/10 dark:bg-white/10 text-gold" : "text-charcoal/50 dark:text-ice/50 hover:text-charcoal dark:hover:text-ice")}
+            className={cn("px-4 py-2 rounded-full text-sm font-bold transition-colors", language === 'en' ? "bg-black/10 dark:bg-white/10 text-gold" : "text-charcoal/70 dark:text-ice/70 hover:text-charcoal dark:hover:text-ice")}
           >
             EN
           </button>
