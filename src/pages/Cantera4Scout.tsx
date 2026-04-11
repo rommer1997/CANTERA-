@@ -143,7 +143,7 @@ export default function Cantera4Scout() {
               <button onClick={() => setSelectedPlayer(null)} className="text-charcoal/40 dark:text-gray-500 hover:text-charcoal dark:hover:text-white mb-6 flex items-center gap-2 text-sm transition-colors">
                 <ChevronRight className="rotate-180" size={16} /> {t('scout.back')}
               </button>
-              <PlayerDeepDive player={selectedPlayer} />
+              <PlayerDeepDive player={selectedPlayer} onContact={handleContactTutor} />
             </motion.div>
           )}
 
@@ -178,6 +178,7 @@ export default function Cantera4Scout() {
           <NavBtn icon={<Mail />} label={t('nav.inbox')} active={activeTab === 'contact'} onClick={() => setActiveTab('contact')} />
         </div>
       </div>
+      <NotificationCenter isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} />
     </div>
   );
 }
@@ -254,7 +255,7 @@ function PlayerSnippet({ player, onClick }: { player: Player, onClick: () => voi
   );
 }
 
-function PlayerDeepDive({ player }: { player: Player }) {
+function PlayerDeepDive({ player, onContact }: { player: Player, onContact: () => void }) {
   const hasAccess = checkDataAccess(MOCK_SCOUT, player.id);
   const [isUnlocking, setIsUnlocking] = useState(false);
   const { t } = useLanguage();
@@ -320,7 +321,7 @@ function PlayerDeepDive({ player }: { player: Player }) {
           <p className="text-gray-400 font-mono">{player.position} • {player.team} • {player.age} {t('cv.age').toLowerCase()}</p>
         </div>
         <button 
-          onClick={handleContactTutor}
+          onClick={onContact}
           className="px-6 py-3 bg-[#A1C4FD]/10 text-[#A1C4FD] border border-[#A1C4FD]/30 rounded-xl font-bold hover:bg-[#A1C4FD]/20 transition-colors flex items-center gap-2"
         >
           <Mail size={18} /> {t('scout.contact_tutor')}
@@ -414,7 +415,6 @@ function PlayerDeepDive({ player }: { player: Player }) {
           </div>
         </div>
       </div>
-      <NotificationCenter isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} />
     </div>
   );
 }

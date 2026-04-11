@@ -68,8 +68,8 @@ export default function Cantera1IdentityHub() {
       
       switch (role) {
         case 'PLAYER': navigate('/player/PLY-8472'); break;
-        case 'SCOUT': navigate('/scout'); break;
-        case 'REFEREE': navigate('/referee'); break;
+        case 'SCOUT': navigate('/c4'); break;
+        case 'REFEREE': navigate('/c3'); break;
         case 'GUARDIAN': navigate('/guardian'); break;
         default: navigate('/');
       }

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Cantera1IdentityHub from './pages/Cantera1IdentityHub';
 import Cantera2PlayerDashboard from './pages/Cantera2PlayerDashboard';
 import Cantera3Referee from './pages/Cantera3Referee';
@@ -21,7 +21,7 @@ export default function App() {
     <ThemeProvider>
       <ThemeWrapper>
         <LanguageProvider>
-          <BrowserRouter>
+          <HashRouter>
             <Routes>
               <Route path="/" element={<Cantera1IdentityHub />} />
               <Route path="/player/:id" element={<Cantera2PlayerDashboard />} />
@@ -30,8 +30,10 @@ export default function App() {
               <Route path="/c4-paywall" element={<Cantera4Scout />} />
               <Route path="/guardian" element={<Cantera4GuardianDashboard />} />
               <Route path="/settings" element={<Cantera5Settings />} />
+              {/* Catch-all route to redirect to home */}
+              <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
-          </BrowserRouter>
+          </HashRouter>
         </LanguageProvider>
       </ThemeWrapper>
     </ThemeProvider>
