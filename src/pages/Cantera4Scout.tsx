@@ -13,14 +13,42 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../core/i18n/LanguageContext';
 import Logo from '../components/Logo';
+import NotificationCenter from '../components/NotificationCenter';
+import { useAppStore } from '../store/useAppStore';
 
 type ScoutTab = 'hub' | 'pipeline' | 'contact';
 
 export default function Cantera4Scout() {
   const [activeTab, setActiveTab] = useState<ScoutTab>('hub');
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [activeFilter, setActiveFilter] = useState('All Players');
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const { notifications, addNotification } = useAppStore();
+  const unreadCount = notifications.filter(n => !n.read).length;
   const navigate = useNavigate();
   const { t } = useLanguage();
+
+  const handleContactTutor = () => {
+    if (!selectedPlayer) return;
+    addNotification({
+      title: 'Solicitud enviada',
+      message: `Has solicitado contactar al tutor de ${selectedPlayer.name}.`,
+      type: 'info'
+    });
+    alert(`Solicitud de contacto enviada al tutor de ${selectedPlayer.name}. En una versión real, esto llegaría al panel del tutor instantáneamente.`);
+  };
+
+  const filteredPlayers = MOCK_PLAYERS.filter(player => {
+    const matchesSearch = player.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesFilter = activeFilter === 'All Players' || 
+                         (activeFilter === 'Verified Only' && player.isValidated) ||
+                         (activeFilter === 'U19' && player.age <= 19) ||
+                         (activeFilter === 'U16' && player.age <= 16) ||
+                         (activeFilter === 'Midfielders' && player.position.includes('Midfielder')) ||
+                         (activeFilter === 'Forwards' && (player.position.includes('Forward') || player.position.includes('ST') || player.position.includes('LW') || player.position.includes('RW')));
+    return matchesSearch && matchesFilter;
+  });
 
   return (
     <div className="min-h-screen bg-white dark:bg-charcoal text-charcoal dark:text-white font-sans selection:bg-gold/30 pb-32 transition-colors duration-300">
@@ -38,9 +66,16 @@ export default function Cantera4Scout() {
           <div className="w-8 h-8 rounded-full bg-black/5 dark:bg-[#2A2A2A] flex items-center justify-center border border-[#D4AF37] transition-colors">
             <span className="text-xs font-bold text-[#D4AF37]">PRO</span>
           </div>
-          <button className="relative text-charcoal/40 dark:text-gray-400 hover:text-charcoal dark:hover:text-white transition-colors">
+          <button 
+            onClick={() => setIsNotificationsOpen(true)}
+            className="relative text-charcoal/40 dark:text-gray-400 hover:text-charcoal dark:hover:text-white transition-colors"
+          >
             <Bell size={20} />
-            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-charcoal"></span>
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[8px] font-black rounded-full border-2 border-white dark:border-charcoal flex items-center justify-center">
+                {unreadCount}
+              </span>
+            )}
           </button>
           <button onClick={() => navigate('/settings')} className="text-charcoal/40 dark:text-gray-400 hover:text-charcoal dark:hover:text-white transition-colors">
             <Settings size={20} />
@@ -58,6 +93,8 @@ export default function Cantera4Scout() {
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-charcoal/40 dark:text-gray-500 transition-colors" size={20} />
                   <input 
                     type="text" 
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
                     placeholder={t('scout.search_placeholder')} 
                     className="w-full bg-black/5 dark:bg-white/[0.02] border border-border-subtle dark:border-[#2A2A2A] rounded-xl py-4 pl-12 pr-4 text-charcoal dark:text-white focus:outline-none focus:border-[#A1C4FD] transition-colors"
                   />
@@ -68,20 +105,35 @@ export default function Cantera4Scout() {
                 
                 {/* Quick Filter Chips */}
                 <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                  <button className="px-4 py-1.5 rounded-full bg-[#A1C4FD] text-charcoal font-bold text-xs whitespace-nowrap">All Players</button>
-                  <button className="px-4 py-1.5 rounded-full bg-black/5 dark:bg-white/5 border border-border-subtle hover:border-[#A1C4FD]/50 text-charcoal dark:text-white text-xs font-medium whitespace-nowrap transition-colors">U19</button>
-                  <button className="px-4 py-1.5 rounded-full bg-black/5 dark:bg-white/5 border border-border-subtle hover:border-[#A1C4FD]/50 text-charcoal dark:text-white text-xs font-medium whitespace-nowrap transition-colors">U16</button>
-                  <button className="px-4 py-1.5 rounded-full bg-black/5 dark:bg-white/5 border border-border-subtle hover:border-[#A1C4FD]/50 text-charcoal dark:text-white text-xs font-medium whitespace-nowrap transition-colors">Midfielders</button>
-                  <button className="px-4 py-1.5 rounded-full bg-black/5 dark:bg-white/5 border border-border-subtle hover:border-[#A1C4FD]/50 text-charcoal dark:text-white text-xs font-medium whitespace-nowrap transition-colors">Forwards</button>
-                  <button className="px-4 py-1.5 rounded-full bg-black/5 dark:bg-white/5 border border-border-subtle hover:border-[#A1C4FD]/50 text-charcoal dark:text-white text-xs font-medium whitespace-nowrap transition-colors flex items-center gap-1"><Star size={12} className="text-gold" /> Verified Only</button>
+                  {['All Players', 'U19', 'U16', 'Midfielders', 'Forwards', 'Verified Only'].map(filter => (
+                    <button 
+                      key={filter}
+                      onClick={() => setActiveFilter(filter)}
+                      className={cn(
+                        "px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex items-center gap-1",
+                        activeFilter === filter 
+                          ? "bg-[#A1C4FD] text-charcoal font-bold" 
+                          : "bg-black/5 dark:bg-white/5 border border-border-subtle hover:border-[#A1C4FD]/50 text-charcoal dark:text-white"
+                      )}
+                    >
+                      {filter === 'Verified Only' && <Star size={12} className={activeFilter === filter ? "text-charcoal" : "text-gold"} />}
+                      {filter}
+                    </button>
+                  ))}
                 </div>
               </div>
 
               {/* Feed */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {MOCK_PLAYERS.map(player => (
-                  <PlayerSnippet key={player.id} player={player} onClick={() => setSelectedPlayer(player)} />
-                ))}
+                {filteredPlayers.length > 0 ? (
+                  filteredPlayers.map(player => (
+                    <PlayerSnippet key={player.id} player={player} onClick={() => setSelectedPlayer(player)} />
+                  ))
+                ) : (
+                  <div className="col-span-full py-12 text-center text-charcoal/40 dark:text-gray-500">
+                    No players found matching your criteria.
+                  </div>
+                )}
               </div>
             </motion.div>
           )}
@@ -267,7 +319,10 @@ function PlayerDeepDive({ player }: { player: Player }) {
           </div>
           <p className="text-gray-400 font-mono">{player.position} • {player.team} • {player.age} {t('cv.age').toLowerCase()}</p>
         </div>
-        <button className="px-6 py-3 bg-[#A1C4FD]/10 text-[#A1C4FD] border border-[#A1C4FD]/30 rounded-xl font-bold hover:bg-[#A1C4FD]/20 transition-colors flex items-center gap-2">
+        <button 
+          onClick={handleContactTutor}
+          className="px-6 py-3 bg-[#A1C4FD]/10 text-[#A1C4FD] border border-[#A1C4FD]/30 rounded-xl font-bold hover:bg-[#A1C4FD]/20 transition-colors flex items-center gap-2"
+        >
           <Mail size={18} /> {t('scout.contact_tutor')}
         </button>
       </div>
@@ -359,6 +414,7 @@ function PlayerDeepDive({ player }: { player: Player }) {
           </div>
         </div>
       </div>
+      <NotificationCenter isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} />
     </div>
   );
 }

@@ -10,6 +10,8 @@ import { cn } from '../lib/utils';
 import { useLanguage } from '../core/i18n/LanguageContext';
 import Logo from '../components/Logo';
 import BackButton from '../components/BackButton';
+import NotificationCenter from '../components/NotificationCenter';
+import { useAppStore } from '../store/useAppStore';
 
 type GuardianTab = 'oversight' | 'messages' | 'approvals';
 
@@ -19,13 +21,44 @@ export default function Cantera4GuardianDashboard() {
   const { t } = useLanguage();
 
   const children = [
-    { id: 'PLY-8472', name: 'Mateo Silva', age: 18, position: 'CM', team: 'Real Madrid Academy', status: 'Active', image: 'https://picsum.photos/seed/player1/100/100' }
+    { id: 'PLY-8472', name: 'Mateo Silva', age: 18, position: 'CM', team: 'Real Madrid Academy', status: 'Active', image: 'https://picsum.photos/seed/player1/100/100' },
+    { id: 'PLY-9921', name: 'Sofia Silva', age: 16, position: 'FW', team: 'Atletico Madrid Femenino', status: 'Active', image: 'https://picsum.photos/seed/player2/100/100' }
   ];
 
   const approvals = [
     { id: 1, scout: 'Scout Arsenal F.C.', player: 'Mateo Silva', type: 'Direct Contact', date: '2 hours ago', status: 'pending' },
-    { id: 2, scout: 'Scout Manchester City', player: 'Mateo Silva', type: 'Data Access', date: '1 day ago', status: 'approved' }
+    { id: 2, scout: 'Scout Manchester City', player: 'Mateo Silva', type: 'Data Access', date: '1 day ago', status: 'approved' },
+    { id: 3, scout: 'Scout Lyon Féminin', player: 'Sofia Silva', type: 'Trial Invitation', date: '3 hours ago', status: 'pending' }
   ];
+
+  const [approvalsList, setApprovalsList] = useState(approvals);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const { notifications, addNotification } = useAppStore();
+  const unreadCount = notifications.filter(n => !n.read).length;
+
+  const handleApprove = (id: number) => {
+    const approval = approvalsList.find(a => a.id === id);
+    setApprovalsList(prev => prev.map(a => a.id === id ? { ...a, status: 'approved' } : a));
+    if (approval) {
+      addNotification({
+        title: 'Solicitud Aprobada',
+        message: `Has aprobado la solicitud de ${approval.scout} para ${approval.player}.`,
+        type: 'success'
+      });
+    }
+  };
+
+  const handleDecline = (id: number) => {
+    const approval = approvalsList.find(a => a.id === id);
+    setApprovalsList(prev => prev.map(a => a.id === id ? { ...a, status: 'declined' } : a));
+    if (approval) {
+      addNotification({
+        title: 'Solicitud Rechazada',
+        message: `Has rechazado la solicitud de ${approval.scout} para ${approval.player}.`,
+        type: 'warning'
+      });
+    }
+  };
 
   return (
     <div className="min-h-screen bg-white dark:bg-charcoal text-charcoal dark:text-white font-sans selection:bg-gold/30 pb-32 transition-colors duration-300">
@@ -39,9 +72,16 @@ export default function Cantera4GuardianDashboard() {
           </div>
         </div>
         <div className="flex items-center gap-4">
-          <button className="relative text-charcoal/40 dark:text-gray-400 hover:text-charcoal dark:hover:text-white transition-colors">
+          <button 
+            onClick={() => setIsNotificationsOpen(true)}
+            className="relative text-charcoal/40 dark:text-gray-400 hover:text-charcoal dark:hover:text-white transition-colors"
+          >
             <Bell size={20} />
-            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-charcoal"></span>
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[8px] font-black rounded-full border-2 border-white dark:border-charcoal flex items-center justify-center">
+                {unreadCount}
+              </span>
+            )}
           </button>
           <button onClick={() => navigate('/settings')} className="text-charcoal/40 dark:text-gray-400 hover:text-charcoal dark:hover:text-white transition-colors">
             <Settings size={20} />
@@ -135,7 +175,7 @@ export default function Cantera4GuardianDashboard() {
             <motion.div key="approvals" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-6">
               <h2 className="text-2xl font-bold">Pending Approvals</h2>
               <div className="space-y-4">
-                {approvals.map(app => (
+                {approvalsList.map(app => (
                   <div key={app.id} className="p-6 rounded-2xl border border-border-subtle bg-black/[0.01] dark:bg-white/[0.01] flex flex-col md:flex-row justify-between items-center gap-6">
                     <div className="flex items-center gap-4 w-full md:w-auto">
                       <div className="w-12 h-12 rounded-xl bg-gold/10 flex items-center justify-center text-gold">
@@ -150,10 +190,16 @@ export default function Cantera4GuardianDashboard() {
                     <div className="flex items-center gap-3 w-full md:w-auto">
                       {app.status === 'pending' ? (
                         <>
-                          <button className="flex-1 md:flex-none px-6 py-2.5 bg-emerald-500 text-white rounded-xl text-sm font-bold hover:bg-emerald-600 transition-colors flex items-center justify-center gap-2">
+                          <button 
+                            onClick={() => handleApprove(app.id)}
+                            className="flex-1 md:flex-none px-6 py-2.5 bg-emerald-500 text-white rounded-xl text-sm font-bold hover:bg-emerald-600 transition-colors flex items-center justify-center gap-2"
+                          >
                             <CheckCircle2 size={16} /> Approve
                           </button>
-                          <button className="flex-1 md:flex-none px-6 py-2.5 bg-red-500/10 text-red-500 border border-red-500/20 rounded-xl text-sm font-bold hover:bg-red-500/20 transition-colors flex items-center justify-center gap-2">
+                          <button 
+                            onClick={() => handleDecline(app.id)}
+                            className="flex-1 md:flex-none px-6 py-2.5 bg-red-500/10 text-red-500 border border-red-500/20 rounded-xl text-sm font-bold hover:bg-red-500/20 transition-colors flex items-center justify-center gap-2"
+                          >
                             <XCircle size={16} /> Deny
                           </button>
                         </>
@@ -165,6 +211,11 @@ export default function Cantera4GuardianDashboard() {
                     </div>
                   </div>
                 ))}
+                {approvalsList.length === 0 && (
+                  <div className="py-12 text-center text-gray-500">
+                    No pending approvals.
+                  </div>
+                )}
               </div>
             </motion.div>
           )}
@@ -179,6 +230,7 @@ export default function Cantera4GuardianDashboard() {
           <NavBtn icon={<MessageSquare />} label={t('nav.inbox')} active={activeTab === 'messages'} onClick={() => setActiveTab('messages')} />
         </div>
       </div>
+      <NotificationCenter isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} />
     </div>
   );
 }

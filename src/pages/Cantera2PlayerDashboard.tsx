@@ -16,6 +16,11 @@ import BackButton from '../components/BackButton';
 import TutorialService, { TourStep } from '../components/TutorialService';
 import { useNavigate } from 'react-router-dom';
 import { MOCK_OPPORTUNITIES, Opportunity } from '../core/domain';
+import { QRCodeSVG } from 'qrcode.react';
+import { useAppStore } from '../store/useAppStore';
+import NotificationCenter from '../components/NotificationCenter';
+import { db } from '../firebase';
+import { doc, getDoc, setDoc, deleteDoc, collection, getDocs } from 'firebase/firestore';
 
 // --- Types & Mock Data ---
 
@@ -160,6 +165,28 @@ export default function Cantera2PlayerDashboard() {
   const [isPublishOpen, setIsPublishOpen] = useState(false);
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [isVerificationModalOpen, setIsVerificationModalOpen] = useState(false);
+  const [isQROpen, setIsQROpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const { notifications } = useAppStore();
+  const unreadCount = notifications.filter(n => !n.read).length;
+
+  const handleShare = async () => {
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: 'Cantera Player Profile',
+          text: 'Check out my football profile on Cantera!',
+          url: window.location.href,
+        });
+      } else {
+        await navigator.clipboard.writeText(window.location.href);
+        alert('Link copied to clipboard!');
+      }
+    } catch (error) {
+      console.error('Error sharing:', error);
+    }
+  };
+
   const { t } = useLanguage();
   const navigate = useNavigate();
 
@@ -203,6 +230,11 @@ export default function Cantera2PlayerDashboard() {
     setActiveTab('feed');
   };
 
+  useEffect(() => {
+    (window as any).setIsPublishOpen = setIsPublishOpen;
+    return () => { delete (window as any).setIsPublishOpen; };
+  }, []);
+
   return (
     <div className="min-h-screen bg-white dark:bg-charcoal text-charcoal dark:text-ice pb-32 font-sans selection:bg-gold/30 transition-colors duration-300">
       
@@ -221,14 +253,21 @@ export default function Cantera2PlayerDashboard() {
               <span className="text-xs font-bold">?</span>
             </div>
           </button>
-          <button className="text-charcoal/60 dark:text-ice/60 hover:text-gold transition-colors" aria-label="My QR Code">
+          <button onClick={() => setIsQROpen(true)} className="text-charcoal/60 dark:text-ice/60 hover:text-gold transition-colors" aria-label="My QR Code">
             <div className="p-1.5 rounded-md bg-black/5 dark:bg-white/5 border border-border-subtle">
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="5" height="5" x="3" y="3" rx="1"/><rect width="5" height="5" x="16" y="3" rx="1"/><rect width="5" height="5" x="3" y="16" rx="1"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/><path d="M21 21v.01"/><path d="M12 7v3a2 2 0 0 1-2 2H7"/><path d="M3 12h.01"/><path d="M12 3h.01"/><path d="M12 16v.01"/><path d="M16 12h1"/><path d="M21 12v.01"/><path d="M12 21v-1"/></svg>
             </div>
           </button>
-          <button className="relative text-charcoal/60 dark:text-ice/60 hover:text-gold transition-colors">
+          <button 
+            onClick={() => setIsNotificationsOpen(true)}
+            className="relative text-charcoal/60 dark:text-ice/60 hover:text-gold transition-colors"
+          >
             <Bell size={20} />
-            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-charcoal"></span>
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[8px] font-black rounded-full border-2 border-white dark:border-charcoal flex items-center justify-center">
+                {unreadCount}
+              </span>
+            )}
           </button>
           <button onClick={() => navigate('/settings')} className="text-charcoal/60 dark:text-ice/60 hover:text-gold transition-colors"><Settings size={20} /></button>
         </div>
@@ -286,12 +325,104 @@ export default function Cantera2PlayerDashboard() {
       <PublishModal isOpen={isPublishOpen} onClose={() => setIsPublishOpen(false)} />
       <EditProfileModal isOpen={isEditProfileOpen} onClose={() => setIsEditProfileOpen(false)} />
       <VerificationModal isOpen={isVerificationModalOpen} onClose={() => setIsVerificationModalOpen(false)} t={t} />
+      <NotificationCenter isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} />
+
+      {/* QR Code Modal */}
+      <AnimatePresence>
+        {isQROpen && (
+          <motion.div 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+            onClick={() => setIsQROpen(false)}
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
+              className="bg-white dark:bg-charcoal p-8 rounded-3xl border border-border-subtle max-w-sm w-full text-center"
+              onClick={e => e.stopPropagation()}
+            >
+              <h3 className="text-xl font-bold mb-2">My Cantera QR</h3>
+              <p className="text-sm text-charcoal/50 dark:text-ice/50 mb-8">Scouts can scan this to view your profile instantly.</p>
+              
+              <div className="bg-white p-4 rounded-2xl inline-block mb-8">
+                <QRCodeSVG value={window.location.href} size={200} fgColor="#1A1A1A" />
+              </div>
+
+              <div className="flex gap-4">
+                <button onClick={handleShare} className="flex-1 py-3 bg-gold text-charcoal font-bold rounded-xl hover:bg-gold/80 transition-colors flex items-center justify-center gap-2">
+                  <Share2 size={18} /> Share Link
+                </button>
+                <button onClick={() => setIsQROpen(false)} className="flex-1 py-3 bg-black/5 dark:bg-white/5 border border-border-subtle rounded-xl font-bold hover:bg-black/10 dark:hover:bg-white/10 transition-colors">
+                  Close
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
     </div>
   );
 }
 
 // --- Components ---
+
+function KPISummary({ t }: { t: (k: string) => string }) {
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-5 gap-3 p-4">
+      {[
+        { label: 'Scout Views', value: '8', trend: '↑2', icon: <Globe size={16} />, color: 'text-blue-500' },
+        { label: 'Messages', value: '2', trend: 'New', icon: <MessageCircle size={16} />, color: 'text-gold' },
+        { label: 'Clubs Watching', value: '3', trend: 'Active', icon: <Briefcase size={16} />, color: 'text-emerald-500' },
+        { label: 'Next Event', value: 'Jun 15', trend: 'Trial', icon: <Calendar size={16} />, color: 'text-purple-500' },
+        { label: 'Latest Rating', value: '84', trend: 'May 8', icon: <ShieldCheck size={16} />, color: 'text-gold' },
+      ].map((kpi, i) => (
+        <motion.div 
+          key={i}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: i * 0.1 }}
+          className="glass-panel p-3 flex flex-col justify-between min-h-[90px] border-border-subtle/50"
+        >
+          <div className={cn("p-1.5 rounded-lg bg-black/5 dark:bg-white/5 w-fit mb-2", kpi.color)}>
+            {kpi.icon}
+          </div>
+          <div>
+            <p className="text-[10px] text-charcoal/50 dark:text-ice/50 uppercase font-bold tracking-wider">{kpi.label}</p>
+            <div className="flex items-end justify-between">
+              <p className="text-lg font-bold">{kpi.value}</p>
+              <span className={cn("text-[9px] font-black px-1 rounded", kpi.color === 'text-gold' ? 'bg-gold/10' : 'bg-black/5 dark:bg-white/5')}>
+                {kpi.trend}
+              </span>
+            </div>
+          </div>
+        </motion.div>
+      ))}
+    </div>
+  );
+}
+
+function NotificationBanner({ t }: { t: (k: string) => string }) {
+  return (
+    <div className="px-4 mb-2">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="bg-gold/10 border border-gold/20 rounded-2xl p-4 flex items-center gap-4"
+      >
+        <div className="w-10 h-10 rounded-full bg-gold/20 flex items-center justify-center text-gold shrink-0">
+          <Bell size={20} className="animate-bounce" />
+        </div>
+        <div className="flex-1">
+          <p className="text-sm font-bold text-charcoal dark:text-white">Arsenal FC is watching you!</p>
+          <p className="text-xs text-charcoal/60 dark:text-ice/60">A scout from Arsenal just viewed your profile. Keep it up!</p>
+        </div>
+        <button className="text-xs font-bold text-gold hover:underline underline-offset-4">
+          View Profile
+        </button>
+      </motion.div>
+    </div>
+  );
+}
 
 function NavButton({ icon, label, isActive, onClick }: { icon: React.ReactNode, label: string, isActive: boolean, onClick: () => void }) {
   return (
@@ -314,76 +445,142 @@ function NavButton({ icon, label, isActive, onClick }: { icon: React.ReactNode, 
 function ScreenFeed() {
   const { t } = useLanguage();
   const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({});
+  const user = useAppStore(state => state.user);
 
-  const toggleLike = (id: string) => {
-    setLikedPosts(prev => ({ ...prev, [id]: !prev[id] }));
+  useEffect(() => {
+    const fetchLikes = async () => {
+      if (!user?.uid) return;
+      try {
+        const likesRef = collection(db, `users/${user.uid}/likes`);
+        const snapshot = await getDocs(likesRef);
+        const likes: Record<string, boolean> = {};
+        snapshot.forEach(doc => {
+          likes[doc.id] = true;
+        });
+        setLikedPosts(likes);
+      } catch (error) {
+        console.error("Error fetching likes", error);
+      }
+    };
+    fetchLikes();
+  }, [user?.uid]);
+
+  const toggleLike = async (id: string) => {
+    const isLiked = likedPosts[id];
+    
+    // Optimistic update
+    setLikedPosts(prev => ({ ...prev, [id]: !isLiked }));
+
+    if (user?.uid) {
+      try {
+        const likeRef = doc(db, `users/${user.uid}/likes`, id);
+        if (isLiked) {
+          await deleteDoc(likeRef);
+        } else {
+          await setDoc(likeRef, { timestamp: new Date().toISOString() });
+        }
+      } catch (error) {
+        console.error("Error toggling like", error);
+        // Revert optimistic update on error
+        setLikedPosts(prev => ({ ...prev, [id]: isLiked }));
+      }
+    }
   };
 
   return (
-    <div className="space-y-6 p-4">
-      {mockPlayer.feed.map((post) => (
-        <div key={post.id} className="glass-panel overflow-hidden border border-border-subtle rounded-2xl">
-          {/* Post Header */}
-          <div className="p-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full overflow-hidden border border-gold/30">
-                <img src="https://picsum.photos/seed/player1/400/400" alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-              </div>
-              <div>
-                <div className="flex items-center gap-1">
-                  <p className="font-semibold text-sm text-charcoal dark:text-ice">{mockPlayer.name}</p>
-                  {mockPlayer.verification_status && <ShieldCheck size={14} className="text-gold" />}
-                </div>
-                <p className="text-xs text-charcoal/50 dark:text-ice/50">{t(post.time)}</p>
-              </div>
-            </div>
-            <button className="text-charcoal/40 dark:text-ice/40 hover:text-gold transition-colors"><Activity size={18} /></button>
+    <div className="space-y-6 pb-24">
+      <KPISummary t={t} />
+      <NotificationBanner t={t} />
+
+      {/* Create Post Trigger */}
+      <div className="px-4">
+        <div className="glass-panel p-4 flex items-center gap-4 border-border-subtle/50">
+          <div className="w-10 h-10 rounded-full overflow-hidden border border-gold/30">
+            <img src={user?.avatar || "https://picsum.photos/seed/player1/400/400"} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
           </div>
-
-          {/* Post Content */}
-          <div className="px-4 pb-3">
-            <p className="text-sm text-charcoal/90 dark:text-ice/90 leading-relaxed">{t(post.content)}</p>
-          </div>
-
-          {/* Post Media */}
-          {post.image && (
-            <div className="relative w-full max-h-[500px] bg-black/5 dark:bg-black/20 overflow-hidden flex items-center justify-center">
-              <img 
-                src={post.image} 
-                alt="Post media" 
-                className="w-full h-full object-contain max-h-[500px]" 
-                referrerPolicy="no-referrer" 
-              />
-              {post.type === 'video' && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                  <div className="w-12 h-12 rounded-full bg-charcoal/80 backdrop-blur-sm flex items-center justify-center text-gold border border-gold/30">
-                    <Play size={20} className="ml-1" />
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Post Actions */}
-          <div className="p-4 flex items-center justify-between border-t border-border-subtle/50">
-            <div className="flex items-center gap-6">
-              <button 
-                onClick={() => toggleLike(post.id)}
-                className={cn("flex items-center gap-2 transition-colors", likedPosts[post.id] ? "text-red-500" : "text-charcoal/60 dark:text-ice/60 hover:text-red-400")}
-              >
-                <Heart size={20} fill={likedPosts[post.id] ? "currentColor" : "none"} /> 
-                <span className="text-sm font-medium">{post.likes + (likedPosts[post.id] ? 1 : 0)}</span>
-              </button>
-              <button className="flex items-center gap-2 text-charcoal/60 dark:text-ice/60 hover:text-charcoal dark:hover:text-ice transition-colors">
-                <MessageCircle size={20} /> <span className="text-sm font-medium">{post.comments}</span>
-              </button>
-              <button className="flex items-center gap-2 text-charcoal/60 dark:text-ice/60 hover:text-charcoal dark:hover:text-ice transition-colors">
-                <Share2 size={20} />
-              </button>
-            </div>
+          <button 
+            onClick={() => (window as any).setIsPublishOpen?.(true)}
+            className="flex-1 bg-black/5 dark:bg-white/5 border border-border-subtle rounded-xl py-2.5 px-4 text-left text-charcoal/50 dark:text-ice/50 text-sm hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+          >
+            {t('c2.post.create')}...
+          </button>
+          <div className="flex items-center gap-2">
+            <button className="p-2 text-blue-500 hover:bg-blue-500/10 rounded-lg transition-colors"><Video size={20} /></button>
+            <button className="p-2 text-emerald-500 hover:bg-emerald-500/10 rounded-lg transition-colors"><ImageIcon size={20} /></button>
           </div>
         </div>
-      ))}
+      </div>
+
+      <div className="px-4 space-y-6">
+        {mockPlayer.feed.map((post) => (
+          <div key={post.id} className="glass-panel overflow-hidden border border-border-subtle rounded-2xl">
+            {/* Post Header */}
+            <div className="p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full overflow-hidden border border-gold/30">
+                  <img src="https://picsum.photos/seed/player1/400/400" alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-1">
+                    <p className="font-semibold text-sm text-charcoal dark:text-ice">{mockPlayer.name}</p>
+                    {mockPlayer.verification_status && <ShieldCheck size={14} className="text-gold" />}
+                  </div>
+                  <p className="text-xs text-charcoal/50 dark:text-ice/50">{t(post.time)}</p>
+                </div>
+              </div>
+              <button className="text-charcoal/40 dark:text-ice/40 hover:text-gold transition-colors"><Activity size={18} /></button>
+            </div>
+
+            {/* Post Content */}
+            <div className="px-4 pb-3">
+              <p className="text-sm text-charcoal/90 dark:text-ice/90 leading-relaxed">{t(post.content)}</p>
+            </div>
+
+            {/* Post Media */}
+            {post.image && (
+              <div className="relative w-full max-h-[500px] bg-black/5 dark:bg-black/20 overflow-hidden flex items-center justify-center">
+                <img 
+                  src={post.image} 
+                  alt="Post media" 
+                  className="w-full h-full object-contain max-h-[500px]" 
+                  referrerPolicy="no-referrer" 
+                />
+                {post.type === 'video' && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                    <div className="w-12 h-12 rounded-full bg-charcoal/80 backdrop-blur-sm flex items-center justify-center text-gold border border-gold/30">
+                      <Play size={20} className="ml-1" />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Post Actions */}
+            <div className="p-4 flex flex-col gap-4 border-t border-border-subtle/50">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-6">
+                  <button 
+                    onClick={() => toggleLike(post.id)}
+                    className={cn("flex items-center gap-2 transition-colors", likedPosts[post.id] ? "text-red-500" : "text-charcoal/60 dark:text-ice/60 hover:text-red-400")}
+                  >
+                    <Heart size={20} fill={likedPosts[post.id] ? "currentColor" : "none"} /> 
+                    <span className="text-sm font-medium">{post.likes + (likedPosts[post.id] ? 1 : 0)}</span>
+                  </button>
+                  <button className="flex items-center gap-2 text-charcoal/60 dark:text-ice/60 hover:text-charcoal dark:hover:text-ice transition-colors">
+                    <MessageCircle size={20} /> <span className="text-sm font-medium">{post.comments}</span>
+                  </button>
+                  <button className="flex items-center gap-2 text-charcoal/60 dark:text-ice/60 hover:text-charcoal dark:hover:text-ice transition-colors">
+                    <Share2 size={20} />
+                  </button>
+                </div>
+                <button className="text-gold text-xs font-bold uppercase tracking-widest hover:underline underline-offset-4">
+                  View Scout Analytics
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -823,51 +1020,53 @@ function ScreenProfile({ onEdit, t, profileTab, setProfileTab, onOpenVerificatio
 
 // --- Modals ---
 
-function PublishModal({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) {
-  const { t } = useLanguage();
-  if (!isOpen) return null;
-
-  return (
-    <AnimatePresence>
-      <motion.div 
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 bg-charcoal/90 backdrop-blur-sm flex flex-col justify-end"
-      >
-        <div className="absolute inset-0" onClick={onClose} />
-        <motion.div 
-          initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
-          transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-          className="bg-charcoal border-t border-border-subtle rounded-t-3xl p-6 relative z-10"
-        >
-          <div className="w-12 h-1.5 bg-white/10 rounded-full mx-auto mb-8" />
-          <h2 className="text-xl font-bold mb-6">{t('c2.post.create')}</h2>
-          
-          <div className="grid grid-cols-3 gap-4 mb-8">
-            <button className="flex flex-col items-center gap-3 p-4 rounded-2xl bg-white/5 hover:bg-white/10 transition-colors border border-border-subtle">
-              <div className="w-12 h-12 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center"><Video size={24} /></div>
-              <span className="text-xs font-medium">{t('c2.post.highlight')}</span>
-            </button>
-            <button className="flex flex-col items-center gap-3 p-4 rounded-2xl bg-white/5 hover:bg-white/10 transition-colors border border-border-subtle">
-              <div className="w-12 h-12 rounded-full bg-green-500/20 text-green-400 flex items-center justify-center"><ImageIcon size={24} /></div>
-              <span className="text-xs font-medium">{t('c2.post.photo')}</span>
-            </button>
-            <button className="flex flex-col items-center gap-3 p-4 rounded-2xl bg-white/5 hover:bg-white/10 transition-colors border border-border-subtle">
-              <div className="w-12 h-12 rounded-full bg-gold/20 text-gold flex items-center justify-center"><Trophy size={24} /></div>
-              <span className="text-xs font-medium">{t('c2.post.milestone')}</span>
-            </button>
-          </div>
-
-          <button onClick={onClose} className="w-full py-4 rounded-xl bg-white/5 text-ice font-medium hover:bg-white/10 transition-colors">
-            {t('verification.close')}
-          </button>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
-  );
-}
-
 function EditProfileModal({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) {
   const { t } = useLanguage();
+  const user = useAppStore(state => state.user);
+  const setUser = useAppStore(state => state.setUser);
+  
+  const [name, setName] = useState(user?.name || mockPlayer.name);
+  const [bio, setBio] = useState(user?.bio || mockPlayer.bio);
+  const [location, setLocation] = useState(mockPlayer.location);
+  const [height, setHeight] = useState(mockPlayer.height);
+  const [weight, setWeight] = useState(mockPlayer.weight);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      setName(user.name);
+      setBio(user.bio || mockPlayer.bio);
+    }
+  }, [user]);
+
+  const handleSave = async () => {
+    if (!user?.uid) {
+      onClose();
+      return;
+    }
+    
+    setIsSaving(true);
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      await setDoc(userRef, {
+        displayName: name,
+        bio: bio,
+        location: location,
+        height: height,
+        weight: weight,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+      
+      setUser({ ...user, name, bio });
+      onClose();
+    } catch (error) {
+      console.error("Error saving profile", error);
+      alert("Failed to save profile.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -880,7 +1079,9 @@ function EditProfileModal({ isOpen, onClose }: { isOpen: boolean, onClose: () =>
         <div className="flex items-center justify-between p-4 border-b border-border-subtle bg-charcoal/80 backdrop-blur-md sticky top-0 z-10">
           <button onClick={onClose} className="p-2 text-ice/60 hover:text-ice"><X size={24} /></button>
           <h2 className="font-bold text-lg">{t('c2.edit.title')}</h2>
-          <button onClick={onClose} className="p-2 text-gold font-medium">{t('c2.edit.save')}</button>
+          <button onClick={handleSave} disabled={isSaving} className="p-2 text-gold font-medium disabled:opacity-50">
+            {isSaving ? 'Saving...' : t('c2.edit.save')}
+          </button>
         </div>
 
         {/* Form */}
@@ -889,7 +1090,7 @@ function EditProfileModal({ isOpen, onClose }: { isOpen: boolean, onClose: () =>
           {/* Avatar Edit */}
           <div className="flex flex-col items-center gap-4">
             <div className="relative">
-              <img src="https://picsum.photos/seed/player1/400/400" alt="Avatar" className="w-24 h-24 rounded-full object-cover border-2 border-border-subtle opacity-50" referrerPolicy="no-referrer" />
+              <img src={user?.avatar || "https://picsum.photos/seed/player1/400/400"} alt="Avatar" className="w-24 h-24 rounded-full object-cover border-2 border-border-subtle opacity-50" referrerPolicy="no-referrer" />
               <div className="absolute inset-0 flex items-center justify-center">
                 <Camera size={24} className="text-white" />
               </div>
@@ -901,24 +1102,24 @@ function EditProfileModal({ isOpen, onClose }: { isOpen: boolean, onClose: () =>
           <div className="space-y-6">
             <div>
               <label className="text-xs text-ice/50 uppercase tracking-wider mb-2 block">{t('c2.edit.name')}</label>
-              <input type="text" defaultValue={mockPlayer.name} className="w-full bg-transparent border-b border-border-subtle py-2 text-ice focus:outline-none focus:border-gold transition-colors" />
+              <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full bg-transparent border-b border-border-subtle py-2 text-ice focus:outline-none focus:border-gold transition-colors" />
             </div>
             <div>
               <label className="text-xs text-ice/50 uppercase tracking-wider mb-2 block">{t('c2.edit.bio')}</label>
-              <textarea defaultValue={mockPlayer.bio} rows={3} className="w-full bg-transparent border-b border-border-subtle py-2 text-ice focus:outline-none focus:border-gold transition-colors resize-none" />
+              <textarea value={bio} onChange={e => setBio(e.target.value)} rows={3} className="w-full bg-transparent border-b border-border-subtle py-2 text-ice focus:outline-none focus:border-gold transition-colors resize-none" />
             </div>
             <div>
               <label className="text-xs text-ice/50 uppercase tracking-wider mb-2 block">{t('c2.edit.location')}</label>
-              <input type="text" defaultValue={mockPlayer.location} className="w-full bg-transparent border-b border-border-subtle py-2 text-ice focus:outline-none focus:border-gold transition-colors" />
+              <input type="text" value={location} onChange={e => setLocation(e.target.value)} className="w-full bg-transparent border-b border-border-subtle py-2 text-ice focus:outline-none focus:border-gold transition-colors" />
             </div>
             <div className="grid grid-cols-2 gap-6">
               <div>
                 <label className="text-xs text-ice/50 uppercase tracking-wider mb-2 block">{t('c2.edit.height')}</label>
-                <input type="text" defaultValue={mockPlayer.height} className="w-full bg-transparent border-b border-border-subtle py-2 text-ice focus:outline-none focus:border-gold transition-colors" />
+                <input type="text" value={height} onChange={e => setHeight(e.target.value)} className="w-full bg-transparent border-b border-border-subtle py-2 text-ice focus:outline-none focus:border-gold transition-colors" />
               </div>
               <div>
                 <label className="text-xs text-ice/50 uppercase tracking-wider mb-2 block">{t('c2.edit.weight')}</label>
-                <input type="text" defaultValue={mockPlayer.weight} className="w-full bg-transparent border-b border-border-subtle py-2 text-ice focus:outline-none focus:border-gold transition-colors" />
+                <input type="text" value={weight} onChange={e => setWeight(e.target.value)} className="w-full bg-transparent border-b border-border-subtle py-2 text-ice focus:outline-none focus:border-gold transition-colors" />
               </div>
             </div>
           </div>
@@ -945,6 +1146,92 @@ function EditProfileModal({ isOpen, onClose }: { isOpen: boolean, onClose: () =>
             </div>
           </div>
 
+        </div>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
+function PublishModal({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) {
+  const { t } = useLanguage();
+  const user = useAppStore(state => state.user);
+  const [content, setContent] = useState('');
+  const [type, setType] = useState<'video' | 'image' | 'text'>('text');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handlePost = async () => {
+    if (!content.trim()) return;
+    setIsSubmitting(true);
+    
+    // Simulate API call
+    setTimeout(() => {
+      setIsSubmitting(false);
+      setContent('');
+      onClose();
+    }, 1500);
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <AnimatePresence>
+      <motion.div 
+        initial={{ opacity: 0, y: 100 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 100 }}
+        className="fixed inset-0 z-[100] bg-charcoal flex flex-col"
+      >
+        <div className="flex items-center justify-between p-4 border-b border-border-subtle">
+          <button onClick={onClose} className="p-2 text-ice/60"><X size={24} /></button>
+          <h2 className="font-bold text-lg">{t('c2.post.create')}</h2>
+          <button 
+            onClick={handlePost}
+            disabled={isSubmitting || !content.trim()}
+            className="px-4 py-1.5 bg-gold text-charcoal font-bold rounded-full disabled:opacity-50"
+          >
+            {isSubmitting ? '...' : t('c2.post.publish')}
+          </button>
+        </div>
+
+        <div className="p-6 space-y-6 flex-1 overflow-y-auto">
+          <div className="flex items-center gap-3">
+            <img src={user?.avatar || "https://picsum.photos/seed/player1/400/400"} alt="Avatar" className="w-10 h-10 rounded-full border border-gold/30" referrerPolicy="no-referrer" />
+            <div>
+              <p className="font-bold text-sm">{user?.name || 'Mateo Silva'}</p>
+              <div className="flex gap-2 mt-1">
+                {(['text', 'image', 'video'] as const).map(t_type => (
+                  <button 
+                    key={t_type}
+                    onClick={() => setType(t_type)}
+                    className={cn(
+                      "px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border transition-all",
+                      type === t_type ? "bg-gold border-gold text-charcoal" : "border-border-subtle text-ice/40"
+                    )}
+                  >
+                    {t_type}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <textarea 
+            placeholder={t('c2.post.placeholder')}
+            value={content}
+            onChange={e => setContent(e.target.value)}
+            className="w-full bg-transparent text-lg text-ice placeholder:text-ice/20 focus:outline-none resize-none min-h-[200px]"
+          />
+
+          <div className="grid grid-cols-2 gap-4">
+            <button className="p-4 rounded-2xl border border-dashed border-border-subtle flex flex-col items-center justify-center gap-2 text-ice/40 hover:text-gold hover:border-gold transition-all">
+              <ImageIcon size={32} />
+              <span className="text-xs font-bold uppercase tracking-widest">{t('c2.post.add_photo')}</span>
+            </button>
+            <button className="p-4 rounded-2xl border border-dashed border-border-subtle flex flex-col items-center justify-center gap-2 text-ice/40 hover:text-gold hover:border-gold transition-all">
+              <Video size={32} />
+              <span className="text-xs font-bold uppercase tracking-widest">{t('c2.post.add_video')}</span>
+            </button>
+          </div>
         </div>
       </motion.div>
     </AnimatePresence>

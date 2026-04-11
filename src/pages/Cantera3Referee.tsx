@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { 
   Calendar, Clock, Play, Square, AlertTriangle, FileSignature, 
   CheckCircle, ShieldCheck, Activity, ChevronRight, User, Settings,
-  Award, BarChart3, Globe, Shield, MapPin, Search, Star, Trophy, Bell
+  Award, BarChart3, Globe, Shield, MapPin, Search, Star, Trophy, Bell,
+  Home, Plus, X
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -11,19 +12,29 @@ import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../core/i18n/LanguageContext';
 import Logo from '../components/Logo';
 import BackButton from '../components/BackButton';
+import NotificationCenter from '../components/NotificationCenter';
+import { useAppStore } from '../store/useAppStore';
 
-type RefTab = 'match_center' | 'live_console' | 'evaluation' | 'integrity' | 'profile';
+type RefTab = 'match_center' | 'live_console' | 'evaluation' | 'integrity' | 'profile' | 'calendar';
 
 export default function Cantera3Referee() {
   const [activeTab, setActiveTab] = useState<RefTab>('match_center');
+  const [isCreateMatchOpen, setIsCreateMatchOpen] = useState(false);
   const [matchStatus, setMatchStatus] = useState<'SCHEDULED' | 'LIVE' | 'COMPLETED'>('SCHEDULED');
   const [events, setEvents] = useState<MatchEvent[]>([]);
   const [timer, setTimer] = useState(0);
   const [isAvailable, setIsAvailable] = useState(true);
   const [selectedMatchPlayer, setSelectedMatchPlayer] = useState<{id: string, name: string, number: number, team: string} | null>(null);
   const [playerRatings, setPlayerRatings] = useState<Record<string, number>>({});
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const { notifications } = useAppStore();
+  const unreadCount = notifications.filter(n => !n.read).length;
   const navigate = useNavigate();
   const { t } = useLanguage();
+
+  const handleDownloadPDF = () => {
+    alert('Generating PDF report... This feature requires a backend service for production-ready documents.');
+  };
 
   const MATCH_PLAYERS = {
     home: {
@@ -89,9 +100,16 @@ export default function Cantera3Referee() {
             <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
             <span className="text-[#A1C4FD] hidden md:inline">{t('ref.system_online')}</span>
           </div>
-          <button className="relative text-charcoal/40 dark:text-gray-400 hover:text-charcoal dark:hover:text-white transition-colors">
+          <button 
+            onClick={() => setIsNotificationsOpen(true)}
+            className="relative text-charcoal/40 dark:text-gray-400 hover:text-charcoal dark:hover:text-white transition-colors"
+          >
             <Bell size={20} />
-            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-charcoal"></span>
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[8px] font-black rounded-full border-2 border-white dark:border-charcoal flex items-center justify-center">
+                {unreadCount}
+              </span>
+            )}
           </button>
           <button onClick={() => navigate('/settings')} className="text-charcoal/40 dark:text-gray-400 hover:text-charcoal dark:hover:text-white transition-colors">
             <Settings size={20} />
@@ -99,8 +117,10 @@ export default function Cantera3Referee() {
         </div>
       </header>
 
+      {/* Main Content Area */}
       <div className="max-w-5xl mx-auto p-6">
         <AnimatePresence mode="wait">
+          {activeTab === 'calendar' && <ScreenCalendar t={t} />}
           {activeTab === 'match_center' && (
             <motion.div key="mc" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-8">
               <h2 className="text-2xl font-bold text-[#D4AF37]">{t('ref.match_center')}</h2>
@@ -327,12 +347,17 @@ export default function Cantera3Referee() {
                   <h2 className="text-2xl font-bold text-[#D4AF37]">{t('ref.evaluation')}</h2>
                   <p className="text-sm text-gray-400">{t('ref.generate_report')}</p>
                 </div>
-                <div className="bg-gold/10 text-gold px-3 py-1 rounded-full text-xs font-bold border border-gold/20">
-                  STRICT MODE
+                <div className="flex gap-2">
+                  <button onClick={handleDownloadPDF} className="bg-white/10 text-white px-3 py-1 rounded-full text-xs font-bold border border-white/20 hover:bg-white/20 transition-colors">
+                    Download PDF
+                  </button>
+                  <div className="bg-gold/10 text-gold px-3 py-1 rounded-full text-xs font-bold border border-gold/20">
+                    STRICT MODE
+                  </div>
                 </div>
               </div>
               
-              <div className="space-y-4">
+              <div id="evaluation-report" className="space-y-4 bg-white dark:bg-charcoal p-4 rounded-xl">
                 {MOCK_PLAYERS.map(player => (
                   <EvaluationCard key={player.id} player={player} />
                 ))}
@@ -514,15 +539,150 @@ export default function Cantera3Referee() {
 
       {/* Bottom Nav */}
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[95%] max-w-md bg-white/80 dark:bg-charcoal/80 backdrop-blur-xl border border-border-subtle/50 rounded-full shadow-2xl z-50 px-2 py-2 transition-all duration-300">
-        <div className="flex justify-around items-center h-14">
-          <NavBtn icon={<Calendar />} label={t('nav.matches')} active={activeTab === 'match_center'} onClick={() => setActiveTab('match_center')} />
-          <NavBtn icon={<Clock />} label={t('nav.live')} active={activeTab === 'live_console'} onClick={() => setActiveTab('live_console')} disabled={matchStatus === 'SCHEDULED'} />
+        <div className="flex justify-around items-center h-14 relative">
+          <NavBtn icon={<Home />} label={t('nav.home')} active={activeTab === 'match_center'} onClick={() => setActiveTab('match_center')} />
+          <NavBtn icon={<Calendar />} label={t('nav.calendar')} active={activeTab === 'calendar'} onClick={() => setActiveTab('calendar')} />
+          
+          {/* Create Match FAB */}
+          <div className="relative -top-8">
+            <button 
+              onClick={() => setIsCreateMatchOpen(true)}
+              className="w-14 h-14 bg-gold rounded-full flex items-center justify-center text-charcoal shadow-[0_8px_25px_rgba(212,175,55,0.4)] hover:scale-110 active:scale-95 transition-all"
+            >
+              <Plus size={28} strokeWidth={2.5} />
+            </button>
+          </div>
+
           <NavBtn icon={<CheckCircle />} label={t('nav.eval')} active={activeTab === 'evaluation'} onClick={() => setActiveTab('evaluation')} disabled={matchStatus !== 'COMPLETED'} />
           <NavBtn icon={<User />} label={t('nav.profile')} active={activeTab === 'profile'} onClick={() => setActiveTab('profile')} />
-          <NavBtn icon={<FileSignature />} label={t('nav.docs')} active={activeTab === 'integrity'} onClick={() => setActiveTab('integrity')} />
         </div>
       </div>
+
+      {/* Modals */}
+      <CreateMatchModal isOpen={isCreateMatchOpen} onClose={() => setIsCreateMatchOpen(false)} />
+      <NotificationCenter isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} />
     </div>
+  );
+}
+
+function ScreenCalendar({ t }: { t: (k: string) => string }) {
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-8">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold text-gold">{t('ref.my_calendar')}</h2>
+        <div className="flex gap-2">
+          <button className="px-3 py-1 rounded-lg bg-white/5 border border-border-subtle text-xs font-bold">{t('calendar.month')}</button>
+          <button className="px-3 py-1 rounded-lg bg-gold text-charcoal text-xs font-bold">{t('calendar.week')}</button>
+        </div>
+      </div>
+
+      <div className="space-y-6">
+        <div className="space-y-3">
+          <h3 className="text-xs text-ice/30 uppercase tracking-widest font-bold">Today, May 10</h3>
+          <div className="p-4 rounded-2xl border border-gold/30 bg-gold/5 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-gold/20 flex flex-col items-center justify-center text-gold">
+                <span className="text-xs font-bold">15:00</span>
+              </div>
+              <div>
+                <p className="font-bold">Real Madrid U19 vs Barcelona U19</p>
+                <p className="text-xs text-ice/50">Estadio Alfredo Di Stefano</p>
+              </div>
+            </div>
+            <button className="px-4 py-2 bg-gold text-charcoal font-bold rounded-lg text-xs">LIVE</button>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <h3 className="text-xs text-ice/30 uppercase tracking-widest font-bold">Tomorrow, May 11</h3>
+          {[1, 2].map(i => (
+            <div key={i} className="p-4 rounded-2xl border border-border-subtle bg-white/5 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-white/10 flex flex-col items-center justify-center text-ice/50">
+                  <span className="text-xs font-bold">{14 + i}:00</span>
+                </div>
+                <div>
+                  <p className="font-bold">Match Assignment {i}</p>
+                  <p className="text-xs text-ice/50">Location {i}</p>
+                </div>
+              </div>
+              <ChevronRight className="text-ice/20" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+function CreateMatchModal({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) {
+  const { t } = useLanguage();
+
+  if (!isOpen) return null;
+
+  return (
+    <AnimatePresence>
+      <motion.div 
+        initial={{ opacity: 0, y: 100 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 100 }}
+        className="fixed inset-0 z-[100] bg-charcoal flex flex-col"
+      >
+        <div className="flex items-center justify-between p-4 border-b border-border-subtle">
+          <button onClick={onClose} className="p-2 text-ice/60"><X size={24} /></button>
+          <h2 className="font-bold text-lg">{t('ref.create_match')}</h2>
+          <button onClick={onClose} className="px-4 py-1.5 bg-gold text-charcoal font-bold rounded-full">Create</button>
+        </div>
+
+        <div className="p-6 space-y-8 flex-1 overflow-y-auto">
+          <div className="space-y-4">
+            <label className="text-xs text-ice/50 uppercase tracking-widest font-bold">Match Teams</label>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <p className="text-xs text-ice/30 uppercase">Home</p>
+                <div className="p-4 rounded-xl border border-border-subtle bg-white/5 text-center font-bold">Real Madrid U19</div>
+              </div>
+              <div className="space-y-2">
+                <p className="text-xs text-ice/30 uppercase">Away</p>
+                <div className="p-4 rounded-xl border border-border-subtle bg-white/5 text-center font-bold">Barcelona U19</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <label className="text-xs text-ice/50 uppercase tracking-widest font-bold">Date & Time</label>
+            <div className="flex gap-4">
+              <div className="flex-1 p-4 rounded-xl border border-border-subtle bg-white/5 flex items-center gap-3">
+                <Calendar size={18} className="text-gold" />
+                <span className="font-bold">Jun 15, 2026</span>
+              </div>
+              <div className="flex-1 p-4 rounded-xl border border-border-subtle bg-white/5 flex items-center gap-3">
+                <Clock size={18} className="text-gold" />
+                <span className="font-bold">15:00</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <label className="text-xs text-ice/50 uppercase tracking-widest font-bold">Invite Players</label>
+            <div className="space-y-2">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="p-3 rounded-xl border border-border-subtle bg-white/5 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-gold/20 flex items-center justify-center text-gold font-bold text-xs">#{i+9}</div>
+                    <span className="font-medium">Player Name {i}</span>
+                  </div>
+                  <CheckCircle size={18} className="text-gold" />
+                </div>
+              ))}
+              <button className="w-full py-3 rounded-xl border border-dashed border-border-subtle text-ice/40 font-bold text-sm hover:text-gold hover:border-gold transition-all">
+                + Add Players
+              </button>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    </AnimatePresence>
   );
 }
 

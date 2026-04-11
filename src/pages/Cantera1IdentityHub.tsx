@@ -7,6 +7,8 @@ import { useLanguage } from '../core/i18n/LanguageContext';
 import { useTheme } from '../core/ThemeContext';
 import { useAppStore } from '../store/useAppStore';
 import Logo from '../components/Logo';
+import { signInWithGoogle, db } from '../firebase';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 // --- Types ---
 type RoleType = 'player' | 'referee' | 'scout' | 'guardian';
@@ -29,6 +31,52 @@ export default function Cantera1IdentityHub() {
 
   const handleRoleSelection = (role: RoleType) => {
     setSelectedRole(role);
+  };
+
+  const handleGoogleLogin = async () => {
+    if (!selectedRole) return;
+    try {
+      const user = await signInWithGoogle();
+      
+      const userRef = doc(db, 'users', user.uid);
+      const userSnap = await getDoc(userRef);
+      
+      let role = selectedRole.toUpperCase() as 'PLAYER' | 'SCOUT' | 'REFEREE' | 'GUARDIAN';
+      
+      if (userSnap.exists()) {
+        role = userSnap.data().role;
+      } else {
+        await setDoc(userRef, {
+          uid: user.uid,
+          email: user.email,
+          displayName: user.displayName,
+          photoURL: user.photoURL,
+          role: role,
+          createdAt: serverTimestamp()
+        });
+      }
+      
+      setUser({
+        uid: user.uid,
+        name: user.displayName || 'User',
+        email: user.email || '',
+        role: role,
+        bio: '',
+        avatar: user.photoURL || '',
+        plan: 'FREE'
+      });
+      
+      switch (role) {
+        case 'PLAYER': navigate('/player/PLY-8472'); break;
+        case 'SCOUT': navigate('/scout'); break;
+        case 'REFEREE': navigate('/referee'); break;
+        case 'GUARDIAN': navigate('/guardian'); break;
+        default: navigate('/');
+      }
+    } catch (error) {
+      console.error("Login failed", error);
+      alert("Login failed. Please try again.");
+    }
   };
 
   const handleDemoLogin = () => {
@@ -214,7 +262,10 @@ export default function Cantera1IdentityHub() {
                 </div>
 
                 <div className="space-y-4">
-                  <button className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-xl bg-white text-charcoal font-medium hover:bg-white/90 transition-colors">
+                  <button 
+                    onClick={handleGoogleLogin}
+                    className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-xl bg-white text-charcoal font-medium hover:bg-white/90 transition-colors"
+                  >
                     <svg className="w-5 h-5" viewBox="0 0 24 24">
                       <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
                       <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
