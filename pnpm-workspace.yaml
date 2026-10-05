@@ -1,2 +1,11 @@
 allowBuilds:
+  # Prepara y verifica los binarios usados por Vite y sus herramientas.
+  'esbuild@0.25.12 || 0.28.2': true
+  # Cantera proporciona la configuración explícitamente en src/firebase.ts.
+  '@firebase/util': false
+  # Su postinstall solo imprime un mensaje de apoyo económico.
+  core-js: false
+  # Su postinstall solo avisa sobre el esquema de versiones de dependencias.
+  protobufjs: false
+  # Conserva el bloqueo de la compilación nativa ajena a estas comprobaciones.
   re2: false
