@@ -1,10 +1,10 @@
 # CANTERA
-## Whitepaper del proyecto · Versión 0.5
+## Whitepaper del proyecto · Versión 0.6
 
 **Fecha de edición:** 6 de octubre de 2026  
 **Objeto:** misión, producto, gobernanza, sostenibilidad y trazabilidad de una comunidad deportiva global de acceso gratuito.  
 **Promotor y administrador inicial:** propietario de Cantera; identidad pública y contacto definitivo pendientes de configuración.  
-**Situación de esta edición:** código comunitario integrado y comprobado localmente; configuración cloud y lanzamiento pendientes. No acredita una entidad constituida, usuarios activos, patrocinadores contratados, auditoría independiente ni lanzamiento productivo completado.
+**Situación de esta edición:** código comunitario integrado, comprobado localmente y en CI; configuración cloud y lanzamiento pendientes. No acredita una entidad constituida, usuarios activos, patrocinadores contratados, auditoría independiente ni lanzamiento productivo completado.
 
 ## Resumen ejecutivo
 
@@ -242,7 +242,7 @@ Estas referencias indican dónde comprobar el requisito. La tabla no afirma que 
 
 El [plan de ejecución](PLAN_CANTERA.md) detalla hitos acumulativos de 0 a 100 %. Los porcentajes del plan no son un informe de avance real. La entrega completa del alcance inicial exige que las funciones ofrecidas a clientes funcionen con datos persistentes y permisos, que los textos reflejen al responsable y al servicio efectivo, y que soporte y confianza tengan operación real.
 
-La interfaz y la integración de datos están construidas localmente. TypeScript, compilación, 14 pruebas de dominio/normalización, 19 de reglas con emuladores y 16 de limpieza con dobles locales han pasado: 49 pruebas de distinto alcance. Se comprobaron recorridos de interfaz en el navegador local y se añadió integración continua. La sección 16 registra su alcance y la auditoría del servicio real. Esta edición no declara completados el lanzamiento, la cobertura mundial operativa, las páginas institucionales completas o el acceso juvenil.
+La interfaz y la integración de datos están construidas localmente. TypeScript, compilación, 14 pruebas de dominio/normalización, 19 de reglas con emuladores y 16 de limpieza con dobles de datos/archivos han pasado también en la [ejecución de GitHub Actions del 6 de octubre](https://github.com/rommer1997/CANTERA-/actions/runs/37384779319): 49 pruebas de distinto alcance. Se comprobaron recorridos de interfaz en el navegador local. La sección 16 registra la evidencia local, la ejecución automática y la auditoría del servicio real. La CI no despliega servicios ni prueba cuentas reales. Esta edición no declara completados el lanzamiento, la cobertura mundial operativa, las páginas institucionales completas o el acceso juvenil.
 
 ## 14. Riesgos y seguimiento
 
@@ -266,29 +266,32 @@ La interfaz y la integración de datos están construidas localmente. TypeScript
 | 0.3 | 6 de octubre de 2026 | Pruebas de normalización, QA local de liga/copa/feed y workflow de comprobación automática con primera ejecución GitHub pendiente. |
 | 0.4 | 6 de octubre de 2026 | Backend de limpieza preparado, 16 pruebas adicionales y CI separada para su runtime Node 22; despliegue e invocación cloud pendientes. |
 | 0.5 | 6 de octubre de 2026 | Decisión D-09 de esperar patrocinador, medios cloud desactivados por defecto y QA local MP4 de 2 s/rechazo de 91 s. |
+| 0.6 | 6 de octubre de 2026 | Ambos trabajos de GitHub Actions superados, 49 pruebas y política explícita de scripts de dependencias. Conserva los requisitos de activación cloud y lanzamiento pendientes. |
 
-La base Git consultada para esta edición es `79591442a6e8938f07b3c1154f1b363af5672cce`. La implementación comunitaria y estos documentos contienen trabajo local posterior todavía no incluido en ese commit. El identificador acredita la referencia de partida, no el contenido final ni una versión desplegada.
+La referencia de partida del proyecto es `79591442a6e8938f07b3c1154f1b363af5672cce`. El código comprobado en la [ejecución de CI `37384779319`](https://github.com/rommer1997/CANTERA-/actions/runs/37384779319) corresponde al commit `54fd7e98c9469dac60e0fedd53594e778f7b9751`. Esta versión 0.6 registra esa evidencia mediante una actualización documental posterior. Ninguno de estos identificadores acredita una versión desplegada o cuentas reales comprobadas.
 
 Cada entrega debe añadir identificador de código, cambios, pruebas con entorno y fecha, documentos revisados, estado de despliegue y límites abiertos. No publicar evidencia de pruebas de desarrollo como tracción de usuarios. No sustituir la identidad o forma jurídica pendiente por datos ficticios.
 
 ## 16. Evidencia de esta entrega
 
-### 16.1 Implementación y verificación local
+### 16.1 Implementación, verificación local e integración continua
 
 La aplicación integra perfil propio, acceso Google y restauración de sesión, eventos, inscripción, torneos, invitación y calendario, feed, solicitudes de verificación, herramientas administrativas y páginas de información. La integración Firebase está en el código; su disponibilidad productiva depende de configuración real. La demostración permanece separada y explícita y no constituye comunidad multiusuario.
 
 | Control | Evidencia a 6 de octubre de 2026 | Límite |
 |---|---|---|
-| TypeScript | `pnpm lint` superado | Comprobación estática local. |
-| Compilación | `pnpm build` superado | Paquete local; no acredita publicación web. |
+| TypeScript | `pnpm lint` superado localmente y en GitHub Actions | Comprobación estática. |
+| Compilación | `pnpm build` superado localmente y en GitHub Actions | Generación de paquete; no acredita publicación web. |
 | Dominio y normalización | 14 pruebas superadas: 6 de lógica y 8 de normalización | Reglas deportivas, fechas y registros malformados; no asistencia real. |
 | Seguridad | 19 pruebas superadas en `tests/security.test.mjs` | Emuladores Firestore/Storage con proyecto `demo-*`; incluye reglas de la base nombrada, última plaza concurrente, consentimiento, privacidad y aprobación administrativa. |
 | Documentación UI | Términos, privacidad, cookies/almacenamiento, misión y patrocinio integrados | Responsable, correo y país reales y revisión de publicación todavía pendientes. |
 | Navegador integrado | Liga de 3 con resultados/empate/corrección y recarga; copa de 3 con pase libre/final/campeón; foto/logro, reacción/comentario y recarga; reel MP4 sintético de 2 s decodificado/reproducido y persistente; MP4 de 91 s rechazado con límite 90 s | Modo local y persistencia del dispositivo; no cuentas cloud ni sincronización. |
-| Integración continua | Workflow de push/pull request añadido y sintaxis YAML validada | Primera ejecución en GitHub pendiente; no es un despliegue productivo. |
-| Backend de limpieza | 16 pruebas de `functions/tests/cleanup.test.mjs` y sintaxis superadas localmente con Node 24.19 y Node 22.23.3 | Dobles de datos/archivos; runtime previsto Node 22 comprobado localmente, trigger real sin desplegar ni invocar. |
+| Integración continua | Ambos trabajos superados en la ejecución 37384779319; 49 pruebas | GitHub Actions sobre el commit identificado en sección 15; sin despliegue ni cuentas reales. |
+| Backend de limpieza | 16 pruebas de `functions/tests/cleanup.test.mjs` y sintaxis superadas localmente y en CI Node 22 | Dobles de datos/archivos; comprobación local con Node 24.19 y Node 22.23.3, trigger real sin desplegar ni invocar. |
 
-El workflow prepara Node 24 y Java 21 para la app y otro trabajo Node 22 para la función; instala dependencias fijadas, ejecuta TypeScript, dominio/normalización, build, reglas en `demo-cantera` emulado y tests/check del backend. No requiere credenciales de producción y no añade publicación automática. La comprobación local y la futura ejecución alojada conservan evidencias separadas. El QA de reproducción y duración del reel es local; no se presenta como subida a la nube o inspección de duración en servidor.
+La [ejecución `37384779319`](https://github.com/rommer1997/CANTERA-/actions/runs/37384779319) del 6 de octubre de 2026 superó los dos trabajos del workflow sobre el commit `54fd7e98c9469dac60e0fedd53594e778f7b9751`. La app con Node 24/Java 21 instaló dependencias fijadas, comprobó TypeScript, superó 14 pruebas de dominio/normalización, compiló y superó 19 pruebas de reglas en `demo-cantera` emulado. El backend Node 22 superó sintaxis y 16 pruebas con dobles de datos/archivos. Estas 49 pruebas cubren lógica, permisos emulados y limpieza con dobles. La CI no utiliza credenciales de producción ni añade publicación automática. El QA de reproducción y duración del reel es local; no se presenta como subida a la nube o inspección de duración en servidor.
+
+La instalación conserva la política estricta de pnpm y decisiones explícitas por dependencia: autoriza únicamente las versiones revisadas de esbuild y bloquea los scripts opcionales revisados de las otras dependencias. Los scripts nuevos necesitan revisión y decisión antes de instalarse.
 
 No se atribuye al servicio real la configuración de los emuladores. La inspección de vídeo en servidor, transcodificación, cuotas, protección contra abuso, bloqueo de cuentas y paginación todavía necesitan trabajo. La limpieza de publicaciones tiene código probado con dobles locales; su despliegue y prueba cloud permanecen pendientes. Equipos con varios gestores, notificaciones, chat, tutela y recorridos originales de scouting siguen en la hoja de ruta.
 
@@ -296,7 +299,7 @@ No se atribuye al servicio real la configuración de los emuladores. La inspecci
 
 El adaptador `cleanupCommunityPost` prepara una función Gen2 para borrados en la base nombrada de Cantera, región `europe-west1` y runtime Node 22. El handler elimina interacciones vinculadas en lotes de hasta 450, valida la ruta de medios y trata ausencia, duplicados y reintentos. Las pruebas contemplan fallos y preservación de recursos ajenos, padres recreados y generaciones posteriores del archivo.
 
-Esta función no está desplegada y espera financiación por patrocinio antes de activarse. Tras confirmar financiación necesita configuración autorizada, servicios y facturación pertinentes, bucket real y permisos de ejecución confirmados e invocación comprobada con datos controlados. Los 16 casos son pruebas locales con dobles, no evidencia de borrado real en Firebase. El mecanismo trata nuevos eventos de eliminación; no acredita un saneamiento histórico ni una baja completa de cuenta, denuncias, medios nunca publicados o copias. La retención por borrado suave y versiones no se altera; sus plazos y la atención de errores/avisos requieren operación y revisión.
+Esta función no está desplegada y espera financiación por patrocinio antes de activarse. Tras confirmar financiación necesita configuración autorizada, servicios y facturación pertinentes, bucket real y permisos de ejecución confirmados e invocación comprobada con datos controlados. Los 16 casos usan dobles de datos/archivos y pasaron localmente y en CI Node 22; el borrado real en Firebase queda pendiente de comprobación. El mecanismo trata nuevos eventos de eliminación; no acredita un saneamiento histórico ni una baja completa de cuenta, denuncias, medios nunca publicados o copias. La retención por borrado suave y versiones no se altera; sus plazos y la atención de errores/avisos requieren operación y revisión.
 
 ### 16.3 Auditoría cloud y puerta de lanzamiento
 
@@ -304,4 +307,4 @@ La auditoría del 6 de octubre encontró una base Firestore nombrada en región 
 
 Para lanzar: completar y autorizar configuración de datos y dominio; identificar al responsable y canal de atención; conceder al propietario su permiso administrativo de forma segura; publicar y comprobar el recorrido con cuentas reales. Los medios y funciones esperan patrocinador antes de habilitar facturación y servicios. La configuración de producción mantiene `VITE_ENABLE_MEDIA_UPLOADS=false` por defecto; la prueba explícita permite medios locales. Las reglas locales probadas no demuestran que el servicio esté activo. La comprobación con dos cuentas y dispositivos queda pendiente.
 
-**Estado documentado:** código integrado y pruebas locales superadas; aplicación todavía no declarada lista para clientes ni publicada como servicio productivo final. La gratuidad, el alcance global y la vocación sin finalidad lucrativa permanecen como decisiones y objetivos; no se presenta una entidad registrada ni financiación confirmada.
+**Estado documentado:** código integrado y comprobaciones locales y de CI superadas; aplicación todavía no declarada lista para clientes ni publicada como servicio productivo final. La gratuidad, el alcance global y la vocación sin finalidad lucrativa permanecen como decisiones y objetivos; no se presenta una entidad registrada ni financiación confirmada.

@@ -1,22 +1,24 @@
 # Checklist de publicación legal y transparencia de Cantera
 
-Versión 0.5 · 6 de octubre de 2026. Documento operativo interno, relacionado con [PLAN_CANTERA.md](../PLAN_CANTERA.md) y [WHITEPAPER.md](../WHITEPAPER.md). Las casillas de lanzamiento permanecen abiertas hasta comprobar el servicio final; la evidencia local se registra por separado. Este archivo no sustituye los textos públicos ni certifica cumplimiento internacional. La versión de aceptación de los términos en el código sigue siendo `2026-10-05`.
+Versión 0.6 · 6 de octubre de 2026. Documento operativo interno, relacionado con [PLAN_CANTERA.md](../PLAN_CANTERA.md) y [WHITEPAPER.md](../WHITEPAPER.md). Las casillas de lanzamiento permanecen abiertas hasta comprobar el servicio final; la evidencia local y de CI se registra por separado. Este archivo no sustituye los textos públicos ni certifica cumplimiento internacional. La versión de aceptación de los términos en el código sigue siendo `2026-10-05`.
 
 ## 0. Evidencia de esta entrega y puertas abiertas
 
 | Área | Comprobado a 6 de octubre de 2026 | Pendiente para lanzamiento |
 |---|---|---|
 | Código integrado | UI comunitaria, datos Firebase, solicitudes/admin y páginas legales incorporados | Publicación y recorrido entre usuarios reales. |
-| Calidad técnica | TypeScript y compilación superados; 14 pruebas de dominio/normalización superadas | Prueba de aplicación publicada en móvil y escritorio. |
-| Reglas | 19 pruebas superadas con Firestore/Storage emulados, incluida base nombrada, última plaza y privacidad/admin | Autorización, despliegue y comprobación de reglas remotas. |
+| Calidad técnica | TypeScript, compilación y 14 pruebas de dominio/normalización superados localmente y en GitHub Actions | Prueba de aplicación publicada en móvil y escritorio. |
+| Reglas | 19 pruebas superadas localmente y en GitHub Actions con Firestore/Storage emulados, incluida base nombrada, última plaza y privacidad/admin | Autorización, despliegue y comprobación de reglas remotas. |
 | Información de uso | `/legal/terms`, `/legal/privacy`, `/legal/cookies`, aceptación `2026-10-05` y advertencia de datos del responsable pendientes | Nombre, contacto, país, forma real de operación y revisión correspondiente. |
 | Almacenamiento y seguimiento | No se añadió marketing ni analítica; se retiraron Google Fonts remotas; demo explícita y separada | Auditoría del navegador final y servicios de terceros reales. |
 | Edad | 18+ autodeclarado y aceptación exigidos para operar | Garantías de edad y futura tutela conforme al alcance; no anunciar acceso juvenil listo. |
 | Aforo | Formulario/lógica: torneos 2–32, partidos 2–64 | Verificar misma conducta con servicio final y cuentas reales. |
 | Navegador local | Liga de 3 con goles/empate/corrección/recarga; copa de 3 con pase libre/final/campeón; foto/logro, reacción y comentario tras recarga; MP4 sintético 2 s decodificado/reproducido y persistente; MP4 91 s rechazado con límite 90 s | Datos del dispositivo; cuentas cloud, subida de medios y recorrido productivo pendientes. |
-| Integración continua | Push/PR para app Node 24/Java 21 y backend Node 22, instalación fijada y checks/tests; YAML válido | Primera ejecución de GitHub pendiente; no habilita ni despliega el servicio real. |
-| Limpieza de publicaciones | Código Gen2 para base nombrada y 16 pruebas con dobles locales superadas con Node 24.19 y Node 22.23.3 | Runtime de despliegue Node 22 comprobado localmente; bucket, permisos, despliegue e invocación real pendientes. |
+| Integración continua | Ambos trabajos de la ejecución 37384779319 superados: app Node 24/Java 21 y backend Node 22; 49 pruebas | No habilita ni despliega servicios, ni prueba cuentas reales. |
+| Limpieza de publicaciones | Código Gen2 para base nombrada y 16 pruebas con dobles superadas localmente y en CI Node 22 | Runtime comprobado; bucket, permisos, despliegue e invocación real pendientes. |
 | Financiación | Decisión expresa del propietario: esperar patrocinador para infraestructura de medios | No activar facturación, Storage o funciones antes de financiación; subidas cloud desactivadas por defecto. |
+
+La [ejecución de GitHub Actions `37384779319`](https://github.com/rommer1997/CANTERA-/actions/runs/37384779319) del 6 de octubre de 2026 comprobó el commit `54fd7e98c9469dac60e0fedd53594e778f7b9751`: ambos trabajos terminaron correctamente y suman 14 pruebas de dominio/normalización, 19 de reglas emuladas y 16 de limpieza con dobles de datos/archivos. Esta evidencia no cierra las pruebas de producción ni los controles legales. La instalación mantiene la política estricta de scripts y decisiones explícitas de `pnpm-workspace.yaml`.
 
 Auditoría del Firebase real: base nombrada en `eur3` con reglas de bloqueo total (`deny-all`), sin buckets y con facturación deshabilitada; falta `cantera-tau.vercel.app` en dominios autorizados de Google Auth. Estos servicios no se modificaron en esta entrega.
 
@@ -130,7 +132,8 @@ La revisión española puede utilizar la [guía de cookies de la AEPD](https://w
 | Revisión documental | Versión de términos, privacidad, almacenamiento y normas | Propietario y revisión competente según ámbito | Pendiente |
 | Auditoría de almacenamiento | Inventario y observación del navegador del sitio final | Desarrollo | Código inventariado; auditoría final pendiente |
 | Registro e información | Flujo probado con versión correcta y enlaces accesibles | Desarrollo/producto | UI y aceptación integradas; datos legales y prueba cloud pendientes |
-| Derechos y eliminación | Petición de prueba y efecto en datos/archivos | Operación/desarrollo | Limpieza de post preparada con 16 tests locales; despliegue y recorrido de derechos pendientes |
+| Derechos y eliminación | Petición de prueba y efecto en datos/archivos | Operación/desarrollo | Limpieza de post preparada con 16 pruebas con dobles, también superadas en CI; despliegue y recorrido de derechos pendientes |
+| CI de código | Ejecución alojada sobre commit identificado | Desarrollo | Ambos trabajos y 49 pruebas superados; sin despliegue ni cuentas reales |
 | Permisos y admin | Intentos de acciones no autorizadas denegados | Desarrollo/operación | 19 pruebas emuladas superadas; reglas reales y claim pendientes |
 | Moderación y soporte | Caso de prueba recibido, atendido y trazado | Administrador | Pendiente |
 | Publicación | URL, versión de código, fecha y documentos efectivos | Responsable de lanzamiento | Pendiente |
@@ -144,5 +147,6 @@ La publicación se considera lista cuando los datos están completos, las revisi
 | 0.3 | 6 de octubre de 2026 | Normalización, recorridos comprobados en navegador local e integración continua con resultado GitHub todavía pendiente. |
 | 0.4 | 6 de octubre de 2026 | Limpieza de posts preparada con 16 pruebas adicionales y CI backend Node 22; no declara eliminación operativa ni baja completa. |
 | 0.5 | 6 de octubre de 2026 | Decisión de esperar patrocinador, subidas cloud desactivadas y QA local de reproducción MP4 2 s y rechazo 91 s. |
+| 0.6 | 6 de octubre de 2026 | Registra GitHub Actions con ambos trabajos y 49 pruebas superados; mantiene pendientes los controles de nube, datos reales, financiación y publicación. |
 
 Estado de publicación: **pendiente**. La orientación sin finalidad lucrativa no implica una entidad constituida. Las cuentas juveniles siguen fuera de la primera apertura hasta contar con tutela, controles y revisión.

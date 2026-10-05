@@ -2,9 +2,9 @@
 
 Fecha de actualización: 6 de octubre de 2026. Responsable de producto y administrador inicial: propietario de Cantera.
 
-Versión del plan: 0.6. Documentos relacionados: [Whitepaper 0.5](WHITEPAPER.md) y [checklist de publicación legal](docs/LEGAL_RELEASE_CHECKLIST.md).
+Versión del plan: 0.7. Documentos relacionados: [Whitepaper 0.6](WHITEPAPER.md) y [checklist de publicación legal 0.6](docs/LEGAL_RELEASE_CHECKLIST.md).
 
-Este documento define el producto completo, su primera versión y las condiciones para lanzarlo. Los porcentajes describen hitos del plan; **no indican que ese porcentaje esté construido, probado o publicado**. La interfaz comunitaria y su integración Firebase están implementadas en la copia local. TypeScript, compilación, 14 pruebas de dominio/normalización, 19 de seguridad con emuladores y 16 de limpieza con dobles locales han pasado: 49 pruebas en total, con alcances distintos. El navegador integrado también permitió comprobar recorridos locales de liga, copa y feed. La auditoría del servicio real encontró configuración que todavía impide el lanzamiento. La sección 22 distingue esta evidencia de las tareas pendientes; no se declara la aplicación lista para clientes ni desplegada en producción.
+Este documento define el producto completo, su primera versión y las condiciones para lanzarlo. Los porcentajes describen hitos del plan; **no indican que ese porcentaje esté construido, probado o publicado**. La interfaz comunitaria y su integración Firebase están implementadas en la copia local. TypeScript, compilación, 14 pruebas de dominio/normalización, 19 de seguridad con emuladores y 16 de limpieza con dobles de datos/archivos han pasado también en la [ejecución de GitHub Actions del 6 de octubre](https://github.com/rommer1997/CANTERA-/actions/runs/37384779319): 49 pruebas en total, con alcances distintos. El navegador integrado también permitió comprobar recorridos locales de liga, copa y feed. La auditoría del servicio real encontró configuración que todavía impide el lanzamiento. La sección 22 distingue esta evidencia de las tareas pendientes; la CI no despliega servicios ni prueba cuentas reales, y no se declara la aplicación lista para clientes ni desplegada en producción.
 
 ## 1. Decisiones confirmadas y decisiones pendientes
 
@@ -359,7 +359,7 @@ Antes de abrir subidas a cualquiera: paginar feed, cargar vídeos solo cuando se
 
 **100 % del alcance inicial** significa que una persona o responsable de equipo puede organizar gratuitamente un partido o torneo, otros pueden inscribirse, celebrar y registrar la actividad, compartirla en los tres formatos, y usar un servicio publicado con datos persistentes, permisos correctos, soporte y verificación manual. La apertura juvenil y las capacidades institucionales prometidas necesitan sus recorridos completos antes de contarse como terminadas. No significa que se haya construido una red social del tamaño de TikTok ni que todas las funciones futuras estén incluidas.
 
-La entrega debe declarar por separado: construido localmente, probado localmente, probado con Firebase, desplegado, pendiente y limitado. Hasta verificar la nube y el servicio público, describir el resultado como **base funcional local con lanzamiento pendiente**. Mantener este plan actualizado con evidencia cuando cada hito se cierre.
+La entrega debe declarar por separado: construido localmente, probado localmente, comprobado en CI, probado con Firebase real, desplegado, pendiente y limitado. Hasta verificar la nube y el servicio público, describir el resultado como **base funcional local con lanzamiento pendiente**. Mantener este plan actualizado con evidencia cuando cada hito se cierre.
 
 ## 21. Documentación de uso y trazabilidad para clientes reales
 
@@ -375,21 +375,21 @@ La trazabilidad utiliza identificadores de requisitos y decisiones del [whitepap
 
 ## 22. Evidencia de la entrega y situación real a 6 de octubre de 2026
 
-### Construido y verificado localmente
+### Construido localmente y verificado también en integración continua
 
 La interfaz integra inicio, perfil, eventos, detalle con invitación y calendario, feed de tres formatos, solicitudes y administración, misión/patrocinio, y páginas de términos, privacidad y almacenamiento. Las rutas legales son `/legal/terms`, `/legal/privacy` y `/legal/cookies`; la versión de aceptación del código permanece `2026-10-05`. Actualizar la fecha de este plan no modifica esa versión ni constituye una nueva aceptación.
 
 | Verificación | Resultado de esta entrega | Alcance y referencia |
 |---|---|---|
-| TypeScript | Superado | `pnpm lint`, comprobación estática. |
-| Compilación | Superada | `pnpm build`, paquete de producción generado localmente. |
+| TypeScript | Superado localmente y en GitHub Actions | `pnpm lint`, comprobación estática. |
+| Compilación | Superada localmente y en GitHub Actions | `pnpm build`, generación de paquete; no acredita publicación. |
 | Dominio y normalización | 14 pruebas superadas | 6 de `tests/logic.test.ts` y 8 de `tests/normalization.test.ts`: torneos, inscripción, zonas/DST, registros corruptos, rutas de medios y reconstrucción sin privilegios extra. |
 | Reglas de datos y archivos | 19 pruebas superadas | `tests/security.test.mjs`, emuladores Firestore y Storage de un proyecto `demo-*`; incluye base nombrada, concurrencia de última plaza, privacidad, consentimiento, admin y archivos. |
 | Límites del formulario y lógica | Integrados | Torneos máximo 32, partidos máximo 64; zona horaria y país/ciudad obligatorios. |
 | Información y almacenamiento | Integrados en UI/código | Textos de uso y privacidad, preferencias y prueba local explícita. No se añadió marketing ni analítica; se retiraron las fuentes remotas de Google. |
 | QA de interfaz | Recorridos locales comprobados en navegador integrado | Liga de 3, copa de 3 con pase libre/final/campeón, foto/logro e interacciones y reel MP4 sintético de 2 s; persistencia tras recarga. MP4 de 91 s rechazado. |
-| Integración continua | Workflow añadido y YAML validado | `.github/workflows/ci.yml`; primera ejecución alojada pendiente de subir el código. |
-| Limpieza de publicaciones | Código y 16 pruebas locales preparados | `functions/cleanup.mjs`, adaptador `functions/index.mjs` y `functions/tests/cleanup.test.mjs`; dobles locales y sintaxis comprobados con Node 24.19 y Node 22.23.3, correspondiente al runtime previsto de despliegue. |
+| Integración continua | Ambos trabajos superados en GitHub Actions | Ejecución `37384779319` sobre el commit `54fd7e98c9469dac60e0fedd53594e778f7b9751`; 49 pruebas, sin despliegue ni cuentas reales. |
+| Limpieza de publicaciones | Código, sintaxis y 16 pruebas superadas localmente y en CI Node 22 | `functions/cleanup.mjs`, adaptador `functions/index.mjs` y `functions/tests/cleanup.test.mjs`; dobles de datos/archivos. Comprobaciones locales con Node 24.19 y Node 22.23.3; trigger sin desplegar ni invocar en nube. |
 
 ### Comprobaciones del navegador local
 
@@ -397,11 +397,13 @@ En el modo local explícito se comprobó una liga de 3 participantes: generació
 
 Esta evidencia corresponde al navegador integrado y datos del dispositivo. No constituye prueba con cuentas cloud, carga de vídeo en producción o sincronización entre dispositivos. Las pruebas del recorrido real con dos cuentas siguen abiertas; las de medios cloud esperan además la financiación elegida por el propietario.
 
-### Comprobación automática propuesta en GitHub
+### Comprobación automática observada en GitHub
 
-El workflow se ejecutará en push y pull request: instalará las dependencias del lockfile con pnpm, comprobará TypeScript, ejecutará `pnpm test` —incluida normalización—, compilará y probará Firestore/Storage emulados mediante `demo-cantera`. El trabajo de app utiliza Node 24 y Java 21; un trabajo separado utiliza Node 22, el lockfile propio de `functions`, instalación sin scripts y pruebas/check de limpieza. Tiene permiso de lectura de repositorio y no añade credenciales de producción ni pasos de despliegue. La sintaxis YAML fue validada localmente; el resultado en un runner de GitHub no se ha observado todavía.
+La [ejecución `37384779319`](https://github.com/rommer1997/CANTERA-/actions/runs/37384779319) del 6 de octubre de 2026, sobre el commit `54fd7e98c9469dac60e0fedd53594e778f7b9751`, terminó correctamente en sus dos trabajos. La app con Node 24 y Java 21 instaló las dependencias del lockfile con pnpm, comprobó TypeScript, ejecutó las 14 pruebas de dominio/normalización, compiló y superó las 19 pruebas de Firestore/Storage emulados en `demo-cantera`. El trabajo separado Node 22 instaló el lockfile de `functions` sin scripts, comprobó sintaxis y superó sus 16 pruebas con dobles: 49 pruebas en total. El workflow conserva permiso de lectura de repositorio, sin credenciales de producción ni pasos de despliegue. Su resultado no prueba cuentas reales, subidas cloud ni invocación del trigger.
 
-Las versiones de acciones se eligieron consultando sus fuentes oficiales el 6 de octubre: [checkout](https://github.com/actions/checkout), [pnpm/setup](https://github.com/pnpm/setup) y [setup-java](https://github.com/actions/setup-java). `pnpm/setup` prepara pnpm y Node conjuntamente. Mantener el workflow dentro de la revisión normal del código y comprobar su primera ejecución después de subirlo.
+La política estricta de instalación mantiene decisiones explícitas en `pnpm-workspace.yaml`: autoriza las dos versiones revisadas de esbuild y bloquea los demás scripts opcionales revisados. Un script nuevo no queda autorizado por esta entrega.
+
+Las versiones de acciones se eligieron consultando sus fuentes oficiales el 6 de octubre: [checkout](https://github.com/actions/checkout), [pnpm/setup](https://github.com/pnpm/setup) y [setup-java](https://github.com/actions/setup-java). `pnpm/setup` prepara pnpm y Node conjuntamente. Mantener el workflow dentro de la revisión normal del código y registrar el resultado de cada versión comprobada.
 
 Los 19 casos prueban reglas emuladas y no implican que estén activas en el proyecto real. La duración de vídeo se comprueba en cliente; inspección confiable de servidor, transcodificación, cuotas, protección contra abuso, bloqueo de cuentas y procesamiento completo siguen pendientes. La limpieza automática de publicaciones dispone ahora de código y pruebas, pero su activación y comprobación cloud están pendientes. Las consultas cloud mantienen límites de 100 eventos, 100 publicaciones y 1.000 interacciones. Equipos con varios gestores, avisos, chat, acceso juvenil y recorridos originales de scouting permanecen en la hoja de ruta.
 
@@ -431,6 +433,12 @@ El cambio propuesto se limita a la base nombrada de Cantera y a las reglas inclu
 4. Publicar la versión web y probar el recorrido con dos cuentas y otro dispositivo, incluidos permisos, solicitudes, contenido y retirada.
 5. Cerrar los límites y procesos necesarios para el volumen previsto, sin habilitar menores hasta completar tutela y revisión.
 
-Estado: **código integrado y probado localmente; activación cloud y lanzamiento pendientes**. La vocación sin finalidad lucrativa y el patrocinio son decisiones de proyecto; todavía no se acredita una entidad constituida o financiación confirmada.
+Estado: **código integrado, comprobado localmente y en CI; activación cloud y lanzamiento pendientes**. La vocación sin finalidad lucrativa y el patrocinio son decisiones de proyecto; todavía no se acredita una entidad constituida o financiación confirmada.
 
 Las subidas de medios en producción están desactivadas por defecto mediante `VITE_ENABLE_MEDIA_UPLOADS=false`. El modo de prueba explícito conserva fotos y vídeos solo en el dispositivo. Cambiar la bandera no crea Storage ni activa la función: requiere cerrar financiación, configuración y pruebas. El núcleo gratuito se mantiene; el coste de infraestructura pendiente no se traslada a una cuota de organización.
+
+## 23. Registro de actualización documental
+
+| Versión del plan | Fecha | Cambio |
+|---|---|---|
+| 0.7 | 6 de octubre de 2026 | Registra ambos trabajos de GitHub Actions superados sobre `54fd7e98c9469dac60e0fedd53594e778f7b9751`, 49 pruebas y política explícita de scripts de dependencias. Mantiene abiertas las puertas de lanzamiento, financiación y datos reales. |

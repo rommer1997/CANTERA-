@@ -33,7 +33,9 @@ pnpm test:security
 
 La interfaz local está en `http://127.0.0.1:3000/`. Las rutas usan HashRouter: `/#/play`, `/#/feed`, `/#/profile` y `/#/admin`.
 
-Las pruebas de seguridad sólo se ejecutan en un proyecto emulado `demo-*`, nunca contra producción. Comprueban permisos por usuario, consentimiento, privacidad, límites, última plaza concurrente, aprobación administrativa y almacenamiento. El repositorio incluye 14 pruebas de dominio/normalización, 19 de seguridad y 16 del backend de limpieza (49 en total); TypeScript y compilación fueron verificados. La integración continua definida en `.github/workflows/ci.yml` separa frontend Node 24 y backend Node 22; todavía no se ha ejecutado en GitHub.
+Las pruebas de seguridad sólo se ejecutan en un proyecto emulado `demo-*`, nunca contra producción. Comprueban permisos por usuario, consentimiento, privacidad, límites, última plaza concurrente, aprobación administrativa y almacenamiento. La [ejecución de GitHub Actions del 6 de octubre de 2026](https://github.com/rommer1997/CANTERA-/actions/runs/37384779319), sobre el commit `54fd7e98c9469dac60e0fedd53594e778f7b9751`, superó ambos trabajos: TypeScript, compilación, 14 pruebas de dominio/normalización, 19 de seguridad emulada y 16 de limpieza con dobles de datos/archivos, 49 en total. La integración continua de `.github/workflows/ci.yml` separa app Node 24/Java 21 y backend Node 22. Este resultado no despliega servicios ni prueba cuentas reales.
+
+La instalación mantiene la política estricta de pnpm: `pnpm-workspace.yaml` autoriza únicamente las versiones revisadas de esbuild y bloquea los scripts opcionales revisados de las otras dependencias. Las dependencias nuevas con scripts requieren una decisión explícita.
 
 ## Entorno local separado
 

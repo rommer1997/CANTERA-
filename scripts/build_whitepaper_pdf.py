@@ -97,10 +97,10 @@ class MarkdownRenderer:
                 label, url = link.groups()
                 if url.startswith(('https://', 'http://')):
                     self.external_links[url] = label
-                    result.append(f'<a href="{html.escape(url, quote=True)}" color="#176747"><u>{html.escape(label)}</u></a>')
+                    result.append(f'<a href="{html.escape(url, quote=True)}" color="#176747"><u>{self.inline(label, table=table)}</u></a>')
                 else:
                     self.local_references[url] = label
-                    result.append(f'<font color="#176747">{html.escape(label)}</font>')
+                    result.append(f'<font color="#176747">{self.inline(label, table=table)}</font>')
             elif piece.startswith('**') and piece.endswith('**'):
                 result.append(f'<b>{self.inline(piece[2:-2], table=table)}</b>')
             elif piece.startswith('`') and piece.endswith('`'):
@@ -412,7 +412,7 @@ def build(source: Path, output: Path, publish: bool, expected_sha: str | None) -
                   Paragraph(f'<font name="CanteraMono" size="8.0">{source_sha}</font>', style['body']),
                   Spacer(1, 7), Paragraph('Fuentes enlazadas en el texto', style['h3'])])
     for url, label in renderer.external_links.items():
-        story.append(Paragraph(f'<a href="{html.escape(url, quote=True)}" color="#176747"><u>{html.escape(label)}</u></a><br/><font size="8" color="#6f8076">{html.escape(url)}</font>', style['body']))
+        story.append(Paragraph(f'<a href="{html.escape(url, quote=True)}" color="#176747"><u>{renderer.inline(label)}</u></a><br/><font size="8" color="#6f8076">{html.escape(url)}</font>', style['body']))
     if renderer.local_references:
         story.extend([Paragraph('Documentación de esta entrega', style['h3']),
                       Paragraph('Las referencias a archivos locales designan documentos del proyecto. Su publicación web deberá acompañar la versión de código a la que se refieren.', style['note'])])
