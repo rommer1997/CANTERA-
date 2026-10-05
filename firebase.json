@@ -1,0 +1,33 @@
+{
+  "functions": [{
+    "source": "functions",
+    "codebase": "cantera-cleanup",
+    "runtime": "nodejs22",
+    "ignore": ["node_modules", "tests", "README.md", "*.log"],
+    "predeploy": ["pnpm --dir functions --ignore-workspace test", "pnpm --dir functions --ignore-workspace check"]
+  }],
+  "firestore": [
+    {
+      "database": "ai-studio-647af55f-499b-43f3-9268-9bf5f62701bb",
+      "rules": "firestore.rules",
+      "indexes": "firestore.indexes.json"
+    }
+  ],
+  "storage": {
+    "rules": "storage.rules"
+  },
+  "emulators": {
+    "firestore": {
+      "host": "127.0.0.1",
+      "port": 8080
+    },
+    "storage": {
+      "host": "127.0.0.1",
+      "port": 9199
+    },
+    "ui": {
+      "enabled": false
+    },
+    "singleProjectMode": true
+  }
+}

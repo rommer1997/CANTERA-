@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 import localConfig from '../firebase-applet-config.json';
 
 // Support for both local development and Vercel environment variables
@@ -41,6 +42,7 @@ if (!config.apiKey || config.apiKey.includes('TODO')) {
 const app = initializeApp(config);
 export const auth = getAuth(app);
 export const db = getFirestore(app, config.databaseId || '(default)');
+export const storage = getStorage(app);
 export const googleProvider = new GoogleAuthProvider();
 
 export const signInWithGoogle = async () => {

@@ -1,50 +1,16 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
-import Cantera1IdentityHub from './pages/Cantera1IdentityHub';
-import Cantera2PlayerDashboard from './pages/Cantera2PlayerDashboard';
-import Cantera3Referee from './pages/Cantera3Referee';
-import Cantera4Scout from './pages/Cantera4Scout';
-import Cantera4GuardianDashboard from './pages/Cantera4GuardianDashboard';
-import Cantera3ScoutDashboard from './pages/Cantera3ScoutDashboard';
-import Cantera5Settings from './pages/Cantera5Settings';
-import { LanguageProvider } from './core/i18n/LanguageContext';
-import { ThemeProvider, useTheme } from './core/ThemeContext';
-import { cn } from './lib/utils';
-import React from 'react';
+import { lazy, Suspense } from 'react';
+import { CommunityProvider } from './community/CommunityContext';
+import { AboutPage, AdminPage, CommunityHome, CommunityLayout, LegalPage, ProfilePage } from './community/CommunityPages';
+const EventsPage = lazy(() => import('./community/EventsPage'));
+const FeedPage = lazy(() => import('./community/FeedPage'));
 
 export default function App() {
-  return (
-    <ThemeProvider>
-      <ThemeWrapper>
-        <LanguageProvider>
-          <HashRouter>
-            <Routes>
-              <Route path="/" element={<Cantera1IdentityHub />} />
-              <Route path="/player/:id" element={<Cantera2PlayerDashboard />} />
-              <Route path="/c3" element={<Cantera3Referee />} />
-              <Route path="/c4" element={<Cantera3ScoutDashboard />} />
-              <Route path="/c4-paywall" element={<Cantera4Scout />} />
-              <Route path="/guardian" element={<Cantera4GuardianDashboard />} />
-              <Route path="/settings" element={<Cantera5Settings />} />
-              {/* Catch-all route to redirect to home */}
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </HashRouter>
-        </LanguageProvider>
-      </ThemeWrapper>
-    </ThemeProvider>
-  );
-}
-
-function ThemeWrapper({ children }: { children: React.ReactNode }) {
-  const { theme } = useTheme();
-  return (
-    <div className={cn("min-h-screen transition-colors duration-300", theme)}>
-      {children}
-    </div>
-  );
+  return <HashRouter><CommunityProvider><Suspense fallback={<div className="c-empty" role="status">Cargando Cantera…</div>}><Routes><Route element={<CommunityLayout />}>
+    <Route index element={<CommunityHome />} />
+    <Route path="play" element={<EventsPage />} /><Route path="play/:eventId" element={<EventsPage />} />
+    <Route path="feed" element={<FeedPage />} /><Route path="profile" element={<ProfilePage />} />
+    <Route path="admin" element={<AdminPage />} /><Route path="about" element={<AboutPage />} />
+    <Route path="legal/:kind" element={<LegalPage />} /><Route path="*" element={<Navigate to="/" replace />} />
+  </Route></Routes></Suspense></CommunityProvider></HashRouter>;
 }

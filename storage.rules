@@ -1,0 +1,30 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signed() { return request.auth != null; }
+    function owner(uid) { return signed() && request.auth.uid == uid; }
+    function admin() { return signed() && request.auth.token.get('admin', false) == true; }
+    match /community/{uid}/{fileName} {
+      // Published media is public. Download-token URLs also remain public to their holders.
+      allow get: if true;
+      allow list: if false;
+      // This app uses named Firestore: do not validate a different (default) profile here.
+      // Publication requires accepted terms and adult confirmation in Firestore.
+      // Server upload quotas and file inspection are launch gates.
+      allow create: if owner(uid) && resource == null && fileName.size() <= 128 && request.resource.size > 0 && (
+        request.resource.size <= 10 * 1024 * 1024 && (
+          request.resource.contentType == 'image/jpeg' && fileName.matches('[a-zA-Z0-9_-]+[.]jpg')
+          || request.resource.contentType == 'image/png' && fileName.matches('[a-zA-Z0-9_-]+[.]png')
+          || request.resource.contentType == 'image/webp' && fileName.matches('[a-zA-Z0-9_-]+[.]webp')
+        )
+        || request.resource.size <= 50 * 1024 * 1024 && (
+          request.resource.contentType == 'video/mp4' && fileName.matches('[a-zA-Z0-9_-]+[.]mp4')
+          || request.resource.contentType == 'video/webm' && fileName.matches('[a-zA-Z0-9_-]+[.]webm')
+        )
+      );
+      allow update: if false;
+      allow delete: if owner(uid) || admin();
+    }
+    match /{path=**} { allow read, write: if false; }
+  }
+}

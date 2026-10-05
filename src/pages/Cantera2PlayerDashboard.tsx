@@ -214,7 +214,7 @@ export default function Cantera2PlayerDashboard() {
       case 0: setActiveTab('dashboard'); break; // Radar
       case 1: setActiveTab('profile'); break; // PRO Badge
       case 2: break; // Guardian (Header, any tab)
-      case 3: setActiveTab('network'); break; // Analytics
+      case 3: setActiveTab('dashboard'); break; // Analytics
       case 4: break; // Decision (Any tab)
       case 5: setActiveTab('dashboard'); break; // Compare
       case 6: 
@@ -434,7 +434,7 @@ function NavButton({ icon, label, isActive, onClick }: { icon: React.ReactNode, 
         isActive ? "text-gold bg-gold/10 scale-110" : "text-charcoal/40 dark:text-ice/40 hover:text-charcoal/80 dark:hover:text-ice/80"
       )}
     >
-      {React.cloneElement(icon as React.ReactElement, { size: 20 })}
+      {React.cloneElement(icon as React.ReactElement<{ size?: number }>, { size: 20 })}
       <span className="text-[9px] font-bold uppercase tracking-tighter">{label}</span>
       {isActive && <motion.div layoutId="nav-indicator" className="w-1 h-1 bg-gold rounded-full absolute -bottom-1" />}
     </button>

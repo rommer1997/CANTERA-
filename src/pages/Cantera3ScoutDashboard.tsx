@@ -12,7 +12,7 @@ import Logo from '../components/Logo';
 import BackButton from '../components/BackButton';
 import NotificationCenter from '../components/NotificationCenter';
 import { useAppStore } from '../store/useAppStore';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 
 // --- MOCK DATA ---
 const MOCK_PLAYERS = [
