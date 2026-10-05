@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowDownToLine, ArrowLeft, ArrowRight, CalendarDays, Check, ChevronRight, Clock3, Flag, MapPin, Plus, Share2, ShieldCheck, SlidersHorizontal, Trophy, Users, X } from 'lucide-react';
+import { ArrowDownToLine, ArrowLeft, ArrowRight, CalendarDays, Check, ChevronRight, Clock3, Flag, MapPin, Plus, Search, Share2, ShieldCheck, SlidersHorizontal, Trophy, Users, X } from 'lucide-react';
 import { useCommunity } from './CommunityContext';
 import { standings, zonedDateTimeToIso } from './logic';
 import type { EventInput, Fixture, PlayEvent } from './types';
@@ -15,6 +15,9 @@ const entryLabel = (event: PlayEvent) => event.entry === 'teams' ? 'equipos' : '
 const errorMessage = (error: unknown) => error instanceof Error ? error.message : 'No hemos podido completar la acción. Vuelve a intentarlo.';
 const statusLabel = (event: PlayEvent) => event.status === 'cancelled' ? 'Cancelado' : event.status === 'closed' ? 'Inscripción cerrada' : Object.keys(event.participants).length >= event.capacity ? 'Completo' : 'Inscripción abierta';
 const invitationUrl = (id: string) => `${window.location.origin}${window.location.pathname}#/play/${id}`;
+const locationKey = (value: string) => value.trim().normalize('NFKC').toLocaleLowerCase('es');
+const locationOptions = (values: string[]) => [...new Map(values.filter(Boolean).map(value => [locationKey(value), value])).values()].sort((a, b) => a.localeCompare(b));
+const queryLocation = (value: string | null, limit: number) => (value || '').trim().slice(0, limit);
 
 function initialDate() {
   const date = new Date();
@@ -24,12 +27,12 @@ function initialDate() {
   return localDate.toISOString().slice(0, 16);
 }
 
-function CreateEvent({ onClose }: { onClose: () => void }) {
+function CreateEvent({ onClose, initialType }: { onClose: () => void; initialType: EventInput['type'] }) {
   const { profile, createEvent } = useCommunity();
   const navigate = useNavigate();
   const [title, setTitle] = useState('');
-  const [type, setType] = useState<EventInput['type']>('match');
-  const [entry, setEntry] = useState<EventInput['entry']>('players');
+  const [type, setType] = useState<EventInput['type']>(initialType);
+  const [entry, setEntry] = useState<EventInput['entry']>(initialType === 'tournament' ? 'teams' : 'players');
   const [format, setFormat] = useState<EventInput['format']>('7');
   const [level, setLevel] = useState<EventInput['level']>(profile?.level || 'amateur');
   const [city, setCity] = useState(profile?.city || '');
@@ -37,32 +40,52 @@ function CreateEvent({ onClose }: { onClose: () => void }) {
   const [timeZone, setTimeZone] = useState(browserTimeZone);
   const [venue, setVenue] = useState('');
   const [startAt, setStartAt] = useState(initialDate);
-  const [capacity, setCapacity] = useState('14');
+  const [capacity, setCapacity] = useState(initialType === 'tournament' ? '8' : '14');
   const [tournamentFormat, setTournamentFormat] = useState<EventInput['tournamentFormat']>('league');
   const [description, setDescription] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const maxCapacity = type === 'tournament' ? 32 : 64;
-  const modalRef = useRef<HTMLElement>(null);
-  const restoreFocusRef = useRef(document.activeElement instanceof HTMLElement ? document.activeElement : null);
+  const modalRef = useRef<HTMLDialogElement>(null);
+  const titleInputRef = useRef<HTMLInputElement>(null);
+  const restoreFocusRef = useRef<HTMLElement | null>(null);
   const savingRef = useRef(saving);
   const closeRef = useRef(onClose);
   savingRef.current = saving;
   closeRef.current = onClose;
 
   useEffect(() => {
-    const handler = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !savingRef.current) closeRef.current();
-      if (event.key !== 'Tab' || !modalRef.current) return;
-      const focusable = [...modalRef.current.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href]')];
-      const first = focusable[0]; const last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
-      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
-    };
-    document.addEventListener('keydown', handler);
+    const dialog = modalRef.current;
+    if (!dialog) return;
+    const active = document.activeElement;
+    const triggers = [
+      active instanceof HTMLElement && active !== document.body && !active.closest('dialog') ? active : null,
+      document.querySelector<HTMLElement>('.c-bottom-create'),
+      document.querySelector<HTMLElement>('.ce-mobile-header button'),
+      document.querySelector<HTMLElement>('.ce-hero-actions button'),
+    ];
+    restoreFocusRef.current = triggers.find(element => element?.isConnected && element.getClientRects().length > 0) || null;
     const previous = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    return () => { document.removeEventListener('keydown', handler); document.body.style.overflow = previous; restoreFocusRef.current?.focus(); };
+    if (!dialog.open) dialog.showModal();
+    let focusFrame = 0;
+    // The creation selector may restore its own focus as it closes. Refocus
+    // after that transition while the native dialog keeps the page inert.
+    const openFrame = requestAnimationFrame(() => {
+      focusFrame = requestAnimationFrame(() => {
+        if (dialog.open) titleInputRef.current?.focus({ preventScroll: true });
+      });
+    });
+    return () => {
+      cancelAnimationFrame(openFrame);
+      cancelAnimationFrame(focusFrame);
+      if (dialog.open) dialog.close();
+      document.body.style.overflow = previous;
+      const trigger = restoreFocusRef.current;
+      requestAnimationFrame(() => {
+        if (!document.querySelector('dialog[open]') && trigger?.isConnected && trigger.getClientRects().length > 0) trigger.focus({ preventScroll: true });
+      });
+    };
   }, []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -83,12 +106,12 @@ function CreateEvent({ onClose }: { onClose: () => void }) {
     } catch (error) { setError(errorMessage(error)); } finally { setSaving(false); }
   }
 
-  return <div className="ce-modal-backdrop" onClick={() => { if (!saving) onClose(); }}>
-    <section ref={modalRef} className="ce-modal" role="dialog" aria-modal="true" aria-labelledby="ce-create-title" onClick={event => event.stopPropagation()}>
-      <div className="ce-modal-heading"><div><span className="c-eyebrow">Del grupo al campo</span><h2 id="ce-create-title">Organiza tu próximo encuentro.</h2></div><button className="ce-icon-button" type="button" aria-label="Cerrar formulario" onClick={onClose} disabled={saving}><X size={22} /></button></div>
+  return <dialog ref={modalRef} className="ce-modal-backdrop" aria-labelledby="ce-create-title" onCancel={event => { event.preventDefault(); if (!savingRef.current) closeRef.current(); }} onClose={() => { if (!modalRef.current?.open) closeRef.current(); }} onClick={event => { if (event.target === event.currentTarget && !saving) onClose(); }}>
+    <section className="ce-modal" onClick={event => event.stopPropagation()}>
+      <div className="ce-modal-heading"><div><span className="c-eyebrow">Del grupo al campo</span><h2 id="ce-create-title"><span className="ce-modal-desktop-title">Organiza tu próximo encuentro.</span><span className="ce-modal-mobile-title">{type === 'tournament' ? 'Crear torneo' : 'Crear partido'}</span></h2></div><button className="ce-icon-button" type="button" aria-label="Cerrar formulario" onClick={onClose} disabled={saving}><X size={22} /></button></div>
       <p className="ce-form-intro">Publicar, invitar y gestionar inscripciones en Cantera es gratis. Acordad directamente cualquier coste del campo.</p>
       <form className="ce-form" onSubmit={submit}>
-        <label className="ce-field ce-full">Nombre del encuentro<input autoFocus aria-label="Nombre del encuentro" className="c-input" maxLength={100} placeholder="Por ejemplo: Fútbol del domingo en Madrid" value={title} onChange={event => setTitle(event.target.value)} required minLength={3} /></label>
+        <label className="ce-field ce-full">Nombre del encuentro<input ref={titleInputRef} autoFocus aria-label="Nombre del encuentro" className="c-input" maxLength={100} placeholder="Por ejemplo: Fútbol del domingo en Madrid" value={title} onChange={event => setTitle(event.target.value)} required minLength={3} /></label>
         <fieldset className="ce-choice-field ce-full"><legend>¿Qué vas a organizar?</legend><div className="ce-type-choices">{(['match', 'tournament'] as const).map(value => <button type="button" key={value} className={`ce-type-choice ${type === value ? 'active' : ''}`} aria-pressed={type === value} onClick={() => { setType(value); setEntry(value === 'tournament' ? 'teams' : 'players'); setCapacity(value === 'tournament' ? '8' : '14'); }}>{value === 'match' ? <Flag size={23} /> : <Trophy size={23} />}<span>{value === 'match' ? 'Partido' : 'Torneo'}<small>{value === 'match' ? 'Un encuentro, mucha comunidad.' : 'Un calendario y una clasificación.'}</small></span>{type === value && <Check size={17} />}</button>)}</div></fieldset>
         <label className="ce-field">País<input aria-label="País" className="c-input" maxLength={100} placeholder="País del encuentro" value={country} onChange={event => setCountry(event.target.value)} required /></label>
         <label className="ce-field">Ciudad<input aria-label="Ciudad" className="c-input" maxLength={80} placeholder="Ciudad del encuentro" value={city} onChange={event => setCity(event.target.value)} required /></label>
@@ -106,7 +129,7 @@ function CreateEvent({ onClose }: { onClose: () => void }) {
         <div className="ce-form-footer ce-full"><span><ShieldCheck size={17} /> Elige el campo, el formato y tu convocatoria.</span><button className="c-button" type="submit" disabled={saving}>{saving ? 'Publicando…' : 'Publicar encuentro'}<ArrowRight size={17} /></button></div>
       </form>
     </section>
-  </div>;
+  </dialog>;
 }
 
 function EventCard({ event }: { event: PlayEvent }) {
@@ -117,7 +140,7 @@ function EventCard({ event }: { event: PlayEvent }) {
   const month = new Intl.DateTimeFormat('es', { month: 'short', timeZone: event.timeZone }).format(date).replace('.', '');
   return <Link className={`ce-event-card ${event.status === 'cancelled' ? 'ce-cancelled' : ''}`} to={`/play/${event.id}`}>
     <div className={`ce-card-cover ${event.type === 'tournament' ? 'ce-tournament-cover' : ''}`}><div className="ce-pitch-mark" aria-hidden="true"><div /><span /></div><span className="ce-card-category">{event.type === 'tournament' ? <Trophy size={15} /> : <Flag size={15} />}{event.type === 'tournament' ? 'Torneo' : 'Partido'} · Fútbol {event.format}</span><div className="ce-card-date"><strong>{day}</strong><span>{month}</span></div><span className={`ce-status ${event.status !== 'open' || count >= event.capacity ? 'ce-status-muted' : ''}`}>{statusLabel(event)}</span></div>
-    <div className="ce-card-body"><div className="ce-card-meta"><span>{levelLabel(event.level)}</span>{event.type === 'tournament' && <span>{event.tournamentFormat === 'league' ? 'Liga' : 'Eliminatoria'}</span>}</div><h3>{event.title}</h3><p><MapPin size={16} /><span>{event.city}, {event.country} · {event.venue}</span></p><p><Clock3 size={16} /><span>{formatDate(event.startAt, event.timeZone)} · {formatTime(event.startAt, event.timeZone)}</span></p><div className="ce-card-occupancy"><div><span>{count} / {event.capacity} {entryLabel(event)}</span><strong>{Math.max(0, event.capacity - count)} plazas</strong></div><div className="ce-progress-track"><span style={{ width: `${percentage}%` }} /></div></div><div className="ce-card-footer"><span>Por {event.ownerName}</span><span>Ver encuentro<ArrowUpRightIcon /></span></div></div>
+    <div className="ce-card-body"><div className="ce-card-mobile-meta"><span>{event.type === 'tournament' ? 'Torneo' : 'Partido'} · Fútbol {event.format}</span><span>{event.status === 'cancelled' ? 'Cancelado' : event.status === 'closed' ? 'Cerrado' : count >= event.capacity ? 'Completo' : 'Abierto'}</span></div><div className="ce-card-meta"><span>{levelLabel(event.level)}</span>{event.type === 'tournament' && <span>{event.tournamentFormat === 'league' ? 'Liga' : 'Eliminatoria'}</span>}</div><h3>{event.title}</h3><p><MapPin size={16} /><span>{event.city}, {event.country} · {event.venue}</span></p><p><Clock3 size={16} /><span>{formatDate(event.startAt, event.timeZone)} · {formatTime(event.startAt, event.timeZone)}</span></p><div className="ce-card-occupancy"><div><span>{count} / {event.capacity} {entryLabel(event)}</span><strong>{Math.max(0, event.capacity - count)} plazas</strong></div><div className="ce-progress-track"><span style={{ width: `${percentage}%` }} /></div></div><div className="ce-card-footer"><span>Por {event.ownerName}</span><span>Ver encuentro<ArrowUpRightIcon /></span></div></div>
   </Link>;
 }
 
@@ -222,25 +245,87 @@ function EventDetail({ event }: { event: PlayEvent }) {
 
 export default function EventsPage() {
   const { eventId } = useParams<{ eventId: string }>();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const requestedType = searchParams.get('type');
+  const requestedCreate = searchParams.get('create') === '1';
+  const country = queryLocation(searchParams.get('country'), 100);
+  const city = queryLocation(searchParams.get('city'), 80);
+  const type = requestedType === 'match' || requestedType === 'tournament' ? requestedType : 'all';
   const { events, loading, profile } = useCommunity();
   const [creating, setCreating] = useState(false);
-  const [city, setCity] = useState('');
-  const [country, setCountry] = useState('');
+  const [creationType, setCreationType] = useState<EventInput['type']>('match');
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [level, setLevel] = useState('all');
-  const [type, setType] = useState(requestedType === 'match' || requestedType === 'tournament' ? requestedType : 'all');
   const [onlyOpen, setOnlyOpen] = useState(true);
   const [search, setSearch] = useState('');
-  useEffect(() => { setType(requestedType === 'match' || requestedType === 'tournament' ? requestedType : 'all'); }, [requestedType]);
-  const countries = [...new Set(events.map(event => event.country))].filter(Boolean).sort((a, b) => a.localeCompare(b));
-  const cities = [...new Set(events.filter(event => !country || event.country === country).map(event => event.city))].sort((a, b) => a.localeCompare(b));
-  const filtered = useMemo(() => events.filter(event => (!country || event.country === country) && (!city || event.city === city) && (level === 'all' || event.level === level) && (type === 'all' || event.type === type) && (!onlyOpen || (event.status === 'open' && new Date(event.startAt).getTime() >= Date.now())) && (!search || `${event.title} ${event.country} ${event.city} ${event.venue}`.toLocaleLowerCase('es').includes(search.toLocaleLowerCase('es')))).sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime()), [events, country, city, level, type, onlyOpen, search]);
+
+  useEffect(() => {
+    if (!requestedCreate || loading || eventId) return;
+    if (!profile) { navigate('/profile'); return; }
+    setCreationType(requestedType === 'tournament' ? 'tournament' : 'match');
+    setCreating(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete('create');
+    setSearchParams(next, { replace: true });
+  }, [requestedCreate, requestedType, loading, profile, eventId, searchParams, setSearchParams, navigate]);
+
+  function updateQuery(updates: Record<string, string>) {
+    const next = new URLSearchParams(searchParams);
+    Object.entries(updates).forEach(([key, value]) => value ? next.set(key, value) : next.delete(key));
+    setSearchParams(next, { replace: true });
+  }
+  function openCreate() {
+    setCreationType(type === 'tournament' ? 'tournament' : 'match');
+    setCreating(true);
+  }
+  function resetFilters() {
+    updateQuery({ country: '', city: '', type: '', create: '' });
+    setLevel('all'); setSearch(''); setOnlyOpen(false); setFiltersOpen(false);
+  }
+
+  const countries = locationOptions([...events.map(event => event.country), country]);
+  const cities = locationOptions([...events.filter(event => !country || locationKey(event.country) === locationKey(country)).map(event => event.city), city]);
+  const activeFilterCount = Number(!!country) + Number(!!city) + Number(level !== 'all');
+  const locationSummary = city ? [city, country].filter(Boolean).join(', ') : country || 'Todos los países y ciudades';
+  const filtered = useMemo(() => events.filter(event =>
+    (!country || locationKey(event.country) === locationKey(country)) &&
+    (!city || locationKey(event.city) === locationKey(city)) &&
+    (level === 'all' || event.level === level) &&
+    (type === 'all' || event.type === type) &&
+    (!onlyOpen || (event.status === 'open' && new Date(event.startAt).getTime() >= Date.now())) &&
+    (!search || [event.title, event.country, event.city, event.venue].join(' ').toLocaleLowerCase('es').includes(search.toLocaleLowerCase('es')))
+  ).sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime()), [events, country, city, level, type, onlyOpen, search]);
   const upcomingCount = events.filter(event => event.status === 'open' && new Date(event.startAt).getTime() >= Date.now()).length;
   const event = eventId ? events.find(item => item.id === eventId) : undefined;
 
   if (loading) return <div className="ce-loading" role="status"><div className="ce-loading-ball" /><h2>Preparando el campo…</h2><p>Cargando los encuentros de la comunidad.</p></div>;
   if (eventId) return event ? <EventDetail key={event.id} event={event} /> : <section className="c-panel ce-not-found"><Trophy size={40} /><h1>No encontramos este encuentro.</h1><p>Puede que el enlace no sea correcto o que no esté disponible en este navegador.</p><Link className="c-button" to="/play">Explorar encuentros<ArrowRight size={17} /></Link></section>;
 
-  return <div className="ce-events-page"><section className="ce-page-hero"><div className="ce-page-hero-copy"><span className="c-eyebrow">Juega. Conecta. Repite.</span><h1>El próximo partido<br /><em>empieza contigo.</em></h1><p>Encuentra tu grupo, organiza un partido o crea un torneo. Desde la pachanga del barrio hasta el siguiente gran cruce.</p><div className="ce-hero-actions">{profile ? <button className="c-button" onClick={() => setCreating(true)}><Plus size={18} />Organizar encuentro</button> : <Link className="c-button" to="/profile"><Plus size={18} />Crea tu perfil y organiza</Link>}<span><ShieldCheck size={16} />Organizar en Cantera es gratis</span></div></div><div className="ce-hero-art" aria-hidden="true"><div className="ce-art-pitch"><span className="ce-art-circle" /><span className="ce-art-line" /><span className="ce-art-box" /><i className="ce-art-player ce-player-1" /><i className="ce-art-player ce-player-2" /><i className="ce-art-player ce-player-3" /><i className="ce-art-player ce-player-4" /><i className="ce-art-player ce-player-5" /><div className="ce-art-ball">⚽</div></div><div className="ce-art-note"><div><Check size={14} /></div><span>La convocatoria está abierta.<strong>Solo faltas tú.</strong></span></div><span className="ce-art-caption">MENOS CHAT. MÁS FÚTBOL.</span></div></section><div className="ce-discover-heading"><div><span className="c-eyebrow">La comunidad sale a jugar</span><h2>Encuentros cerca de ti<span className="ce-heading-count">{upcomingCount}</span></h2></div><span className="ce-discover-hint">Para todos los niveles. Para todos los equipos.</span></div><section className="ce-filter-bar" aria-label="Filtrar encuentros"><div className="ce-search"><SlidersHorizontal size={18} /><input aria-label="Buscar por nombre, país, ciudad o campo" placeholder="Busca un encuentro, ciudad o campo" value={search} onChange={event => setSearch(event.target.value)} /></div><label><span className="ce-sr-only">País</span><select aria-label="País" value={country} onChange={event => { setCountry(event.target.value); setCity(''); }}><option value="">Todos los países</option>{countries.map(value => <option key={value} value={value}>{value}</option>)}</select></label><label><span className="ce-sr-only">Ciudad</span><select aria-label="Ciudad" value={city} onChange={event => setCity(event.target.value)}><option value="">Todas las ciudades</option>{cities.map(value => <option key={value} value={value}>{value}</option>)}</select></label><label><span className="ce-sr-only">Nivel</span><select aria-label="Nivel" value={level} onChange={event => setLevel(event.target.value)}><option value="all">Todos los niveles</option><option value="amateur">Amateur</option><option value="professional">Profesional</option></select></label><label><span className="ce-sr-only">Tipo de encuentro</span><select aria-label="Tipo de encuentro" value={type} onChange={event => setType(event.target.value)}><option value="all">Partidos y torneos</option><option value="match">Partidos</option><option value="tournament">Torneos</option></select></label></section><div className="ce-results-row"><p>{filtered.length} {filtered.length === 1 ? 'encuentro' : 'encuentros'}</p><label className="ce-open-toggle"><input type="checkbox" checked={onlyOpen} onChange={event => setOnlyOpen(event.target.checked)} /><span>Solo próximos y abiertos</span></label></div>{filtered.length ? <div className="ce-event-grid">{filtered.map(event => <EventCard key={event.id} event={event} />)}</div> : <div className="ce-empty-state"><div className="ce-empty-icon"><Flag size={30} /></div><h3>{events.length ? 'Aún no hay encuentros con estos filtros.' : 'El primer encuentro empieza aquí.'}</h3><p>{events.length ? 'Prueba otro país, ciudad o nivel. También puedes reunir a tu grupo y organizar el próximo.' : 'Reúne a tu grupo, elige un campo y abre la convocatoria. Crear el encuentro solo lleva un minuto.'}</p>{events.length ? <button className="c-button secondary" onClick={() => { setCountry(''); setCity(''); setLevel('all'); setType('all'); setSearch(''); setOnlyOpen(false); }}>Ver todos los encuentros</button> : profile ? <button className="c-button" onClick={() => setCreating(true)}><Plus size={17} />Organizar el primero</button> : <Link className="c-button" to="/profile">Crear mi perfil<ArrowRight size={17} /></Link>}</div>}<section className="ce-bottom-banner"><div><span className="c-eyebrow">De una idea al pitido inicial</span><h3>Tu grupo. Tu campo. Tus reglas.</h3><p>Comparte un enlace, completa la convocatoria y deja que el fútbol haga el resto.</p></div>{profile ? <button className="c-button secondary" onClick={() => setCreating(true)}>Crear un encuentro<ArrowRight size={17} /></button> : <Link className="c-button secondary" to="/profile">Empezar<ArrowRight size={17} /></Link>}</section>{creating && <CreateEvent onClose={() => setCreating(false)} />}</div>;
+  return <div className="ce-events-page">
+    <section className="ce-mobile-header" aria-label="Juega">
+      <div><h1>Juega</h1><p><MapPin size={15} aria-hidden="true" /><span>{locationSummary}</span></p></div>
+      {profile ? <button type="button" className="c-button" onClick={openCreate} aria-label="Organizar un partido o torneo"><Plus size={18} />Crear</button> : <Link className="c-button" to="/profile" aria-label="Crear perfil para organizar un partido o torneo"><Plus size={18} />Crear</Link>}
+    </section>
+    <section className="ce-page-hero">
+      <div className="ce-page-hero-copy"><span className="c-eyebrow">Juega. Conecta. Repite.</span><h1>El próximo partido<br /><em>empieza contigo.</em></h1><p>Encuentra tu grupo, organiza un partido o crea un torneo. Desde la pachanga del barrio hasta el siguiente gran cruce.</p><div className="ce-hero-actions">{profile ? <button className="c-button" onClick={openCreate}><Plus size={18} />Organizar encuentro</button> : <Link className="c-button" to="/profile"><Plus size={18} />Crea tu perfil y organiza</Link>}<span><ShieldCheck size={16} />Organizar en Cantera es gratis</span></div></div>
+      <div className="ce-hero-art" aria-hidden="true"><div className="ce-art-pitch"><span className="ce-art-circle" /><span className="ce-art-line" /><span className="ce-art-box" /><i className="ce-art-player ce-player-1" /><i className="ce-art-player ce-player-2" /><i className="ce-art-player ce-player-3" /><i className="ce-art-player ce-player-4" /><i className="ce-art-player ce-player-5" /><div className="ce-art-ball">⚽</div></div><div className="ce-art-note"><div><Check size={14} /></div><span>La convocatoria está abierta.<strong>Solo faltas tú.</strong></span></div><span className="ce-art-caption">MENOS CHAT. MÁS FÚTBOL.</span></div>
+    </section>
+    <div className="ce-discover-heading"><div><span className="c-eyebrow">La comunidad sale a jugar</span><h2>Encuentros cerca de ti<span className="ce-heading-count">{upcomingCount}</span></h2></div><span className="ce-discover-hint">Para todos los niveles. Para todos los equipos.</span></div>
+    <section className={'ce-filter-bar' + (filtersOpen ? ' ce-filters-open' : '')} aria-label="Filtrar encuentros">
+      <div className="ce-search"><Search size={18} aria-hidden="true" /><input type="search" enterKeyHint="search" aria-label="Buscar por nombre, país, ciudad o campo" placeholder="Encuentro, ciudad o campo" value={search} onChange={event => setSearch(event.target.value)} /></div>
+      <button className="ce-filter-toggle" type="button" aria-expanded={filtersOpen} aria-controls="ce-event-filters" onClick={() => setFiltersOpen(value => !value)}><SlidersHorizontal size={18} aria-hidden="true" />Filtros{activeFilterCount > 0 && <span>{activeFilterCount}</span>}</button>
+      <div className="ce-filter-fields" id="ce-event-filters">
+        <label><span className="ce-sr-only">País</span><select aria-label="País" value={country} onChange={event => updateQuery({ country: event.target.value, city: '' })}><option value="">Todos los países</option>{countries.map(value => <option key={value} value={value}>{value}</option>)}</select></label>
+        <label><span className="ce-sr-only">Ciudad</span><select aria-label="Ciudad" value={city} onChange={event => updateQuery({ city: event.target.value })}><option value="">Todas las ciudades</option>{cities.map(value => <option key={value} value={value}>{value}</option>)}</select></label>
+        <label className="ce-level-filter"><span className="ce-sr-only">Nivel</span><select aria-label="Nivel" value={level} onChange={event => setLevel(event.target.value)}><option value="all">Todos los niveles</option><option value="amateur">Amateur</option><option value="professional">Profesional</option></select></label>
+        <label className="ce-type-filter"><span className="ce-sr-only">Tipo de encuentro</span><select aria-label="Tipo de encuentro" value={type} onChange={event => updateQuery({ type: event.target.value === 'all' ? '' : event.target.value })}><option value="all">Partidos y torneos</option><option value="match">Partidos</option><option value="tournament">Torneos</option></select></label>
+      </div>
+    </section>
+    <div className="ce-mobile-types" role="group" aria-label="Tipo de encuentro">{([{ value: 'all', label: 'Todos' }, { value: 'match', label: 'Partidos' }, { value: 'tournament', label: 'Torneos' }] as const).map(item => <button type="button" key={item.value} aria-pressed={type === item.value} onClick={() => updateQuery({ type: item.value === 'all' ? '' : item.value })}>{item.label}</button>)}</div>
+    <div className="ce-results-row"><p role="status">{filtered.length} {filtered.length === 1 ? 'encuentro' : 'encuentros'}</p><label className="ce-open-toggle"><input type="checkbox" checked={onlyOpen} onChange={event => setOnlyOpen(event.target.checked)} /><span>Solo próximos y abiertos</span></label></div>
+    {filtered.length ? <div className="ce-event-grid">{filtered.map(event => <EventCard key={event.id} event={event} />)}</div> : <div className="ce-empty-state"><div className="ce-empty-icon"><Flag size={30} /></div><h3>{events.length ? 'Aún no hay encuentros con estos filtros.' : 'El primer encuentro empieza aquí.'}</h3><p>{events.length ? 'Prueba otro país, ciudad o nivel. También puedes reunir a tu grupo y organizar el próximo.' : 'Reúne a tu grupo, elige un campo y abre la convocatoria. Crear el encuentro solo lleva un minuto.'}</p>{events.length ? <button className="c-button secondary" onClick={resetFilters}>Ver todos los encuentros</button> : profile ? <button className="c-button" onClick={openCreate}><Plus size={17} />Organizar el primero</button> : <Link className="c-button" to="/profile">Crear mi perfil<ArrowRight size={17} /></Link>}</div>}
+    <section className="ce-bottom-banner"><div><span className="c-eyebrow">De una idea al pitido inicial</span><h3>Tu grupo. Tu campo. Tus reglas.</h3><p>Comparte un enlace, completa la convocatoria y deja que el fútbol haga el resto.</p></div>{profile ? <button className="c-button secondary" onClick={openCreate}>Crear un encuentro<ArrowRight size={17} /></button> : <Link className="c-button secondary" to="/profile">Empezar<ArrowRight size={17} /></Link>}</section>
+    {creating && <CreateEvent key={creationType} initialType={creationType} onClose={() => setCreating(false)} />}
+  </div>;
 }

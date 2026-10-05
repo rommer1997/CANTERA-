@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { ArrowRight, ArrowUpRight, Award, CalendarDays, Camera, Check, EyeOff, Film, Flag, Heart, LoaderCircle, MapPin, MessageCircle, MoreHorizontal, Plus, Share2, Trash2, Upload, X } from 'lucide-react';
 import { friendlyError, useCommunity } from './CommunityContext';
 import type { CommunityPost, PostInput, PostKind } from './types';
 import './feed.css';
 
 type FeedFilter = 'all' | PostKind;
+type ComposerRequest = { sequence: number; kind?: PostKind };
 const kindLabels: Record<PostKind, string> = { reel: 'Reel', photo: 'Foto', achievement: 'Logro' };
 const filters: { id: FeedFilter; label: string; icon?: typeof Film }[] = [
   { id: 'all', label: 'Todo' }, { id: 'reel', label: 'Reels', icon: Film },
@@ -65,21 +66,29 @@ async function validateMedia(file: File, kind: PostKind) {
   });
 }
 
-function Modal({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
+function Modal({ title, children, onClose, returnFocusRef }: { title: string; children: React.ReactNode; onClose: () => void; returnFocusRef: React.RefObject<HTMLButtonElement | null> }) {
   const ref = useRef<HTMLDialogElement>(null);
   const headingId = React.useId();
   useEffect(() => {
     const dialog = ref.current;
     dialog?.showModal();
-    return () => { if (dialog?.open) dialog.close(); };
-  }, []);
+    return () => {
+      if (dialog?.open) dialog.close();
+      requestAnimationFrame(() => {
+        // Let the card removal commit before selecting a surviving focus target.
+        if (document.querySelector('dialog[open]')) return;
+        const target = returnFocusRef.current?.isConnected ? returnFocusRef.current : document.getElementById('cf-feed-heading');
+        target?.focus({ preventScroll: true });
+      });
+    };
+  }, [returnFocusRef]);
   return <dialog ref={ref} className="cf-dialog" aria-labelledby={headingId} onCancel={event => { event.preventDefault(); onClose(); }}>
     <div className="cf-dialog-head"><h2 id={headingId}>{title}</h2><button type="button" className="cf-icon-button" onClick={onClose} aria-label="Cerrar diálogo"><X size={19} /></button></div>
     {children}
   </dialog>;
 }
 
-function Composer({ onPublished }: { onPublished: (id: string) => void }) {
+function Composer({ onPublished, openRequest }: { onPublished: (id: string) => void; openRequest: ComposerRequest }) {
   const { profile, events, createPost, mode, mediaUploadsEnabled } = useCommunity();
   const [expanded, setExpanded] = useState(false);
   const [kind, setKind] = useState<PostKind>(mediaUploadsEnabled ? 'photo' : 'achievement');
@@ -93,6 +102,9 @@ function Composer({ onPublished }: { onPublished: (id: string) => void }) {
   const [validating, setValidating] = useState(false);
   const [progress, setProgress] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const consumedRequest = useRef(0);
+  const focusPending = useRef(false);
   const fileSequence = useRef(0);
   const inputId = React.useId();
   const isLocked = busy || validating;
@@ -104,6 +116,29 @@ function Composer({ onPublished }: { onPublished: (id: string) => void }) {
     return () => URL.revokeObjectURL(url);
   }, [file]);
   useEffect(() => () => { fileSequence.current += 1; }, []);
+  useEffect(() => {
+    if (!profile || !openRequest.sequence || openRequest.sequence === consumedRequest.current) return;
+    consumedRequest.current = openRequest.sequence;
+    if (openRequest.kind) {
+      fileSequence.current += 1;
+      setKind(openRequest.kind !== 'achievement' && !mediaUploadsEnabled ? 'achievement' : openRequest.kind);
+      setFile(undefined); setError(''); setValidating(false);
+      if (inputRef.current) inputRef.current.value = '';
+    }
+    focusPending.current = true;
+    setExpanded(true);
+  }, [openRequest, profile?.id, mediaUploadsEnabled]);
+  useEffect(() => {
+    if (!expanded || !focusPending.current) return;
+    const frame = requestAnimationFrame(() => {
+      const form = formRef.current;
+      if (!form) return;
+      focusPending.current = false;
+      form.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'nearest' });
+      form.querySelector<HTMLInputElement | HTMLTextAreaElement>('input:not([type="file"]), textarea')?.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [expanded, openRequest.sequence]);
   useEffect(() => {
     if (!mediaUploadsEnabled && kind !== 'achievement') {
       fileSequence.current += 1;
@@ -153,14 +188,14 @@ function Composer({ onPublished }: { onPublished: (id: string) => void }) {
   }
 
   if (!profile) return <div className="c-panel cf-composer cf-join-composer">
-    <span className="cf-avatar">C</span><div><strong>Tu fútbol tiene una historia.</strong><p>Crea tu perfil para compartirla con la comunidad.</p>{!mediaUploadsEnabled && <p className="c-small">Fotos y reels pendientes del patrocinio del almacenamiento. Los logros escritos forman parte del núcleo gratuito.</p>}</div><Link className="c-button" to="/profile">Crear perfil <ArrowUpRight size={16} /></Link>
+    <span className="cf-avatar">C</span><div><strong><span className="cf-desktop-only">Tu fútbol tiene una historia.</span><span className="cf-mobile-only">Comparte con tu equipo</span></strong><p><span className="cf-desktop-only">Crea tu perfil para compartirla con la comunidad.</span><span className="cf-mobile-only">Accede para publicar y comentar.</span></p>{!mediaUploadsEnabled && <p className="c-small cf-media-notice"><span className="cf-desktop-only">Fotos y reels pendientes del patrocinio del almacenamiento. Los logros escritos forman parte del núcleo gratuito.</span><span className="cf-mobile-only">Fotos y reels pendientes de patrocinio. Los logros son gratuitos.</span></p>}</div><Link className="c-button" to="/profile"><span className="cf-desktop-only">Crear perfil</span><span className="cf-mobile-only">Acceder</span><ArrowUpRight size={16} /></Link>
   </div>;
 
   return <section className="c-panel cf-composer" aria-label="Crear una publicación">
-    <div className="cf-composer-top"><span className="cf-avatar">{initials(profile.name)}</span><button type="button" className="cf-compose-trigger" onClick={() => setExpanded(!expanded)} aria-expanded={expanded} disabled={busy}>¿Qué pasó hoy en la cancha, {profile.name.split(' ')[0]}?</button><button type="button" className="cf-icon-button cf-expand-button" onClick={() => setExpanded(!expanded)} disabled={busy} aria-label={expanded ? 'Cerrar creador de publicaciones' : 'Crear publicación'}>{expanded ? <X size={20} /> : <Plus size={20} />}</button></div>
-    {!expanded && <div className="cf-quick-types">{(['reel', 'photo', 'achievement'] as PostKind[]).map(type => { const Icon = type === 'reel' ? Film : type === 'photo' ? Camera : Award; return <button type="button" key={type} disabled={type !== 'achievement' && !mediaUploadsEnabled} onClick={() => { changeKind(type); setExpanded(true); }}><Icon size={17} /> {type === 'reel' ? 'Subir reel' : type === 'photo' ? 'Compartir foto' : 'Contar un logro'}</button>; })}</div>}
-    {!mediaUploadsEnabled && <p className="c-small">Las fotos y los reels se habilitarán con el patrocinio del almacenamiento. Por ahora puedes compartir tus logros por escrito.</p>}
-    {expanded && <form className="cf-compose-form" onSubmit={publish}>
+    <div className="cf-composer-top"><span className="cf-avatar">{initials(profile.name)}</span><button type="button" className="cf-compose-trigger" onClick={() => setExpanded(!expanded)} aria-expanded={expanded} disabled={busy}><span className="cf-desktop-only">¿Qué pasó hoy en la cancha, {profile.name.split(' ')[0]}?</span><span className="cf-mobile-only">{expanded ? 'Cerrar publicación' : 'Comparte con tu equipo…'}</span></button><button type="button" className="cf-icon-button cf-expand-button" onClick={() => setExpanded(!expanded)} disabled={busy} aria-label={expanded ? 'Cerrar creador de publicaciones' : 'Crear publicación'}>{expanded ? <X size={20} /> : <Plus size={20} />}</button></div>
+    {!expanded && <div className="cf-quick-types">{(['reel', 'photo', 'achievement'] as PostKind[]).map(type => { const Icon = type === 'reel' ? Film : type === 'photo' ? Camera : Award; return <button type="button" key={type} disabled={type !== 'achievement' && !mediaUploadsEnabled} onClick={() => { changeKind(type); setExpanded(true); }}><Icon size={17} /><span className="cf-desktop-only">{type === 'reel' ? 'Subir reel' : type === 'photo' ? 'Compartir foto' : 'Contar un logro'}</span><span className="cf-mobile-only">{kindLabels[type]}</span></button>; })}</div>}
+    {!mediaUploadsEnabled && <p className="c-small cf-media-notice"><span className="cf-desktop-only">Las fotos y los reels se habilitarán con el patrocinio del almacenamiento. Por ahora puedes compartir tus logros por escrito.</span><span className="cf-mobile-only">Fotos y reels pendientes de patrocinio. Puedes publicar logros.</span></p>}
+    {expanded && <form ref={formRef} className="cf-compose-form" onSubmit={publish}>
       <div className="cf-kind-picker" aria-label="Tipo de publicación">{(['reel', 'photo', 'achievement'] as PostKind[]).map(type => <button key={type} type="button" aria-pressed={kind === type} className={kind === type ? 'is-active' : ''} disabled={isLocked || type !== 'achievement' && !mediaUploadsEnabled} onClick={() => changeKind(type)}>{kindLabels[type]}</button>)}</div>
       {kind === 'achievement' && <label className="cf-field">Título del logro<input className="c-input" value={title} onChange={event => setTitle(event.target.value)} maxLength={100} placeholder="Mi primer gol con el equipo" required disabled={busy} /></label>}
       <label className="cf-field">{kind === 'achievement' ? 'Cuenta la historia' : 'Descripción'}<textarea className="c-input cf-textarea" value={text} onChange={event => setText(event.target.value)} maxLength={2000} rows={3} placeholder={kind === 'achievement' ? 'El esfuerzo, el equipo, lo que significa para ti…' : 'Ese gol, esa jugada, ese momento con tu equipo…'} required disabled={busy} /></label>
@@ -199,6 +234,7 @@ function FeedCard({ post, selected }: { post: CommunityPost; selected: boolean }
   const commentInputId = React.useId();
   const videoRef = useRef<HTMLVideoElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const optionsButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -248,7 +284,7 @@ function FeedCard({ post, selected }: { post: CommunityPost; selected: boolean }
   }
 
   return <article id={`cf-post-${post.id}`} className={`c-panel cf-post cf-post--${post.kind} ${selected ? 'cf-post--selected' : ''}`} tabIndex={selected ? -1 : undefined} aria-label={`Publicación de ${post.authorName}`}>
-    <header className="cf-post-head"><span className="cf-avatar">{initials(post.authorName)}</span><div className="cf-author"><strong>{post.authorName}</strong><span><time dateTime={post.createdAt}>{readableDate(post.createdAt)}</time><span aria-hidden="true"> · </span>{kindLabels[post.kind]}</span></div><div className="cf-post-menu" ref={menuRef}><button type="button" className="cf-icon-button" aria-label={`Opciones de la publicación de ${post.authorName}`} aria-expanded={showMenu} onClick={() => setShowMenu(!showMenu)}><MoreHorizontal size={21} /></button>{showMenu && <div className="cf-menu-options"><button type="button" onClick={() => { hidePost(post.id); setShowMenu(false); }}><EyeOff size={16} /> Ocultar publicación</button>{isOwnPost ? <button type="button" className="cf-delete-option" onClick={() => { setDialog('delete'); setDialogError(''); setShowMenu(false); }}><Trash2 size={16} /> Eliminar publicación</button> : profile ? <button type="button" onClick={() => { setDialog('report'); setDialogError(''); setShowMenu(false); }}><Flag size={16} /> Denunciar contenido</button> : <Link to="/profile"><Flag size={16} /> Acceder para denunciar</Link>}</div>}</div></header>
+    <header className="cf-post-head"><span className="cf-avatar">{initials(post.authorName)}</span><div className="cf-author"><strong>{post.authorName}</strong><span><time dateTime={post.createdAt}>{readableDate(post.createdAt)}</time><span aria-hidden="true"> · </span>{kindLabels[post.kind]}</span></div><div className="cf-post-menu" ref={menuRef}><button ref={optionsButtonRef} type="button" className="cf-icon-button" aria-label={`Opciones de la publicación de ${post.authorName}`} aria-expanded={showMenu} onClick={() => setShowMenu(!showMenu)}><MoreHorizontal size={21} /></button>{showMenu && <div className="cf-menu-options"><button type="button" onClick={() => { hidePost(post.id); setShowMenu(false); }}><EyeOff size={16} /> Ocultar publicación</button>{isOwnPost ? <button type="button" className="cf-delete-option" onClick={() => { setDialog('delete'); setDialogError(''); setShowMenu(false); }}><Trash2 size={16} /> Eliminar publicación</button> : profile ? <button type="button" onClick={() => { setDialog('report'); setDialogError(''); setShowMenu(false); }}><Flag size={16} /> Denunciar contenido</button> : <Link to="/profile"><Flag size={16} /> Acceder para denunciar</Link>}</div>}</div></header>
     {post.kind === 'achievement' && <div className="cf-achievement"><span className="cf-achievement-label"><Award size={17} /> Un paso más</span><h2>{post.title}</h2>{post.text && <p className="cf-post-text">{post.text}</p>}<span className="cf-achievement-mark" aria-hidden="true"><Award size={108} strokeWidth={1} /></span></div>}
     {post.kind !== 'achievement' && post.mediaUrl && <div className="cf-media">{mediaError ? <div className="cf-media-failure"><Film size={26} /><p>No pudimos cargar este {post.kind === 'reel' ? 'vídeo' : 'archivo'}.</p><button type="button" className="c-button secondary" onClick={() => setMediaError(false)}>Volver a intentar</button></div> : post.kind === 'reel' ? <video ref={videoRef} src={post.mediaUrl} muted controls playsInline loop preload="metadata" onError={() => setMediaError(true)} onPlay={event => { document.querySelectorAll<HTMLVideoElement>('.cf-media video').forEach(video => { if (video !== event.currentTarget) video.pause(); }); }} aria-label={`Reel de ${post.authorName}`} /> : <img src={post.mediaUrl} alt={post.text || `Foto compartida por ${post.authorName}`} loading="lazy" onError={() => setMediaError(true)} />}</div>}
     {post.kind !== 'achievement' && !post.mediaUrl && <p className="cf-inline-note">El archivo de esta publicación ya no está disponible en este navegador.</p>}
@@ -259,16 +295,20 @@ function FeedCard({ post, selected }: { post: CommunityPost; selected: boolean }
     {reportMessage && <p className="cf-inline-note" role="status">{reportMessage}</p>}
     {error && <p className="c-error cf-card-error" role="alert">{error}</p>}
     {showComments && <section className="cf-comments" aria-label="Comentarios de la publicación">{cardComments.length === 0 ? <p className="cf-no-comments">Empieza la conversación. El equipo también juega aquí.</p> : <ul className="cf-comment-list">{cardComments.map(item => <li key={item.id}><span className="cf-avatar cf-avatar--small">{initials(item.authorName)}</span><div><strong>{item.authorName}</strong><p>{item.text}</p><time dateTime={item.createdAt}>{readableDate(item.createdAt)}</time></div></li>)}</ul>}{profile ? <form className="cf-comment-form" onSubmit={submitComment}><label htmlFor={commentInputId} className="cf-sr-only">Escribir un comentario</label><input id={commentInputId} className="c-input" value={comment} onChange={event => setComment(event.target.value)} maxLength={500} placeholder="Anima, pregunta, comparte…" disabled={busy === 'comment'} required /><button type="submit" className="cf-comment-submit" disabled={!comment.trim() || !!busy} aria-label="Publicar comentario">{busy === 'comment' ? <LoaderCircle className="cf-spin" size={19} /> : <ArrowUpRight size={19} />}</button></form> : <Link className="cf-login-link" to="/profile">Crea tu perfil para comentar <ArrowRight size={15} /></Link>}</section>}
-    {dialog === 'delete' && <Modal title="¿Eliminar esta publicación?" onClose={() => { if (busy !== 'delete') setDialog(null); }}><p>La publicación dejará de aparecer en el feed. Esta acción no se puede deshacer.</p>{dialogError && <p className="c-error" role="alert">{dialogError}</p>}<div className="cf-dialog-actions"><button type="button" className="c-button secondary" onClick={() => setDialog(null)} disabled={busy === 'delete'}>Conservar</button><button type="button" className="c-button cf-danger-button" onClick={() => { void confirmDelete(); }} disabled={busy === 'delete'}>{busy === 'delete' ? 'Eliminando…' : 'Eliminar publicación'}</button></div></Modal>}
-    {dialog === 'report' && <Modal title="Denunciar publicación" onClose={() => { if (busy !== 'report') setDialog(null); }}><form onSubmit={submitReport}><p>Cuéntanos qué ocurre para que podamos revisarlo.</p><label className="cf-field">Motivo de la denuncia<textarea className="c-input cf-textarea" value={reason} onChange={event => setReason(event.target.value)} placeholder="Acoso, contenido inapropiado, suplantación…" maxLength={1000} minLength={5} required rows={4} disabled={busy === 'report'} /></label>{dialogError && <p className="c-error" role="alert">{dialogError}</p>}<div className="cf-dialog-actions"><button type="button" className="c-button secondary" onClick={() => setDialog(null)} disabled={busy === 'report'}>Cancelar</button><button type="submit" className="c-button" disabled={busy === 'report' || reason.trim().length < 5}>{busy === 'report' ? 'Enviando…' : 'Enviar denuncia'}</button></div></form></Modal>}
+    {dialog === 'delete' && <Modal title="¿Eliminar esta publicación?" returnFocusRef={optionsButtonRef} onClose={() => { if (busy !== 'delete') setDialog(null); }}><p>La publicación dejará de aparecer en el feed. Esta acción no se puede deshacer.</p>{dialogError && <p className="c-error" role="alert">{dialogError}</p>}<div className="cf-dialog-actions"><button type="button" className="c-button secondary" onClick={() => setDialog(null)} disabled={busy === 'delete'}>Conservar</button><button type="button" className="c-button cf-danger-button" onClick={() => { void confirmDelete(); }} disabled={busy === 'delete'}>{busy === 'delete' ? 'Eliminando…' : 'Eliminar publicación'}</button></div></Modal>}
+    {dialog === 'report' && <Modal title="Denunciar publicación" returnFocusRef={optionsButtonRef} onClose={() => { if (busy !== 'report') setDialog(null); }}><form onSubmit={submitReport}><p>Cuéntanos qué ocurre para que podamos revisarlo.</p><label className="cf-field">Motivo de la denuncia<textarea className="c-input cf-textarea" value={reason} onChange={event => setReason(event.target.value)} placeholder="Acoso, contenido inapropiado, suplantación…" maxLength={1000} minLength={5} required rows={4} disabled={busy === 'report'} /></label>{dialogError && <p className="c-error" role="alert">{dialogError}</p>}<div className="cf-dialog-actions"><button type="button" className="c-button secondary" onClick={() => setDialog(null)} disabled={busy === 'report'}>Cancelar</button><button type="submit" className="c-button" disabled={busy === 'report' || reason.trim().length < 5}>{busy === 'report' ? 'Enviando…' : 'Enviar denuncia'}</button></div></form></Modal>}
   </article>;
 }
 
 export default function FeedPage() {
-  const { profile, posts, events, loading, hiddenPostIds, mode } = useCommunity();
+  const { profile, posts, events, loading, hiddenPostIds, mode, mediaUploadsEnabled } = useCommunity();
   const [filter, setFilter] = useState<FeedFilter>('all');
   const [params, setParams] = useSearchParams();
+  const location = useLocation();
+  const [composerRequest, setComposerRequest] = useState<ComposerRequest>({ sequence: 0 });
   const [publishedMessage, setPublishedMessage] = useState('');
+  const handledCreate = useRef<string | null>(null);
+  const requestedKind = params.get('create');
   const selectedId = params.get('post');
   const scrolledId = useRef<string | null>(null);
   // Published stories are public; profile is required for writing and interacting.
@@ -277,6 +317,19 @@ export default function FeedPage() {
   const selectedPostVisible = visiblePosts.some(post => post.id === selectedId);
   const nextEvents = events.filter(event => event.status === 'open' && new Date(event.startAt).getTime() > Date.now()).sort((a, b) => a.startAt.localeCompare(b.startAt)).slice(0, 3);
 
+  useEffect(() => {
+    if (loading || !requestedKind || !['achievement', 'photo', 'reel'].includes(requestedKind)) return;
+    const requestKey = `${location.key}:${requestedKind}`;
+    if (handledCreate.current === requestKey) return;
+    handledCreate.current = requestKey;
+    const next = new URLSearchParams(params);
+    next.delete('create');
+    setParams(next, { replace: true });
+    if (profile) {
+      const kind = requestedKind !== 'achievement' && !mediaUploadsEnabled ? 'achievement' : requestedKind as PostKind;
+      setComposerRequest(previous => ({ sequence: previous.sequence + 1, kind }));
+    }
+  }, [requestedKind, location.key, loading, profile?.id, mediaUploadsEnabled, params, setParams]);
   useEffect(() => { setFilter('all'); scrolledId.current = null; }, [selectedId]);
   useEffect(() => {
     if (!selectedId || loading || scrolledId.current === selectedId) return;
@@ -293,13 +346,13 @@ export default function FeedPage() {
   }
 
   return <div className="cf-page">
-    <header className="cf-page-head"><div><p className="c-eyebrow">LA COMUNIDAD · CANTERA</p><h1>El juego sigue<br /><span>fuera de la cancha.</span></h1><p className="cf-page-intro">Jugadas que inspiran. Equipos que conectan. Historias que merecen verse.</p></div><div className="cf-head-stat"><span className="cf-stat-line" /><p>Tu fútbol.<br /><strong>Tu comunidad.</strong></p></div></header>
-    <div className="cf-layout"><main className="cf-main"><Composer onPublished={onPublished} />
+    <header className="cf-page-head"><div><p className="c-eyebrow">LA COMUNIDAD · CANTERA</p><h1 id="cf-feed-heading" tabIndex={-1}><span className="cf-title-desktop">El juego sigue<br /><span>fuera de la cancha.</span></span><span className="cf-title-mobile">Comunidad</span></h1><p className="cf-page-intro">Jugadas que inspiran. Equipos que conectan. Historias que merecen verse.</p></div>{profile ? <button type="button" className="c-button cf-mobile-action" onClick={() => setComposerRequest(previous => ({ sequence: previous.sequence + 1 }))}><Plus size={17} />Publicar</button> : <Link className="c-button cf-mobile-action" to="/profile">Acceder <ArrowUpRight size={16} /></Link>}<div className="cf-head-stat"><span className="cf-stat-line" /><p>Tu fútbol.<br /><strong>Tu comunidad.</strong></p></div></header>
+    <div className="cf-layout"><div className="cf-main"><Composer onPublished={onPublished} openRequest={composerRequest} />
       <div className="cf-filter-row"><div className="cf-filters" aria-label="Filtrar publicaciones">{filters.map(item => { const Icon = item.icon; return <button type="button" key={item.id} className={filter === item.id ? 'is-active' : ''} aria-pressed={filter === item.id} onClick={() => setFilter(item.id)}>{Icon && <Icon size={16} />}{item.label}</button>; })}</div><span className="cf-latest-label">Lo más reciente</span></div>
       {publishedMessage && <p className="cf-published-note" role="status"><Check size={16} />{publishedMessage}<button type="button" className="cf-icon-button" onClick={() => setPublishedMessage('')} aria-label="Cerrar aviso"><X size={15} /></button></p>}
-      {loading ? <div className="c-panel cf-loading" role="status"><LoaderCircle size={22} className="cf-spin" /><p>Cargando historias de la comunidad…</p></div> : cloudGuest ? <div className="c-panel cf-empty-feed"><span className="cf-empty-icon"><Heart size={30} strokeWidth={1.5} /></span><p className="c-eyebrow">NOS VEMOS EN LA CANCHA</p><h2>Una comunidad que juega contigo.</h2><p>Accede para ver las publicaciones, compartir tus jugadas y celebrar los logros de tu equipo.</p><Link className="c-button" to="/profile">Acceder a la comunidad <ArrowUpRight size={16} /></Link></div> : visiblePosts.length === 0 ? <div className="c-panel cf-empty-feed"><span className="cf-empty-icon">{filter === 'reel' ? <Film size={30} strokeWidth={1.5} /> : filter === 'photo' ? <Camera size={30} strokeWidth={1.5} /> : <Award size={30} strokeWidth={1.5} />}</span><p className="c-eyebrow">TODAS LAS HISTORIAS EMPIEZAN AQUÍ</p><h2>{filter === 'all' ? 'Estrena la cancha.' : `El próximo ${kindLabels[filter].toLowerCase()} puede ser el tuyo.`}</h2><p>{hiddenPostIds.length ? 'No hay publicaciones visibles en esta sección. Comparte un momento o explora otra categoría.' : 'Comparte una jugada, una foto con tu equipo o ese logro que te hizo seguir entrenando.'}</p>{filter !== 'all' && <button type="button" className="c-button secondary" onClick={() => setFilter('all')}>Ver toda la comunidad <ArrowRight size={16} /></button>}</div> : <div className={`cf-stream ${filter === 'reel' ? 'cf-stream--reels' : ''}`} aria-label={filter === 'reel' ? 'Reels de la comunidad, desplázate para ver el siguiente' : 'Publicaciones de la comunidad'} tabIndex={filter === 'reel' ? 0 : undefined}>{visiblePosts.map(post => <FeedCard key={post.id} post={post} selected={post.id === selectedId} />)}</div>}
+      {loading ? <div className="c-panel cf-loading" role="status"><LoaderCircle size={22} className="cf-spin" /><p>Cargando historias de la comunidad…</p></div> : cloudGuest ? <div className="c-panel cf-empty-feed"><span className="cf-empty-icon"><Heart size={30} strokeWidth={1.5} /></span><p className="c-eyebrow">NOS VEMOS EN LA CANCHA</p><h2>Una comunidad que juega contigo.</h2><p>Accede para ver las publicaciones, compartir tus jugadas y celebrar los logros de tu equipo.</p><Link className="c-button" to="/profile">Acceder a la comunidad <ArrowUpRight size={16} /></Link></div> : visiblePosts.length === 0 ? <div className="c-panel cf-empty-feed"><span className="cf-empty-icon">{filter === 'reel' ? <Film size={30} strokeWidth={1.5} /> : filter === 'photo' ? <Camera size={30} strokeWidth={1.5} /> : <Award size={30} strokeWidth={1.5} />}</span><p className="c-eyebrow">TODAS LAS HISTORIAS EMPIEZAN AQUÍ</p><h2><span className="cf-desktop-only">{filter === 'all' ? 'Estrena la cancha.' : `El próximo ${kindLabels[filter].toLowerCase()} puede ser el tuyo.`}</span><span className="cf-mobile-only">{filter === 'all' ? 'Sin publicaciones todavía' : `Sin ${filter === 'reel' ? 'reels' : filter === 'photo' ? 'fotos' : 'logros'} visibles`}</span></h2><p><span className="cf-desktop-only">{hiddenPostIds.length ? 'No hay publicaciones visibles en esta sección. Comparte un momento o explora otra categoría.' : 'Comparte una jugada, una foto con tu equipo o ese logro que te hizo seguir entrenando.'}</span><span className="cf-mobile-only">{hiddenPostIds.length ? 'Prueba otra categoría o comparte con tu equipo.' : 'Comparte un logro y empieza la conversación.'}</span></p>{filter !== 'all' && <button type="button" className="c-button secondary" onClick={() => setFilter('all')}>Ver toda la comunidad <ArrowRight size={16} /></button>}<div className="cf-mobile-empty-action">{profile ? <button type="button" className="c-button" onClick={() => setComposerRequest(previous => ({ sequence: previous.sequence + 1, kind: 'achievement' }))}><Plus size={17} />Compartir un logro</button> : <Link className="c-button" to="/profile">Acceder para publicar <ArrowUpRight size={16} /></Link>}</div></div> : <div className={`cf-stream ${filter === 'reel' ? 'cf-stream--reels' : ''}`} aria-label={filter === 'reel' ? 'Reels de la comunidad, desplázate para ver el siguiente' : 'Publicaciones de la comunidad'} tabIndex={filter === 'reel' ? 0 : undefined}>{visiblePosts.map(post => <FeedCard key={post.id} post={post} selected={post.id === selectedId} />)}</div>}
       {selectedId && !loading && !cloudGuest && !posts.some(post => post.id === selectedId) && <p className="cf-inline-note" role="status">La publicación de este enlace ya no está disponible o no tienes acceso a ella.</p>}
-    </main><aside className="cf-sidebar"><section className="cf-play-invitation"><span className="cf-invitation-number" aria-hidden="true">90′</span><p className="c-eyebrow">MENOS SCROLL. MÁS FÚTBOL.</p><h2>La próxima historia<br />empieza jugando.</h2><p>Organiza un partido o encuentra un torneo cerca de ti. Jugar y organizar en Cantera es gratis.</p><Link to="/play" className="cf-invitation-link">Encuentra tu próximo partido <ArrowUpRight size={18} /></Link></section>
+    </div><aside className="cf-sidebar"><section className="cf-play-invitation"><span className="cf-invitation-number" aria-hidden="true">90′</span><p className="c-eyebrow">MENOS SCROLL. MÁS FÚTBOL.</p><h2>La próxima historia<br />empieza jugando.</h2><p>Organiza un partido o encuentra un torneo cerca de ti. Jugar y organizar en Cantera es gratis.</p><Link to="/play" className="cf-invitation-link">Encuentra tu próximo partido <ArrowUpRight size={18} /></Link></section>
       <section className="c-panel cf-upcoming"><div className="cf-sidebar-heading"><h2>En la cancha</h2><Link to="/play" aria-label="Ver todos los partidos y torneos"><ArrowUpRight size={18} /></Link></div>{nextEvents.length ? nextEvents.map(event => <Link key={event.id} to={`/play/${encodeURIComponent(event.id)}`} className="cf-upcoming-event"><span className="cf-event-date">{new Date(event.startAt).getDate()}<small>{new Intl.DateTimeFormat('es-ES', { month: 'short' }).format(new Date(event.startAt))}</small></span><div><strong>{event.title}</strong><span><MapPin size={12} />{event.city}</span><small>{event.type === 'tournament' ? 'Torneo' : 'Partido'} · Fútbol {event.format}</small></div><ArrowUpRight size={15} /></Link>) : <div className="cf-sidebar-empty"><CalendarDays size={22} strokeWidth={1.5} /><p>Todavía no hay próximos eventos.</p><Link to="/play">Organiza el primero <ArrowRight size={14} /></Link></div>}</section>
       <div className="cf-community-note"><p className="c-eyebrow">JUGAMOS EN EL MISMO EQUIPO</p><p>Comparte contenido propio, respeta a los demás y pide permiso antes de publicar a otras personas.</p><span>El talento se ve. El respeto también.</span></div>
     </aside></div>

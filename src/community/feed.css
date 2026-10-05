@@ -2,6 +2,9 @@
 .cf-page-head { display: flex; justify-content: space-between; align-items: center; padding: 24px 0 35px; gap: 30px; }
 .cf-page-head h1 { font-size: clamp(34px, 4.8vw, 62px); font-weight: 650; letter-spacing: -2.4px; line-height: 1.08; margin: 14px 0 18px; }
 .cf-page-head h1 span { color: var(--c-green, #176747); }
+.cf-page-head h1 > .cf-title-desktop { color: inherit; }
+.cf-title-mobile, .cf-mobile-only, .cf-mobile-empty-action { display: none; }
+.cf-page-head .cf-mobile-action { display: none; }
 .cf-page-intro { color: var(--c-muted, #718278); font-size: 15px; max-width: 540px; line-height: 1.6; }
 .cf-head-stat { display: flex; gap: 18px; align-items: center; margin-right: 48px; color: var(--c-muted, #718278); font-size: 14px; line-height: 1.6; }
 .cf-head-stat strong { color: var(--c-ink, #19352c); font-weight: 600; }
@@ -153,5 +156,99 @@
 @keyframes cf-spin { to { transform: rotate(360deg); } }
 @media (max-width: 1100px) { .cf-layout { grid-template-columns: minmax(0, 1fr) 270px; gap: 22px; } .cf-quick-types { padding-left: 0; justify-content: space-around; } .cf-quick-types button { padding-inline: 4px; font-size: 11px; } .cf-head-stat { margin-right: 15px; } .cf-post-actions { gap: 17px; } }
 @media (max-width: 850px) { .cf-layout { grid-template-columns: minmax(0, 1fr); } .cf-sidebar { display: none; } .cf-page-head { padding-top: 12px; } .cf-head-stat { display: none; } .cf-page-head h1 { letter-spacing: -1.7px; } .cf-media video { max-height: 650px; } }
-@media (max-width: 520px) { .cf-page-head { padding-bottom: 24px; } .cf-page-head h1 { font-size: 36px; line-height: 1.1; letter-spacing: -1.4px; } .cf-page-intro { font-size: 12px; max-width: 280px; } .cf-composer { padding: 16px; } .cf-compose-trigger { font-size: 11px; padding: 12px; } .cf-composer-top { gap: 8px; } .cf-expand-button { display: none; } .cf-avatar { width: 35px; height: 35px; font-size: 11px; } .cf-avatar--small { width: 28px; height: 28px; font-size: 9px; } .cf-quick-types { gap: 4px; padding-top: 15px; justify-content: space-between; } .cf-quick-types button { font-size: 10px; gap: 5px; } .cf-quick-types button svg { width: 15px; } .cf-filters { gap: 0; } .cf-filters button { padding: 13px 11px; font-size: 12px; gap: 5px; } .cf-latest-label { display: none; } .cf-filter-row { margin: 18px 0; } .cf-join-composer { flex-wrap: wrap; } .cf-join-composer .c-button { margin-left: 49px; } .cf-join-composer > div { flex-basis: calc(100% - 65px); } .cf-post-head { padding: 16px; } .cf-post-actions { padding: 15px 16px; gap: 16px; } .cf-post-actions button, .cf-post-actions a { font-size: 10px; gap: 5px; } .cf-post-actions .cf-share-action span { display: none; } .cf-post-actions svg { width: 18px; } .cf-caption { padding: 14px 16px 0; font-size: 12px; } .cf-achievement { margin: 0 16px; padding: 25px 20px; } .cf-achievement h2 { font-size: 24px; max-width: 100%; } .cf-achievement-mark { right: 0; opacity: .4; } .cf-event-link { margin-inline: 16px; font-size: 10px; } .cf-comments { padding: 16px; } .cf-inline-note { margin-inline: 16px; } .cf-media video { max-height: 550px; } .cf-compose-footer { align-items: flex-start; } .cf-compose-footer p { max-width: 170px; font-size: 10px; } .cf-empty-feed { padding: 35px 20px; } .cf-empty-feed h2 { font-size: 24px; } .cf-dialog { padding: 20px; } }
+@media (max-width: 700px) {
+  .cf-page { padding-bottom: 0; }
+  .cf-desktop-only { display: none; }
+  .cf-mobile-only { display: inline; }
+  .cf-page-head { gap: 12px; padding: 12px 0 16px; min-height: 70px; }
+  .cf-page-head > div:first-child { min-width: 0; }
+  .cf-page-head .c-eyebrow, .cf-page-intro, .cf-title-desktop { display: none; }
+  .cf-page-head h1 { margin: 0; font-size: 27px; line-height: 1.2; letter-spacing: -.8px; }
+  .cf-page-head h1 > .cf-title-mobile { display: inline; color: var(--c-ink, #19352c); }
+  .cf-page-head .cf-mobile-action { display: inline-flex; min-height: 44px; padding: 10px 13px; gap: 6px; flex-shrink: 0; }
+  .cf-layout { gap: 0; }
+  .cf-page .cf-composer { padding: 12px; border-radius: 12px; }
+  .cf-composer-top { gap: 8px; }
+  .cf-avatar { width: 36px; height: 36px; font-size: 11px; }
+  .cf-avatar--small { width: 29px; height: 29px; font-size: 10px; }
+  .cf-compose-trigger { min-width: 0; min-height: 44px; padding: 10px 12px; font-size: 13px; border-radius: 22px; }
+  .cf-icon-button { min-width: 44px; min-height: 44px; }
+  .cf-expand-button { display: none; }
+  .cf-quick-types { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 10px 0 0; gap: 6px; }
+  .cf-quick-types button { min-width: 0; min-height: 44px; justify-content: center; padding: 8px 4px; gap: 6px; font-size: 12px; background: #f5f7f2; border: 1px solid var(--c-line, #e0e7e1); border-radius: 9px; }
+  .cf-quick-types button svg { width: 17px; height: 17px; flex-shrink: 0; }
+  .cf-page .cf-media-notice { font-size: 11px !important; line-height: 1.45; margin: 9px 0 0; }
+  .cf-join-composer { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 8px 10px; align-items: start; }
+  .cf-join-composer > div { min-width: 0; }
+  .cf-join-composer strong { font-size: 13px; }
+  .cf-join-composer p { font-size: 12px; line-height: 1.45; }
+  .cf-join-composer .c-button { grid-column: 2; justify-self: start; min-height: 44px; padding: 9px 14px; }
+  .cf-compose-form { gap: 14px; margin-top: 12px; padding-top: 12px; scroll-margin-block: 16px 90px; }
+  .cf-kind-picker { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .cf-kind-picker button { min-height: 44px; padding: 9px 6px; font-size: 13px; }
+  .cf-field { gap: 7px; font-size: 13px; }
+  .cf-page .c-input, .cf-dialog .c-input { font-size: 16px; min-height: 46px; }
+  .cf-textarea { min-height: 100px; }
+  .cf-upload-label { min-height: 128px; padding: 18px 12px; }
+  .cf-upload-label strong { font-size: 14px; }
+  .cf-upload-label span { font-size: 12px; }
+  .cf-upload-preview img, .cf-upload-preview video { height: min(280px, 40dvh); }
+  .cf-compose-footer { align-items: center; gap: 10px; }
+  .cf-compose-footer p { font-size: 11px; max-width: 175px; line-height: 1.4; }
+  .cf-compose-footer .c-button { min-height: 46px; padding: 10px 13px; }
+  .cf-filter-row { margin: 14px 0 12px; gap: 0; border-bottom: 0; }
+  .cf-filters { width: 100%; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 3px; padding: 4px; border-radius: 12px; background: #eaf0e7; }
+  .cf-filters button { justify-content: center; min-width: 0; min-height: 44px; gap: 5px; margin: 0; padding: 8px 4px; border: 0; border-radius: 8px; font-size: 12px; }
+  .cf-filters button svg { width: 15px; height: 15px; flex-shrink: 0; }
+  .cf-filters button.is-active { background: #fff; box-shadow: 0 1px 4px #19352c10; }
+  .cf-latest-label { display: none; }
+  .cf-stream { gap: 12px; }
+  .cf-page .cf-post { padding: 0; border-radius: 12px; scroll-margin-top: 76px; }
+  .cf-post-head { padding: 10px 12px; gap: 9px; }
+  .cf-author strong { font-size: 13px; }
+  .cf-author > span { font-size: 11px; line-height: 1.4; }
+  .cf-menu-options { top: 45px; max-width: calc(100vw - 56px); }
+  .cf-menu-options button, .cf-menu-options a { min-height: 44px; font-size: 13px; }
+  .cf-media img { max-height: min(640px, 75dvh); }
+  .cf-media video { max-height: 65dvh; }
+  .cf-caption { padding: 12px 14px 0; font-size: 14px; line-height: 1.6; }
+  .cf-achievement { margin: 0 12px; padding: 20px 16px; }
+  .cf-achievement h2 { font-size: 23px; line-height: 1.2; max-width: 100%; margin: 13px 0 10px; }
+  .cf-achievement p { font-size: 14px; line-height: 1.6; }
+  .cf-achievement-mark { right: 0; opacity: .3; }
+  .cf-event-link { min-height: 44px; margin: 12px 12px 0; padding: 9px 10px; font-size: 12px; }
+  .cf-post-actions { padding: 6px 10px; gap: 8px; }
+  .cf-post-actions button, .cf-post-actions a { min-height: 44px; padding: 8px 4px; gap: 6px; font-size: 12px; }
+  .cf-post-actions .cf-share-action { min-width: 44px; justify-content: center; }
+  .cf-share-action span { display: none; }
+  .cf-inline-note { margin: 0 12px 12px; font-size: 12px; }
+  .cf-card-error { margin-inline: 12px; }
+  .cf-comments { padding: 13px 12px; }
+  .cf-no-comments { font-size: 13px; }
+  .cf-comment-list { gap: 15px; }
+  .cf-comment-list strong { font-size: 12px; }
+  .cf-comment-list p { font-size: 13px; }
+  .cf-comment-form { gap: 8px; align-items: center; }
+  .cf-comment-submit { width: 46px; height: 46px; }
+  .cf-login-link { min-height: 44px; font-size: 13px; }
+  .cf-stream--reels { max-height: calc(100dvh - 190px - env(safe-area-inset-bottom)); padding: 3px 1px; scroll-padding-top: 3px; }
+  .cf-stream--reels .cf-post { scroll-margin-top: 3px; }
+  .cf-stream--reels .cf-media video { min-height: 180px; max-height: max(180px, calc(100dvh - 350px - env(safe-area-inset-bottom))); }
+  .cf-page .cf-loading { padding: 30px 16px; }
+  .cf-page .cf-empty-feed { padding: 24px 16px; border-radius: 12px; }
+  .cf-empty-icon { width: 46px; height: 46px; margin-bottom: 10px; }
+  .cf-empty-icon svg { width: 24px; height: 24px; }
+  .cf-empty-feed .c-eyebrow { display: none; }
+  .cf-empty-feed h2 { font-size: 20px; margin: 5px 0 10px; letter-spacing: -.4px; }
+  .cf-empty-feed > p:not(.c-eyebrow) { font-size: 13px; line-height: 1.5; margin-bottom: 15px; }
+  .cf-empty-feed .c-button { min-height: 44px; }
+  .cf-mobile-empty-action { display: block; margin-top: 10px; }
+  .cf-published-note { margin-bottom: 12px; padding: 5px 10px; font-size: 12px; }
+  .cf-dialog { position: fixed; inset: auto 0 0; margin: 0; width: 100%; max-width: none; max-height: calc(100dvh - 16px - env(safe-area-inset-top)); border-radius: 20px 20px 0 0; padding: 20px 16px calc(20px + env(safe-area-inset-bottom)); overscroll-behavior: contain; }
+  .cf-dialog-head { margin-bottom: 12px; }
+  .cf-dialog-head h2 { font-size: 19px; }
+  .cf-dialog > p, .cf-dialog form > p { font-size: 14px; line-height: 1.5; }
+  .cf-dialog-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 20px; }
+  .cf-dialog-actions .c-button { min-height: 48px; padding: 10px 8px; }
+}
 @media (prefers-reduced-motion: reduce) { .cf-spin { animation: none; } .cf-stream--reels { scroll-behavior: auto; } }
