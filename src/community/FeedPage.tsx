@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { ArrowRight, ArrowUpRight, Award, CalendarDays, Camera, Check, CircleUserRound, Ban, EyeOff, Film, Flag, Heart, LoaderCircle, MapPin, MessageCircle, MoreHorizontal, Plus, Search, Share2, ShieldCheck, Trash2, Upload, UsersRound, X } from 'lucide-react';
 import { friendlyError, useCommunity, usePublicProfile } from './CommunityContext';
+import { legalReady } from './legal';
 import type { CommunityPost, PostComment, PostInput, PostKind } from './types';
 import './feed.css';
 
@@ -348,7 +349,9 @@ function FeedCard({ post, selected, onHidden }: { post: CommunityPost; selected:
 }
 
 export default function FeedPage() {
-  const { profile, posts, events, loading, hiddenPostIds, mode, mediaUploadsEnabled, followingIds, watchPost, linkedPostStates, blockedIds, postsLoading, postsHasMore, loadMorePosts } = useCommunity();
+  const { profile, posts, events, loading, hiddenPostIds, mode, runtimeConfig, mediaUploadsEnabled, followingIds, watchPost, linkedPostStates, blockedIds, postsLoading, postsHasMore, loadMorePosts } = useCommunity();
+  const communityUnavailable = mode === 'cloud' && (runtimeConfig.serviceStatus !== 'open' || import.meta.env.VITE_SERVICE_OPEN !== 'true' || !legalReady);
+  const communityPaused = runtimeConfig.serviceStatus === 'paused';
   const [filter, setFilter] = useState<FeedFilter>('all');
   const [source, setSource] = useState<FeedSource>('community');
   const [search, setSearch] = useState('');
@@ -383,9 +386,12 @@ export default function FeedPage() {
     .sort((a, b) => a.startAt.localeCompare(b.startAt)).slice(0, 3);
 
   useEffect(() => {
-    if (!selectedId || !validSelectedId) return;
+    if (communityUnavailable || !selectedId || !validSelectedId) return;
     return watchPost(selectedId);
-  }, [selectedId, validSelectedId, watchPost, postRetry]);
+  }, [communityUnavailable, selectedId, validSelectedId, watchPost, postRetry]);
+  useEffect(() => {
+    if (communityUnavailable) { setComposerRequest({ sequence: 0 }); setPublishedMessage(''); setPagingError(''); }
+  }, [communityUnavailable]);
   useEffect(() => { if (searchOpen) searchRef.current?.focus(); }, [searchOpen]);
   useEffect(() => {
     if (loading || !requestedKind || !['achievement', 'photo', 'reel'].includes(requestedKind)) return;
@@ -395,20 +401,20 @@ export default function FeedPage() {
     const next = new URLSearchParams(params);
     next.delete('create');
     setParams(next, { replace: true });
-    if (profile) {
+    if (profile && !communityUnavailable) {
       const kind = requestedKind !== 'achievement' && !mediaUploadsEnabled ? 'achievement' : requestedKind as PostKind;
       setComposerRequest(previous => ({ sequence: previous.sequence + 1, kind }));
     }
-  }, [requestedKind, location.key, loading, profile?.id, mediaUploadsEnabled, params, setParams]);
+  }, [requestedKind, location.key, loading, profile?.id, communityUnavailable, mediaUploadsEnabled, params, setParams]);
   useEffect(() => { setFilter('all'); setSource('community'); setSearch(''); scrolledId.current = null; }, [selectedId]);
   useEffect(() => {
-    if (!selectedId || loading || selectedState !== 'ready' || scrolledId.current === selectedId) return;
+    if (communityUnavailable || !selectedId || loading || selectedState !== 'ready' || scrolledId.current === selectedId) return;
     const timer = requestAnimationFrame(() => {
       const card = document.getElementById(`cf-post-${selectedId}`);
       if (card) { card.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }); card.focus({ preventScroll: true }); scrolledId.current = selectedId; }
     });
     return () => cancelAnimationFrame(timer);
-  }, [selectedId, selectedState, loading, selectedPostVisible, filter, source]);
+  }, [communityUnavailable, selectedId, selectedState, loading, selectedPostVisible, filter, source]);
 
   function onPublished(id: string) {
     setFilter('all'); setSource('community'); setSearch('');
@@ -420,7 +426,7 @@ export default function FeedPage() {
   async function morePosts() { setPagingError(''); try { await loadMorePosts(); } catch (err) { setPagingError(errorMessage(err)); } }
 
   return <div className="cf-page">
-    <header className="cf-page-head"><div><h1 id="cf-feed-heading" tabIndex={-1}>Comunidad</h1><p>Lo que pasa dentro y fuera del campo.</p></div>{profile ? <button type="button" className="c-button cf-publish-action" onClick={() => setComposerRequest(previous => ({ sequence: previous.sequence + 1 }))}><Plus size={17} />Publicar</button> : <Link className="c-button cf-publish-action" to="/profile">Acceder <ArrowUpRight size={16} /></Link>}</header>
+    <header className="cf-page-head"><div><h1 id="cf-feed-heading" tabIndex={-1}>Comunidad</h1><p>Lo que pasa dentro y fuera del campo.</p></div>{profile && !communityUnavailable ? <button type="button" className="c-button cf-publish-action" onClick={() => setComposerRequest(previous => ({ sequence: previous.sequence + 1 }))}><Plus size={17} />Publicar</button> : <Link className="c-button cf-publish-action" to="/profile">{profile ? 'Mi perfil' : 'Acceder'} <ArrowUpRight size={16} /></Link>}</header>
     <div className="cf-layout">
       <aside className="cf-profile-rail" aria-label="Tu cuenta y comunidad">
         <section className="c-panel cf-profile-card">{profile ? <><Link className="cf-avatar cf-profile-avatar" to={`/people/${encodeURIComponent(profile.id)}`} aria-label="Ver tu perfil público">{initials(profile.name)}</Link><Link className="cf-rail-name" to={`/people/${encodeURIComponent(profile.id)}`}>{profile.name}{profile.verification === 'verified' && <ShieldCheck size={16} className="cf-verified" role="img" aria-label="Identidad verificada" />}</Link>{profile.team && <p>{profile.team}</p>}{(profile.city || profile.country) && <span className="cf-rail-location"><MapPin size={13} />{[profile.city, profile.country].filter(Boolean).join(', ')}</span>}{profile.bio && <p className="cf-rail-bio">{profile.bio}</p>}<Link className="cf-rail-edit" to="/profile">Editar mi perfil <ArrowUpRight size={14} /></Link></> : <><span className="cf-avatar cf-profile-avatar"><CircleUserRound size={28} /></span><h2>Tu cuenta</h2><p>Publica y conecta con personas y equipos.</p><Link className="c-button" to="/profile">Acceder</Link></>}</section>
@@ -428,6 +434,7 @@ export default function FeedPage() {
         <p className="cf-rail-note">{mode === 'demo' ? 'Prueba local. Los cambios sólo existen en este navegador.' : 'Contenido público. Comparte con permiso de quienes aparecen.'}</p>
       </aside>
       <div className="cf-main">
+        {communityUnavailable ? <section className="c-panel cf-empty-feed cf-service-state" aria-labelledby="cf-service-state-title" role="status"><ShieldCheck size={26} aria-hidden="true" /><h2 id="cf-service-state-title">{communityPaused ? 'Comunidad en pausa' : 'La comunidad está en preparación'}</h2><p>{communityPaused ? 'La consulta y las nuevas publicaciones están temporalmente pausadas.' : 'La apertura del servicio está pendiente. Las publicaciones estarán disponibles cuando se habilite la comunidad.'}</p><p>Tu perfil y las opciones de privacidad siguen accesibles.</p><div className="cf-service-links"><Link className="c-button secondary" to="/profile">{profile ? 'Ir a mi perfil' : 'Perfil y cuenta'}<ArrowRight size={17} /></Link><Link to="/legal/privacy">Privacidad y tus derechos</Link></div></section> : <>
         <Composer onPublished={onPublished} openRequest={composerRequest} />
         <div className="cf-feed-controls">
           <div className="cf-source-tabs" role="group" aria-label="Elegir comunidad o cuentas seguidas"><button id="cf-feed-fallback" type="button" className={source === 'community' ? 'is-active' : ''} aria-pressed={source === 'community'} onClick={() => setSource('community')}>Comunidad</button><button type="button" className={source === 'following' ? 'is-active' : ''} aria-pressed={source === 'following'} onClick={() => setSource('following')}>Siguiendo</button><button type="button" className="cf-search-toggle" aria-label={searchOpen ? 'Cerrar búsqueda de publicaciones' : 'Buscar publicaciones'} aria-expanded={searchOpen} aria-controls={`${searchId}-wrap`} onClick={() => { setSearchOpen(!searchOpen); if (searchOpen) setSearch(''); }}><Search size={20} /></button><Link to="/people" className="cf-people-link" aria-label="Buscar personas y equipos"><UsersRound size={20} /></Link></div>
@@ -443,9 +450,10 @@ export default function FeedPage() {
         {selectedState === 'ready' && selectedId && posts.some(post => post.id === selectedId && blockedIds.includes(post.authorId)) && <p className="cf-linked-status" role="status">Has bloqueado a la cuenta autora. Puedes desbloquearla en <Link to="/people">Personas y equipos</Link>.</p>}
         {loading ? <div className="c-panel cf-loading" role="status"><LoaderCircle size={22} className="cf-spin" /><p>Cargando publicaciones…</p></div> : source === 'following' && !profile ? <div className="c-panel cf-empty-feed"><UsersRound size={26} /><h2>Las cuentas que sigues, aquí</h2><p>Accede para seguir a personas y equipos y ver sus publicaciones.</p><Link className="c-button" to="/profile">Acceder <ArrowUpRight size={16} /></Link></div> : source === 'following' && followingIds.length === 0 ? <div className="c-panel cf-empty-feed"><UsersRound size={26} /><h2>Todavía no sigues a nadie</h2><p>Encuentra personas y equipos para ver aquí lo que comparten.</p><Link className="c-button" to="/people">Buscar cuentas <ArrowRight size={16} /></Link></div> : visiblePosts.length === 0 ? <div className="c-panel cf-empty-feed"><MessageCircle size={26} /><h2>{query ? 'Sin resultados en esta vista' : source === 'following' ? 'Sin publicaciones recientes' : filter === 'all' ? 'Sin publicaciones todavía' : `Sin ${filter === 'reel' ? 'reels' : filter === 'photo' ? 'fotos' : 'logros'} visibles`}</h2><p>{query ? 'Prueba otra búsqueda o cambia los filtros. La búsqueda consulta el contenido cargado.' : filter === 'reel' ? mediaUploadsEnabled ? 'No hay vídeos disponibles en esta vista. Puedes cargar más publicaciones.' : 'No hay reels disponibles en esta vista. Las nuevas cargas requieren patrocinio.' : source === 'following' ? 'Las cuentas que sigues no tienen publicaciones en el contenido cargado.' : hiddenPostIds.length ? 'Cambia los filtros o comparte una publicación.' : 'Comparte un logro para empezar la conversación.'}</p>{query || filter !== 'all' ? <button type="button" className="c-button secondary" onClick={resetFilters}>Quitar filtros</button> : source === 'following' ? <Link className="c-button secondary" to="/people">Explorar cuentas</Link> : profile ? <button type="button" className="c-button" onClick={() => setComposerRequest(previous => ({ sequence: previous.sequence + 1, kind: 'achievement' }))}><Plus size={17} />Publicar un logro</button> : <Link className="c-button" to="/profile">Acceder para publicar</Link>}</div> : <div className={`cf-stream ${filter === 'reel' ? 'cf-stream--reels' : ''}`} aria-label={filter === 'reel' ? 'Reels de la comunidad, desplázate para ver el siguiente' : 'Publicaciones de la comunidad'} tabIndex={filter === 'reel' ? 0 : undefined}>{visiblePosts.map(post => <FeedCard key={post.id} post={post} selected={post.id === selectedId} onHidden={post.id === selectedId ? closeLinkedPost : undefined} />)}</div>}
         <div className="cf-feed-pagination">{pagingError && <p className="c-error" role="alert">{pagingError}</p>}{postsLoading && <p role="status">Cargando publicaciones…</p>}{postsHasMore && <button type="button" className="c-button secondary" disabled={postsLoading} onClick={() => { void morePosts(); }}>Cargar más publicaciones</button>}{!postsHasMore && posts.length > 0 && <p>Fin de las publicaciones disponibles.</p>}</div>
+        </>}
       </div>
       <aside className="cf-sidebar" aria-label="Encuentros de la comunidad">
-        <section className="c-panel cf-upcoming"><div className="cf-sidebar-heading"><h2>Próximos encuentros</h2><Link to="/play" aria-label="Ver partidos y torneos"><ArrowUpRight size={18} /></Link></div>{nextEvents.length ? nextEvents.map(event => <Link key={event.id} to={`/play/${encodeURIComponent(event.id)}`} className="cf-upcoming-event"><span className="cf-event-date">{new Intl.DateTimeFormat('es-ES', { day: 'numeric', timeZone: event.timeZone }).format(new Date(event.startAt))}<small>{new Intl.DateTimeFormat('es-ES', { month: 'short', timeZone: event.timeZone }).format(new Date(event.startAt))}</small></span><div><strong>{event.title}</strong><span><MapPin size={12} />{event.city}</span><small>{event.type === 'tournament' ? 'Torneo' : 'Partido'} · Fútbol {event.format}</small></div></Link>) : <div className="cf-sidebar-empty"><CalendarDays size={22} /><p>Sin encuentros próximos.</p><Link to="/play">Explorar encuentros <ArrowRight size={14} /></Link></div>}</section>
+        <section className="c-panel cf-upcoming"><div className="cf-sidebar-heading"><h2>Próximos encuentros</h2><Link to="/play" aria-label="Ver partidos y torneos"><ArrowUpRight size={18} /></Link></div>{communityUnavailable ? <div className="cf-sidebar-empty"><CalendarDays size={22} aria-hidden="true" /><p>{communityPaused ? 'La consulta de encuentros está temporalmente pausada.' : 'La consulta de encuentros estará disponible cuando se abra el servicio.'}</p></div> : nextEvents.length ? nextEvents.map(event => <Link key={event.id} to={`/play/${encodeURIComponent(event.id)}`} className="cf-upcoming-event"><span className="cf-event-date">{new Intl.DateTimeFormat('es-ES', { day: 'numeric', timeZone: event.timeZone }).format(new Date(event.startAt))}<small>{new Intl.DateTimeFormat('es-ES', { month: 'short', timeZone: event.timeZone }).format(new Date(event.startAt))}</small></span><div><strong>{event.title}</strong><span><MapPin size={12} />{event.city}</span><small>{event.type === 'tournament' ? 'Torneo' : 'Partido'} · Fútbol {event.format}</small></div></Link>) : <div className="cf-sidebar-empty"><CalendarDays size={22} /><p>Sin encuentros próximos.</p><Link to="/play">Explorar encuentros <ArrowRight size={14} /></Link></div>}</section>
         <Link className="c-panel cf-directory-link" to="/people"><UsersRound size={22} /><span><strong>Personas y equipos</strong><small>Explora perfiles de la comunidad</small></span><ArrowUpRight size={16} /></Link>
       </aside>
     </div>

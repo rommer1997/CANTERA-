@@ -394,7 +394,8 @@ export default function EventsPage() {
   const city = queryLocation(searchParams.get('city'), 80);
   const type = requestedType === 'match' || requestedType === 'tournament' ? requestedType : 'all';
   const view = searchParams.get('view') === 'mine' ? 'mine' : 'explore';
-  const { events, loading, profile, mode, eventsHasMore, eventsLoading, loadMoreEvents, ownEventsHasMore, ownEventsLoading, loadMoreOwnEvents } = useCommunity();
+  const { events, loading, profile, mode, runtimeConfig, eventsHasMore, eventsLoading, loadMoreEvents, ownEventsHasMore, ownEventsLoading, loadMoreOwnEvents } = useCommunity();
+  const serviceUnavailable = mode === 'cloud' && runtimeConfig.serviceStatus !== 'open';
   const listedEvent = eventId ? events.find(item => item.id === eventId) : undefined;
   const hasListedEvent = !!listedEvent;
   const [directEvent, setDirectEvent] = useState<{ id: string; event: PlayEvent | null; loading: boolean; error: string } | null>(null);
@@ -411,7 +412,7 @@ export default function EventsPage() {
   useEffect(() => { setOnlyOpen(view === 'explore'); setPagingError(''); }, [view]);
 
   useEffect(() => {
-    if (!eventId || mode !== 'cloud' || hasListedEvent) { setDirectEvent(null); return; }
+    if (!eventId || mode !== 'cloud' || serviceUnavailable || hasListedEvent) { setDirectEvent(null); return; }
     if (eventId.length > 128 || /[\/\\\u0000-\u001f\u007f]/.test(eventId) || ['.', '..', '__proto__', 'constructor', 'prototype'].includes(eventId)) {
       setDirectEvent({ id: eventId, event: null, loading: false, error: '' }); return;
     }
@@ -427,10 +428,10 @@ export default function EventsPage() {
       setDirectEvent({ id: eventId, event: null, loading: false, error: message });
     });
     return () => { active = false; stop(); };
-  }, [eventId, mode, hasListedEvent, eventRetry]);
+  }, [eventId, mode, serviceUnavailable, hasListedEvent, eventRetry]);
 
   useEffect(() => {
-    if (!requestedCreate || loading || eventId) return;
+    if (!requestedCreate || serviceUnavailable || loading || eventId) return;
     if (!profile) { navigate(`/profile?returnTo=${encodeURIComponent(`/play?create=1&type=${requestedType === 'tournament' ? 'tournament' : 'match'}${requestedTeam ? `&team=${encodeURIComponent(requestedTeam)}` : ''}`)}`); return; }
     setCreationType(requestedType === 'tournament' ? 'tournament' : 'match');
     setCreationTeam(requestedTeam);
@@ -438,7 +439,7 @@ export default function EventsPage() {
     const next = new URLSearchParams(searchParams);
     next.delete('create');
     setSearchParams(next, { replace: true });
-  }, [requestedCreate, requestedType, requestedTeam, loading, profile, eventId, searchParams, setSearchParams, navigate]);
+  }, [requestedCreate, requestedType, requestedTeam, serviceUnavailable, loading, profile, eventId, searchParams, setSearchParams, navigate]);
 
   function updateQuery(updates: Record<string, string>) {
     const next = new URLSearchParams(searchParams);
@@ -492,6 +493,7 @@ export default function EventsPage() {
   const event = listedEvent || currentDirectEvent?.event;
   const detailLoading = !!eventId && mode === 'cloud' && !listedEvent && (!currentDirectEvent || currentDirectEvent.loading);
 
+  if (serviceUnavailable) return <div className="ce-events-page"><header className="ce-workspace-header"><div><span className="c-eyebrow">PARTIDOS Y TORNEOS</span><h1>Juega</h1></div></header><section className="c-panel ce-not-found"><CalendarDays size={36} aria-hidden="true" /><div role="status"><h2>{runtimeConfig.serviceStatus === 'paused' ? 'Servicio temporalmente pausado' : 'Apertura pendiente'}</h2><p>{runtimeConfig.serviceStatus === 'paused' ? 'La consulta y organización de encuentros están pausadas. Podrás volver a consultar la convocatoria cuando se reanude el servicio.' : 'Estamos preparando la apertura de los partidos y torneos. La convocatoria pública estará disponible cuando se abra el servicio.'}</p>{eventId && <p>La consulta del encuentro de este enlace queda pendiente hasta que el servicio esté disponible.</p>}</div><div className="ce-empty-actions"><Link className="c-button" to="/profile">Mi cuenta y derechos</Link><Link className="c-button secondary" to="/legal/privacy">Privacidad</Link></div></section></div>;
   if (loading || detailLoading) return <div className="ce-loading" role="status"><div className="ce-loading-ball" /><h2>{eventId ? 'Cargando encuentro' : 'Cargando encuentros'}</h2><p>Consultando la convocatoria de la comunidad.</p></div>;
   if (eventId && !listedEvent && currentDirectEvent?.error) return <section className="c-panel ce-not-found"><h1>No podemos cargar este encuentro.</h1><p role="alert">{currentDirectEvent.error}</p><div className="ce-empty-actions"><button className="c-button" type="button" onClick={() => setEventRetry(value => value + 1)}>Volver a intentar</button><Link className="c-button secondary" to="/play">Explorar encuentros</Link></div></section>;
   if (eventId) return event ? <EventDetail key={event.id} event={event} /> : <section className="c-panel ce-not-found"><Trophy size={36} /><h1>No encontramos este encuentro.</h1><p>Puede que el enlace no sea correcto o que no esté disponible en este navegador.</p><Link className="c-button" to="/play">Explorar encuentros<ArrowRight size={17} /></Link></section>;

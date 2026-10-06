@@ -13,6 +13,10 @@ const entityLabels = { individual: 'Persona', group: 'Grupo', club: 'Club o equi
 const location = (profile: PublicProfile) => [profile.city, profile.country].filter(Boolean).join(', ');
 const dateLabel = (value: string) => new Intl.DateTimeFormat('es', { dateStyle: 'medium' }).format(new Date(value));
 
+function PeopleUnavailable({ paused, detail = false }: { paused: boolean; detail?: boolean }) {
+  return <section className="people-page"><header className="people-heading"><h1 id="people-page-heading" tabIndex={-1}>{detail ? 'Perfil público' : 'Personas y equipos'}</h1></header><div className="people-empty"><Users size={30} aria-hidden="true" /><div role="status"><h2>{paused ? 'Servicio temporalmente pausado' : 'Apertura pendiente'}</h2><p>{paused ? 'La consulta de perfiles públicos está pausada. El directorio estará disponible cuando se reanude el servicio.' : 'Estamos preparando la apertura de la comunidad. El directorio y los perfiles públicos estarán disponibles cuando se abra el servicio.'}</p>{detail && <p>La consulta del perfil de este enlace queda pendiente hasta que el servicio esté disponible.</p>}</div><div className="people-actions"><Link className="people-button" to="/profile">Mi cuenta y derechos</Link><Link className="people-button people-button-secondary" to="/legal/privacy">Privacidad</Link></div></div></section>;
+}
+
 function FollowButton({ target }: { target: PublicProfile }) {
   const { profile, followingIds, toggleFollow } = useCommunity();
   const [busy, setBusy] = useState(false); const [error, setError] = useState('');
@@ -50,17 +54,19 @@ function BlockedAccountRow({ id }: { id: string }) {
   return <li><Link to={`/people/${encodeURIComponent(id)}`}>{person?.name || 'Cuenta bloqueada'}</Link><BlockButton id={id} name={person?.name || 'esta cuenta'} /></li>;
 }
 export function PeoplePage() {
-  const { mode, profiles, publicProfiles, peopleLoading, peopleError, peopleHasMore, searchPeople, blockedIds } = useCommunity();
+  const { mode, runtimeConfig, profiles, publicProfiles, peopleLoading, peopleError, peopleHasMore, searchPeople, blockedIds } = useCommunity();
+  const serviceUnavailable = mode === 'cloud' && runtimeConfig.serviceStatus !== 'open';
   const [search, setSearch] = useState(''); const [field, setField] = useState<'name' | 'city' | 'country'>('name');
   const [applied, setApplied] = useState({ value: '', field: 'name' as 'name' | 'city' | 'country' });
   const [entity, setEntity] = useState('all');
   const [searchError, setSearchError] = useState('');
-  useEffect(() => { setSearch(''); setApplied({ value: '', field: 'name' }); void searchPeople('', 'name', true).catch(err => setSearchError(friendlyError(err))); }, [mode, searchPeople]);
+  useEffect(() => { setSearch(''); setApplied({ value: '', field: 'name' }); if (!serviceUnavailable) void searchPeople('', 'name', true).catch(err => setSearchError(friendlyError(err))); }, [mode, serviceUnavailable, searchPeople]);
   const loaded = profiles.map(item => publicProfiles[item.id] || item).filter(item => !blockedIds.includes(item.id));
   const matches = loaded.filter(item => entity === 'all' || item.entityType === entity);
   const fields = { name: 'nombre', city: 'ciudad', country: 'país' };
   async function runSearch() { const value = search.trim(); setApplied({ value, field }); setSearchError(''); try { await searchPeople(value, field, true); } catch (err) { setSearchError(friendlyError(err)); } }
   async function more() { setSearchError(''); try { await searchPeople(applied.value, applied.field, false); } catch (err) { setSearchError(friendlyError(err)); } }
+  if (serviceUnavailable) return <PeopleUnavailable paused={runtimeConfig.serviceStatus === 'paused'} />;
   return <section className="people-page"><header className="people-heading"><h1 id="people-page-heading" tabIndex={-1}>Personas y equipos</h1><p>Busca cuentas de la comunidad.</p></header>
     <form className="people-search" onSubmit={event => { event.preventDefault(); void runSearch(); }}><label htmlFor="people-search"><Search size={20} aria-hidden="true" /><span className="people-sr-only">Buscar por {fields[field]}</span><input id="people-search" type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder={`Busca por ${fields[field]}`} maxLength={100} /></label><label className="people-type-label" htmlFor="people-field">Buscar por<select id="people-field" value={field} onChange={event => setField(event.target.value as typeof field)}><option value="name">Nombre</option><option value="city">Ciudad</option><option value="country">País</option></select></label><button className="people-button" disabled={peopleLoading}>Buscar</button></form>
     <div className="people-filter-row"><label className="people-type-label" htmlFor="people-type">Tipo en las páginas cargadas<select id="people-type" value={entity} onChange={event => setEntity(event.target.value)}><option value="all">Todos</option><option value="individual">Personas</option><option value="group">Grupos</option><option value="club">Clubes y equipos</option></select></label><p className="people-window" role="status">{applied.value ? `Resultados por comienzo de ${fields[applied.field]}: «${applied.value}».` : 'Directorio de cuentas públicas.'} {matches.length} perfiles mostrados. Puedes cargar las siguientes páginas.</p></div>
@@ -75,11 +81,12 @@ export function PeoplePage() {
 type Activity = CommunityPost | PlayEvent;
 const activityPageSize = 20;
 function useProfileActivity<T extends Activity>(id: string, enabled: boolean, name: 'communityPosts' | 'communityEvents', field: 'authorId' | 'ownerId', normalize: (value: unknown, id?: string) => T | null) {
-  const { mode } = useCommunity();
+  const { mode, runtimeConfig } = useCommunity();
+  const serviceUnavailable = mode === 'cloud' && runtimeConfig.serviceStatus !== 'open';
   const [state, setState] = useState<{ records: T[]; loading: boolean; error: string; more: boolean }>({ records: [], loading: false, error: '', more: true });
   const paging = useRef<{ cursor: QueryDocumentSnapshot<DocumentData> | null; offset: number; busy: boolean; active: boolean }>({ cursor: null, offset: 0, busy: false, active: true });
   const load = useCallback(async () => {
-    const page = paging.current; if (!enabled || page.busy || !page.active) return; page.busy = true;
+    const page = paging.current; if (!enabled || serviceUnavailable || page.busy || !page.active) return; page.busy = true;
     setState(previous => ({ ...previous, loading: true, error: '' }));
     try {
       let records: T[]; let more: boolean;
@@ -94,7 +101,7 @@ function useProfileActivity<T extends Activity>(id: string, enabled: boolean, na
       if (page.active) setState(previous => ({ records: [...new Map([...previous.records, ...records].map(item => [item.id, item])).values()], loading: false, error: '', more }));
     } catch (err) { if (page.active) setState(previous => ({ ...previous, loading: false, error: friendlyError(err) })); }
     finally { page.busy = false; }
-  }, [enabled, field, id, mode, name, normalize]);
+  }, [enabled, serviceUnavailable, field, id, mode, name, normalize]);
   useEffect(() => {
     let page: { cursor: QueryDocumentSnapshot<DocumentData> | null; offset: number; busy: boolean; active: boolean } = { cursor: null, offset: 0, busy: false, active: true }; paging.current = page;
     setState({ records: [], loading: false, error: '', more: true }); void load();
@@ -127,7 +134,8 @@ function ActivityFooter({ activity, noun }: { activity: { loading: boolean; erro
 }
 export function PublicProfilePage() {
   const { profileId = '' } = useParams();
-  const person = usePublicProfile(profileId); const { publicProfileStates, posts, followingIds, toggleFollow, blockedIds } = useCommunity();
+  const person = usePublicProfile(profileId); const { mode, runtimeConfig, publicProfileStates, posts, followingIds, toggleFollow, blockedIds } = useCommunity();
+  const serviceUnavailable = mode === 'cloud' && runtimeConfig.serviceStatus !== 'open';
   const state = !profileId || profileId.length > 128 || ['__proto__', 'constructor', 'prototype', '.', '..'].includes(profileId) || /[\/\\\u0000-\u001f\u007f]/.test(profileId) ? 'missing' : publicProfileStates[profileId];
   const blocked = blockedIds.includes(profileId);
   const publications = useProfileActivity(profileId, !!person && !blocked, 'communityPosts', 'authorId', normalizePost);
@@ -142,6 +150,7 @@ export function PublicProfilePage() {
     try { if (navigator.share) await navigator.share({ title: `${person.name} · Cantera`, url: url.href }); else if (navigator.clipboard?.writeText) { await navigator.clipboard.writeText(url.href); setShareStatus('Enlace copiado.'); } else { setShareFallback(url.href); setShareStatus('Copia el enlace de este perfil.'); } }
     catch (err) { if ((err as { name?: string }).name !== 'AbortError') { setShareFallback(url.href); setShareStatus('Copia el enlace de este perfil.'); } }
   }
+  if (serviceUnavailable) return <PeopleUnavailable paused={runtimeConfig.serviceStatus === 'paused'} detail />;
   if (!person && blocked) return <section className="people-page"><Link className="people-back" to="/people">Personas y equipos</Link><div className="people-empty"><h1>Cuenta bloqueada</h1><BlockButton id={profileId} name="esta cuenta" /></div></section>;
   if (!person) return <section className="people-page"><Link className="people-back" to="/people"><ArrowLeft size={18} aria-hidden="true" />Comunidad</Link><div className="people-empty"><h1>{state === 'missing' ? 'Perfil no encontrado' : state === 'error' ? 'Perfil no disponible' : 'Consultando perfil…'}</h1><p>{state === 'missing' ? 'Comprueba el enlace o encuentra otro perfil en la comunidad.' : state === 'error' ? 'No se ha podido consultar este perfil. Inténtalo de nuevo cuando haya conexión.' : 'Estamos buscando los datos publicados por esta cuenta.'}</p>{(state === 'missing' || state === 'error') && followingIds.includes(profileId) && <div className="people-follow"><button className="people-button people-button-secondary" disabled={unfollowBusy} onClick={() => void unfollowMissing()}>{unfollowBusy ? 'Guardando…' : 'Dejar de seguir esta cuenta'}</button>{unfollowError && <p className="people-error" role="alert">{unfollowError}</p>}</div>}</div></section>;
   if (blocked) return <section className="people-page"><Link className="people-back" to="/people"><ArrowLeft size={18} />Personas y equipos</Link><div className="people-empty"><h1 id="people-page-heading" tabIndex={-1}>Cuenta bloqueada</h1><p>Has ocultado el contenido de {person.name}.</p><BlockButton id={person.id} name={person.name} /></div></section>;
