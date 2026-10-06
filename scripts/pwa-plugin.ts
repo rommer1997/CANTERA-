@@ -5,10 +5,11 @@ import type { Plugin } from 'vite';
 // are deliberately outside the service worker's fetch policy.
 export function canteraShell(): Plugin {
  return { name: 'cantera-shell', apply: 'build', generateBundle(_options, bundle) {
-  const paths = ['index.html', 'cantera-mark.svg', 'cantera-maskable.svg', 'manifest.webmanifest', ...Object.keys(bundle).filter(path => path.startsWith('assets/'))];
+  const staticFiles = ['cantera-mark.svg', 'cantera-maskable.svg', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'icon-touch-180.png', 'manifest.webmanifest'];
+  const paths = ['index.html', ...staticFiles, ...Object.keys(bundle).filter(path => path.startsWith('assets/'))];
   const digest = createHash('sha256');
   for (const [name, output] of Object.entries(bundle).sort(([a], [b]) => a.localeCompare(b))) digest.update(name).update(output.type === 'chunk' ? output.code : output.source);
-  for (const file of ['cantera-mark.svg', 'cantera-maskable.svg', 'manifest.webmanifest']) digest.update(readFileSync(`public/${file}`));
+  for (const file of staticFiles) digest.update(file).update(readFileSync(`public/${file}`));
   const version = digest.digest('hex').slice(0, 16);
   const code = `const CACHE='cantera-shell-${version}';const FILES=${JSON.stringify(paths)};const ROOT=new URL('./',self.location.href);const ABS=new Set(FILES.map(file=>new URL(file,ROOT).href));
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(FILES.map(file=>new URL(file,ROOT).href)))));
