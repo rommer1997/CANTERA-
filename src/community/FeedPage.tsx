@@ -207,7 +207,7 @@ function Composer({ onPublished, openRequest }: { onPublished: (id: string) => v
   if (!profile) return <div className="cf-composer cf-join-composer"><CircleUserRound size={22} aria-hidden="true" /><Link to="/profile">Accede para publicar <ArrowUpRight size={17} /></Link></div>;
 
   return <section className="cf-composer" aria-label="Crear una publicación">
-    <div className="cf-composer-top"><Link className="cf-avatar" to="/profile" aria-label="Ir a tu perfil">{initials(profile.name)}</Link><button ref={triggerRef} type="button" className="cf-compose-trigger" onClick={() => openComposer()} aria-haspopup="dialog" aria-expanded={expanded} disabled={isLocked}>Compartir una publicación… <Plus size={17} /></button></div>
+    <div className="cf-composer-top"><Link className="cf-avatar" to="/profile" aria-label="Ir a tu perfil">{initials(profile.name)}</Link><button ref={triggerRef} type="button" className="cf-compose-trigger" onClick={() => openComposer()} aria-haspopup="dialog" aria-expanded={expanded} disabled={isLocked}><span className="cf-compose-label">Compartir una publicación…</span><Plus size={17} /></button></div>
     {expanded && <Modal title="Nueva publicación" returnFocusRef={triggerRef} onClose={() => { if (!isLocked) setExpanded(false); }}>
     <form ref={formRef} className="cf-compose-form" onSubmit={publish} >
       <div className="cf-kind-picker" aria-label="Tipo de publicación">{(['reel', 'photo', 'achievement'] as PostKind[]).map(type => <button key={type} type="button" aria-pressed={kind === type} className={kind === type ? 'is-active' : ''} disabled={isLocked || type !== 'achievement' && !mediaUploadsEnabled} onClick={() => changeKind(type)}>{kindLabels[type]}</button>)}</div>

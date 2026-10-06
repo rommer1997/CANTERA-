@@ -5,6 +5,7 @@ import { friendlyError, TERMS_VERSION, useCommunity } from './CommunityContext';
 import { legalDocuments, legalReady, operator } from './legal';
 import { AppAvailability } from './AppAvailability';
 import { MobileHome } from './MobileHome';
+import '@fontsource-variable/manrope';
 import './community.css';
 import './mobile.css';
 import './brand.css';
