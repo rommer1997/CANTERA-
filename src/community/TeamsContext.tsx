@@ -6,6 +6,7 @@ import { normalizeTeam, normalizeTeamMember, normalizeTeamInvite, normalizeTeamR
 import { assertInvite, isTeamManager, memberId, validTeamInput } from './teamLogic';
 import { readDemo } from './local';
 import { normalizeEvent } from './normalization';
+import { keyedSubscriptions } from './keyedSubscriptions';
 import type { PlayEvent } from './types';
 import type { CommunityTeam, TeamInput, TeamInvite, TeamJoinRequest, TeamMember } from './teamTypes';
 interface LocalTeams { teams: CommunityTeam[]; members: TeamMember[]; invites: TeamInvite[]; requests: TeamJoinRequest[]; }
@@ -33,12 +34,15 @@ export function TeamsProvider({ children }: { children: React.ReactNode }) {
   const community = useCommunity(); const { profile, mode } = community;
   const [teams, setTeams] = useState<CommunityTeam[]>([]); const [ownTeams, setOwnTeams] = useState<CommunityTeam[]>([]); const [myRoles, setRoles] = useState<Record<string, TeamMember['role']>>({});
   const membershipKey = `${mode}:${profile?.id || 'guest'}`;
+  const currentMembershipKey = useRef(membershipKey); currentMembershipKey.current = membershipKey;
   const [ownKey, setOwnKey] = useState(membershipKey);
   const [loading, setLoading] = useState(false); const [error, setError] = useState(''); const [hasMore, setMore] = useState(true);
   const cursor = useRef<QueryDocumentSnapshot<DocumentData> | null>(null); const busy = useRef(false); const epoch = useRef(0);
   const available = mode === 'demo' || community.runtimeConfig.serviceStatus === 'open';
-  const scope = `${mode}:${profile?.id || 'guest'}:${available}`; const currentScope = useRef(scope); currentScope.current = scope;
+  const publicScope = `${mode}:${available}`; const currentPublicScope = useRef(publicScope); currentPublicScope.current = publicScope;
+  const mutationScope = `${membershipKey}:${available}`; const currentMutationScope = useRef(mutationScope); currentMutationScope.current = mutationScope;
   const actor = (participating = true) => {
+    if (currentMutationScope.current !== mutationScope) throw new Error('Tu cuenta ha cambiado. Vuelve a intentar la acción.');
     if (!profile || (mode === 'cloud' && auth.currentUser?.uid !== profile.id)) throw new Error('Entra con tu cuenta para continuar.');
     if (participating && community.accountModeration?.status === 'suspended') throw new Error(`Tu cuenta está suspendida: ${community.accountModeration.reason}`);
     if (participating && (!profile.city.trim() || !profile.country.trim())) throw new Error('Completa la ciudad y el país de tu perfil antes de participar.');
@@ -46,45 +50,45 @@ export function TeamsProvider({ children }: { children: React.ReactNode }) {
     return profile;
   };
   const loadMore = useCallback(async (reset = false) => {
-    if (currentScope.current !== scope) return;
+    if (currentPublicScope.current !== publicScope) return;
     if (!available) { epoch.current += 1; busy.current = false; setLoading(false); setError(''); setTeams([]); setMore(false); return; }
     if (busy.current && !reset) return;
     if (reset) { cursor.current = null; epoch.current += 1; setTeams([]); }
     const current = epoch.current; busy.current = true; setLoading(true); setError('');
     try {
       if (mode === 'demo') { const all = read().teams.filter(t => t.status === 'active').sort((a, b) => b.createdAt.localeCompare(a.createdAt)); setTeams(all); setMore(false); }
-      else { const snapshot = await getDocs(query(collection(db, 'communityTeams'), where('status', '==', 'active'), orderBy('createdAt', 'desc'), ...(cursor.current ? [startAfter(cursor.current)] : []), limit(40))); if (current !== epoch.current || currentScope.current !== scope) return; cursor.current = snapshot.docs.at(-1) || cursor.current; const batch = snapshot.docs.map(item => teamRecord(item.data(), item.id)).filter((item): item is CommunityTeam => item !== null); setTeams(previous => [...new Map([...(reset ? [] : previous), ...batch].map(t => [t.id, t])).values()]); setMore(snapshot.size === 40); }
-    } catch (err) { if (current === epoch.current && currentScope.current === scope) setError(friendlyError(err)); } finally { if (current === epoch.current && currentScope.current === scope) { busy.current = false; setLoading(false); } }
-  }, [mode, available, scope]);
+      else { const snapshot = await getDocs(query(collection(db, 'communityTeams'), where('status', '==', 'active'), orderBy('createdAt', 'desc'), ...(cursor.current ? [startAfter(cursor.current)] : []), limit(40))); if (current !== epoch.current || currentPublicScope.current !== publicScope) return; cursor.current = snapshot.docs.at(-1) || cursor.current; const batch = snapshot.docs.map(item => teamRecord(item.data(), item.id)).filter((item): item is CommunityTeam => item !== null); setTeams(previous => [...new Map([...(reset ? [] : previous), ...batch].map(t => [t.id, t])).values()]); setMore(snapshot.size === 40); }
+    } catch (err) { if (current === epoch.current && currentPublicScope.current === publicScope) setError(friendlyError(err)); } finally { if (current === epoch.current && currentPublicScope.current === publicScope) { busy.current = false; setLoading(false); } }
+  }, [mode, available, publicScope]);
   useEffect(() => { void loadMore(true); const refresh = () => { if (mode === 'demo') void loadMore(true); }; window.addEventListener('storage', refresh); window.addEventListener('cantera-teams-updated', refresh); return () => { epoch.current += 1; busy.current = false; window.removeEventListener('storage', refresh); window.removeEventListener('cantera-teams-updated', refresh); }; }, [loadMore, mode]);
   useEffect(() => {
-    let active = true; const teamStops: (() => void)[] = []; setOwnKey(`${mode}:${profile?.id || 'guest'}`); setOwnTeams([]); setRoles({}); if (!profile) return;
-    const cleanupTeams = () => { teamStops.splice(0).forEach(stop => stop()); };
+    let active = true; setOwnKey(membershipKey); setOwnTeams([]); setRoles({}); if (!profile) return;
+    const current = () => active && currentMembershipKey.current === membershipKey && (mode === 'demo' || auth.currentUser?.uid === profile.id);
+    const subscriptions = keyedSubscriptions<CommunityTeam>(
+      (id, receive, fail) => onSnapshot(doc(db, 'communityTeams', id), snapshot => receive(snapshot.exists() ? teamRecord(snapshot.data(), snapshot.id) : null), fail),
+      rows => { if (current()) setOwnTeams([...rows.values()]); },
+      err => { if (current()) setError(friendlyError(err)); },
+    );
     const receive = (members: TeamMember[]) => {
-      if (!active) return; cleanupTeams(); setRoles(Object.fromEntries(members.map(m => [m.teamId, m.role])));
+      if (!current()) return; setRoles(Object.fromEntries(members.map(m => [m.teamId, m.role])));
       if (mode === 'demo') { const data = read(); setOwnTeams(data.teams.filter(t => members.some(m => m.teamId === t.id))); return; }
-      const rows = new Map<string, CommunityTeam>(); setOwnTeams([]);
-      for (const membership of members) teamStops.push(onSnapshot(doc(db, 'communityTeams', membership.teamId), snapshot => {
-        if (!active) return; const team = snapshot.exists() ? teamRecord(snapshot.data(), snapshot.id) : null;
-        if (team) rows.set(team.id, team); else rows.delete(membership.teamId);
-        setOwnTeams([...rows.values()]);
-      }, err => { if (active) setError(friendlyError(err)); }));
+      subscriptions.reconcile(members.map(member => member.teamId));
     };
-    if (mode === 'demo') { const refresh = () => receive(read().members.filter(m => m.userId === profile.id)); refresh(); window.addEventListener('storage', refresh); window.addEventListener('cantera-teams-updated', refresh); return () => { active = false; cleanupTeams(); window.removeEventListener('storage', refresh); window.removeEventListener('cantera-teams-updated', refresh); }; }
-    const stop = onSnapshot(query(collection(db, 'communityTeamMembers'), where('userId', '==', profile.id)), snap => receive(snap.docs.map(item => memberRecord(item.data(), item.id)).filter((item): item is TeamMember => item !== null)), err => { if (active) setError(friendlyError(err)); });
-    return () => { active = false; stop(); cleanupTeams(); };
+    if (mode === 'demo') { const refresh = () => receive(read().members.filter(m => m.userId === profile.id)); refresh(); window.addEventListener('storage', refresh); window.addEventListener('cantera-teams-updated', refresh); return () => { active = false; subscriptions.dispose(); window.removeEventListener('storage', refresh); window.removeEventListener('cantera-teams-updated', refresh); }; }
+    const stop = onSnapshot(query(collection(db, 'communityTeamMembers'), where('userId', '==', profile.id)), snap => receive(snap.docs.map(item => memberRecord(item.data(), item.id)).filter((item): item is TeamMember => item !== null)), err => { if (current()) setError(friendlyError(err)); });
+    return () => { active = false; stop(); subscriptions.dispose(); };
   }, [mode, profile?.id]);
   async function getTeam(id: string) { if (mode === 'demo') return read().teams.find(t => t.id === id) || null; const item = await getDoc(doc(db, 'communityTeams', id)); return item.exists() ? teamRecord(item.data(), item.id) : null; }
   async function getInvite(id: string) { actor(false); if (mode === 'demo') return read().invites.find(t => t.id === id) || null; const item = await getDoc(doc(db, 'communityTeamInvites', id)); return item.exists() ? inviteRecord(item.data(), item.id) : null; }
   function localManager(data: LocalTeams, id: string, owner = false) { const user = actor(); const role = data.members.find(m => m.teamId === id && m.userId === user.id)?.role; if (owner ? role !== 'owner' : !isTeamManager(role)) throw new Error('Sólo los responsables del equipo pueden hacer este cambio.'); return user; }
   async function createTeam(input: TeamInput) {
-    const mutationScope = currentScope.current; const user = actor(); const clean = validTeamInput(input); const id = crypto.randomUUID(); const now = stamp(); const team: CommunityTeam = { ...clean, id, ownerId: user.id, status: 'active', createdAt: now, updatedAt: now }; const membership: TeamMember = { id: memberId(id, user.id), teamId: id, userId: user.id, name: user.name, role: 'owner', joinedAt: now };
+    const startedScope = currentMutationScope.current; const user = actor(); const clean = validTeamInput(input); const id = crypto.randomUUID(); const now = stamp(); const team: CommunityTeam = { ...clean, id, ownerId: user.id, status: 'active', createdAt: now, updatedAt: now }; const membership: TeamMember = { id: memberId(id, user.id), teamId: id, userId: user.id, name: user.name, role: 'owner', joinedAt: now };
     if (mode === 'demo') { const data = read(); data.teams.push(team); data.members.push(membership); write(data); }
-    else { const batch = writeBatch(db); batch.set(doc(db, 'communityTeams', id), { ...team, createdAt: serverTimestamp(), updatedAt: serverTimestamp() }); batch.set(doc(db, 'communityTeamMembers', membership.id), { ...membership, joinedAt: serverTimestamp() }); await batch.commit(); if (currentScope.current !== mutationScope) return id; await loadMore(true); }
+    else { const batch = writeBatch(db); batch.set(doc(db, 'communityTeams', id), { ...team, createdAt: serverTimestamp(), updatedAt: serverTimestamp() }); batch.set(doc(db, 'communityTeamMembers', membership.id), { ...membership, joinedAt: serverTimestamp() }); await batch.commit(); if (currentMutationScope.current !== startedScope) return id; await loadMore(true); }
     return id;
   }
-  async function updateTeam(id: string, input: TeamInput) { const mutationScope = currentScope.current; actor(); const clean = validTeamInput(input); if (mode === 'demo') { const data = read(); localManager(data, id, true); const team = data.teams.find(t => t.id === id); if (!team) throw new Error('Equipo no encontrado.'); Object.assign(team, clean, { updatedAt: stamp() }); write(data); } else { const batch = writeBatch(db); batch.update(doc(db, 'communityTeams', id), { ...clean, updatedAt: serverTimestamp() }); await batch.commit(); if (currentScope.current !== mutationScope) return; setOwnTeams(previous => previous.map(t => t.id === id ? { ...t, ...clean, updatedAt: stamp() } : t)); await loadMore(true); } }
-  async function archiveTeam(id: string) { const mutationScope = currentScope.current; actor(); if (mode === 'demo') { const data = read(); localManager(data, id, true); const team = data.teams.find(t => t.id === id); if (!team) throw new Error('Equipo no encontrado.'); team.status = 'archived'; team.updatedAt = stamp(); write(data); } else { const batch = writeBatch(db); batch.update(doc(db, 'communityTeams', id), { status: 'archived', updatedAt: serverTimestamp() }); await batch.commit(); if (currentScope.current !== mutationScope) return; setOwnTeams(previous => previous.map(t => t.id === id ? { ...t, status: 'archived', updatedAt: stamp() } : t)); await loadMore(true); } }
+  async function updateTeam(id: string, input: TeamInput) { const startedScope = currentMutationScope.current; actor(); const clean = validTeamInput(input); if (mode === 'demo') { const data = read(); localManager(data, id, true); const team = data.teams.find(t => t.id === id); if (!team) throw new Error('Equipo no encontrado.'); Object.assign(team, clean, { updatedAt: stamp() }); write(data); } else { const batch = writeBatch(db); batch.update(doc(db, 'communityTeams', id), { ...clean, updatedAt: serverTimestamp() }); await batch.commit(); if (currentMutationScope.current !== startedScope) return; setOwnTeams(previous => previous.map(t => t.id === id ? { ...t, ...clean, updatedAt: stamp() } : t)); await loadMore(true); } }
+  async function archiveTeam(id: string) { const startedScope = currentMutationScope.current; actor(); if (mode === 'demo') { const data = read(); localManager(data, id, true); const team = data.teams.find(t => t.id === id); if (!team) throw new Error('Equipo no encontrado.'); team.status = 'archived'; team.updatedAt = stamp(); write(data); } else { const batch = writeBatch(db); batch.update(doc(db, 'communityTeams', id), { status: 'archived', updatedAt: serverTimestamp() }); await batch.commit(); if (currentMutationScope.current !== startedScope) return; setOwnTeams(previous => previous.map(t => t.id === id ? { ...t, status: 'archived', updatedAt: stamp() } : t)); await loadMore(true); } }
   async function requestJoin(teamId: string, inviteId = '') {
     const user = actor(); const id = memberId(teamId, user.id); const entry: TeamJoinRequest = { id, teamId, userId: user.id, name: user.name, inviteId, status: 'pending', createdAt: stamp(), reviewedAt: '' };
     if (mode === 'demo') { const data = read(); const team = data.teams.find(t => t.id === teamId); if (!team || team.status !== 'active') throw new Error('Este equipo no admite nuevas solicitudes.'); if (inviteId) assertInvite(data.invites.find(i => i.id === inviteId) || null, team); if (data.members.some(m => m.id === id)) throw new Error('Ya formas parte de este equipo.'); const existing = data.requests.find(r => r.id === id); if (existing?.status === 'pending') throw new Error('Tu solicitud ya está pendiente.'); data.requests = [...data.requests.filter(r => r.id !== id), entry]; write(data); }
@@ -100,7 +104,8 @@ export function TeamsProvider({ children }: { children: React.ReactNode }) {
   async function changeRole(teamId: string, userId: string, role: 'manager' | 'member') { const user = actor(); if (user.id === userId) throw new Error('Para cambiar al propietario, utiliza Transferir equipo.'); if (mode === 'demo') { const data = read(); localManager(data, teamId, true); const member = data.members.find(m => m.id === memberId(teamId, userId)); if (!member || member.role === 'owner') throw new Error('No se puede cambiar este rol.'); member.role = role; write(data); } else { const batch = writeBatch(db); batch.update(doc(db, 'communityTeamMembers', memberId(teamId, userId)), { role }); await batch.commit(); } }
   async function transferOwnership(teamId: string, userId: string) { const user = actor(); if (userId === user.id) throw new Error('Ya eres el propietario.'); if (mode === 'demo') { const data = read(); localManager(data, teamId, true); const next = data.members.find(m => m.id === memberId(teamId, userId)); const current = data.members.find(m => m.id === memberId(teamId, user.id)); const team = data.teams.find(t => t.id === teamId); if (!next || !current || !team) throw new Error('El nuevo responsable debe formar parte del equipo.'); next.role = 'owner'; current.role = 'manager'; team.ownerId = userId; team.updatedAt = stamp(); write(data); } else await runTransaction(db, async tx => { const nextRef = doc(db, 'communityTeamMembers', memberId(teamId, userId)); const next = await tx.get(nextRef); if (!next.exists()) throw new Error('El nuevo responsable debe formar parte del equipo.'); tx.update(doc(db, 'communityTeams', teamId), { ownerId: userId, updatedAt: serverTimestamp() }); tx.update(doc(db, 'communityTeamMembers', memberId(teamId, user.id)), { role: 'manager' }); tx.update(nextRef, { role: 'owner' }); }); }
   async function removeMember(teamId: string, userId: string) { const user = actor(userId !== profile?.id); if (mode === 'demo') { const data = read(); const member = data.members.find(m => m.id === memberId(teamId, userId)); if (!member) return; if (member.role === 'owner') throw new Error('Transfiere el equipo antes de salir.'); if (user.id !== userId) localManager(data, teamId, true); data.members = data.members.filter(m => m.id !== member.id); write(data); } else { const batch = writeBatch(db); batch.delete(doc(db, 'communityTeamMembers', memberId(teamId, userId))); await batch.commit(); } }
-  const currentTeams = ownKey === membershipKey ? ownTeams : []; const currentRoles = ownKey === membershipKey ? myRoles : {};
+  const ownIdentityMatches = ownKey === membershipKey && (mode === 'demo' || auth.currentUser?.uid === profile?.id);
+  const currentTeams = ownIdentityMatches ? ownTeams : []; const currentRoles = ownIdentityMatches ? myRoles : {};
   const value: TeamsAPI = { teams, ownTeams: currentTeams, managedTeams: currentTeams.filter(t => t.status === 'active' && isTeamManager(currentRoles[t.id])), myRoles: currentRoles, loading, error, hasMore, loadMore, createTeam, updateTeam, archiveTeam, getTeam, getInvite, requestJoin, reviewJoin, createInvite, revokeInvite, changeRole, transferOwnership, leaveTeam: id => removeMember(id, actor(false).id), removeMember };
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }

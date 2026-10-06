@@ -29,7 +29,7 @@ function FollowButton({ target }: { target: PublicProfile }) {
   </button>{error && <p className="people-error" role="alert">{error}</p>}</div>;
 }
 function PersonRow({ record }: { record: PublicProfile }) {
-  const live = usePublicProfile(record.id); const person = live || record;
+  const person = record;
   return <li className="people-row"><Link className="people-person" to={`/people/${encodeURIComponent(person.id)}`}>
     <span className="people-avatar" aria-hidden="true">{person.name.slice(0, 1).toLocaleUpperCase('es')}</span>
     <span><strong>{person.name}{person.verification === 'verified' && <CheckCircle2 size={16} aria-label="Cuenta verificada por el administrador" />}</strong>
@@ -112,7 +112,8 @@ function useProfileActivity<T extends Activity>(id: string, enabled: boolean, na
   return { ...state, load };
 }
 function RelationshipCounts({ id }: { id: string }) {
-  const { mode, followingIds } = useCommunity();
+  const { mode, profile, followingIds } = useCommunity();
+  const relevantFollowing = profile?.id === id ? followingIds.length : followingIds.includes(id);
   const [counts, setCounts] = useState<{ followers: number; following: number } | null>(null); const [failed, setFailed] = useState(false);
   useEffect(() => {
     let active = true; setCounts(null); setFailed(false);
@@ -126,7 +127,7 @@ function RelationshipCounts({ id }: { id: string }) {
     };
     void refresh(); if (mode === 'demo') { window.addEventListener('storage', refresh); window.addEventListener('cantera-demo-updated', refresh); }
     return () => { active = false; window.removeEventListener('storage', refresh); window.removeEventListener('cantera-demo-updated', refresh); };
-  }, [id, mode, followingIds]);
+  }, [id, mode, profile?.id, relevantFollowing]);
   return <div className="people-counts" aria-live="polite">{counts ? <><span><strong>{counts.followers}</strong> seguidores</span><span><strong>{counts.following}</strong> siguiendo</span><small>Última consulta del seguimiento.</small></> : <span>{failed ? 'Seguimiento: recuento no disponible.' : 'Consultando seguimiento…'}</span>}</div>;
 }
 function ActivityFooter({ activity, noun }: { activity: { loading: boolean; error: string; more: boolean; records: Activity[]; load: () => Promise<void> }; noun: string }) {

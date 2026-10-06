@@ -5,6 +5,8 @@ import { deleteObject, getDownloadURL, ref, uploadBytesResumable } from 'firebas
 import { auth, db, logout, signInWithGoogle, storage } from '../firebase';
 import { useAppStore } from '../store/useAppStore';
 import { deleteLocalMedia, getLocalMedia, readDemo, saveLocalMedia, writeDemo, type DemoData } from './local';
+import { createLocalMediaCache, publishLocalPosts } from './localMediaCache';
+import { createCoalescedRefresh } from './coalescedRefresh';
 import { legalReady, operator } from './legal';
 import { normalizeFixtureRecord, fixtureFields, sameFixture } from './fixtureRecords';
 import { commitDeliveryBatches } from './deliveryBatches';
@@ -55,6 +57,7 @@ const Context = createContext<CommunityAPI | null>(null);
 const stamp = () => new Date().toISOString();
 const newId = () => crypto.randomUUID();
 const peoplePageSize = 40;
+const contentPageSize = { events: 40, posts: 24 } as const;
 const validProfileId = (id: string) => id.length > 0 && id.length <= 128 && !['__proto__', 'constructor', 'prototype', '.', '..'].includes(id) && !/[\/\\\u0000-\u001f\u007f]/.test(id);
 export function friendlyError(error: unknown): string {
   const code = (error as { code?: string })?.code;
@@ -90,8 +93,8 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
   const [blockedIds, setBlockedIds] = useState<string[]>([]);
   const [postInteractionStates, setPostInteractionStates] = useState<Record<string, PostInteractionState>>({});
   const interactions = useRef(new Map<string, { count: number; stop: () => void; cursor: QueryDocumentSnapshot<DocumentData> | null; offset: number; busy: boolean }>());
-  const [pages, setPages] = useState({ eventsHasMore: true, postsHasMore: true, eventsLoading: false, postsLoading: false });
-  const pageCursors = useRef<Record<'events' | 'posts', { cursor: QueryDocumentSnapshot<DocumentData> | null; offset: number; busy: boolean }>>({ events: { cursor: null, offset: 0, busy: false }, posts: { cursor: null, offset: 0, busy: false } });
+  const [pages, setPages] = useState({ eventsHasMore: true, postsHasMore: true, eventsLoading: true, postsLoading: true });
+  const pageCursors = useRef<Record<'events' | 'posts', { cursor: QueryDocumentSnapshot<DocumentData> | null; offset: number; busy: boolean; ready: boolean }>>({ events: { cursor: null, offset: 0, busy: false, ready: false }, posts: { cursor: null, offset: 0, busy: false, ready: false } });
   const [olderEvents, setOlderEvents] = useState<PlayEvent[]>([]);
   const [olderPosts, setOlderPosts] = useState<CommunityPost[]>([]);
   const peopleSearch = useRef<{ value: string; field: PeopleSearchField }>({ value: '', field: 'name' });
@@ -116,10 +119,13 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
   const peopleCursor = useRef<{ mode: Mode; cursor: QueryDocumentSnapshot<DocumentData> | null; offset: number; sequence: number; busy: boolean }>({ mode, cursor: null, offset: 0, sequence: 0, busy: false });
   const currentMode = useRef(mode); currentMode.current = mode;
   const profileWatches = useRef(new Map<string, { count: number; stop: () => void }>());
-  const urls = useRef(new Map<string, string>());
+  const mediaCache = useRef<ReturnType<typeof createLocalMediaCache> | null>(null);
+  const localMedia = useCallback(() => mediaCache.current ||= createLocalMediaCache(getLocalMedia, blob => URL.createObjectURL(blob), url => URL.revokeObjectURL(url)), []);
   const setLegacyUser = useAppStore(s => s.setUser);
   const serviceOpen = mode === 'demo' || import.meta.env.VITE_SERVICE_OPEN === 'true' && legalReady && runtimeConfig.serviceStatus === 'open';
   const serviceOpenRef = useRef(serviceOpen); serviceOpenRef.current = serviceOpen;
+  const readScope = JSON.stringify([mode, firebaseUser?.uid || '', isAdmin, runtimeConfig.serviceStatus, serviceOpen]);
+  const currentReadScope = useRef(readScope); currentReadScope.current = readScope;
   const ownSources = useRef<{ owner: PlayEvent[]; joined: PlayEvent[]; waiting: PlayEvent[] }>({ owner: [], joined: [], waiting: [] });
   const readFailure = useCallback((err: unknown) => { setError(friendlyError(err)); setLoading(false); }, []);
 
@@ -173,10 +179,12 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
           const post = normalizeDemoData(readDemo()).posts.find(item => item.id === id) || null;
           if (post?.mediaPath.startsWith('local:')) {
             const mediaId = post.mediaPath.slice(6);
-            try { if (!urls.current.has(mediaId)) { const blob = await getLocalMedia(mediaId); if (blob instanceof Blob) urls.current.set(mediaId, URL.createObjectURL(blob)); } }
+            receive({ ...post, mediaUrl: localMedia().cached(mediaId) });
+            let mediaUrl = '';
+            try { mediaUrl = await localMedia().load(mediaId); }
             catch { /* Text remains available if local media cannot be read. */ }
             if (current !== sequence) return;
-            receive({ ...post, mediaUrl: urls.current.get(mediaId) || '' });
+            receive({ ...post, mediaUrl });
           } else receive(post);
         };
         void refresh(); window.addEventListener('storage', refresh); window.addEventListener('cantera-demo-updated', refresh);
@@ -190,7 +198,7 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
       setLinkedPosts(previous => { const next = { ...previous[mode] }; delete next[id]; return { ...previous, [mode]: next }; });
       setLinkedStates(previous => { const next = { ...previous[mode] }; delete next[id]; return { ...previous, [mode]: next }; });
     } };
-  }, [mode, serviceOpen]);
+  }, [mode, serviceOpen, localMedia]);
   useEffect(() => () => { postWatches.current.forEach(entry => entry.stop()); postWatches.current.clear(); }, []);
 
   const loadMorePeople = useCallback(async (reset = false) => {
@@ -275,109 +283,111 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let active = true;
-    setError(''); setFixtureData({}); setFixtureStates({}); setEventHistories({}); if (mode === 'cloud' && !serviceOpen) { setLinkedPosts(previous => ({ ...previous, cloud: {} })); setPublicCaches(previous => ({ ...previous, cloud: {} })); } ownSources.current = { owner: [], joined: [], waiting: [] }; setOlderEvents([]); setOlderPosts([]); setOwnEvents([]); setEventNotices([]); setRightsRequests([]); setBlockedIds([]); setPostInteractionStates({}); pageCursors.current = { events: { cursor: null, offset: 0, busy: false }, posts: { cursor: null, offset: 0, busy: false } }; setPages({ eventsHasMore: true, postsHasMore: true, eventsLoading: false, postsLoading: false }); setEvents([]); setPosts([]); setLikes({}); setComments({}); setVerifications([]); setReports([]); setProfile(null);
+    const isCurrentRead = () => active && currentReadScope.current === readScope && (mode === 'demo' || auth.currentUser?.uid === firebaseUser?.uid);
+    const failed = (err: unknown) => { if (isCurrentRead()) readFailure(err); };
+    setError(''); setFixtureData({}); setFixtureStates({}); setEventHistories({}); if (mode === 'cloud' && !serviceOpen) { setLinkedPosts(previous => ({ ...previous, cloud: {} })); setPublicCaches(previous => ({ ...previous, cloud: {} })); } ownSources.current = { owner: [], joined: [], waiting: [] }; setOlderEvents([]); setOlderPosts([]); setOwnEvents([]); setEventNotices([]); setRightsRequests([]); setBlockedIds([]); setPostInteractionStates({}); pageCursors.current = { events: { cursor: null, offset: 0, busy: false, ready: false }, posts: { cursor: null, offset: 0, busy: false, ready: false } }; setPages({ eventsHasMore: serviceOpen, postsHasMore: serviceOpen, eventsLoading: serviceOpen, postsLoading: serviceOpen }); setEvents([]); setPosts([]); setLikes({}); setComments({}); setVerifications([]); setReports([]); setProfile(null);
     setLoading(true);
     if (mode === 'demo') {
       let refreshSequence = 0;
-      const refresh = async () => {
+      const refresh = () => {
         const sequence = ++refreshSequence;
         try {
           const data = normalizeDemoData(readDemo());
-          const hydrated = await Promise.all(data.posts.map(async p => {
-            if (!p.mediaPath.startsWith('local:')) return p;
-            const id = p.mediaPath.slice(6);
-            if (!urls.current.has(id)) { const blob = await getLocalMedia(id); if (blob instanceof Blob) urls.current.set(id, URL.createObjectURL(blob)); }
-            return { ...p, mediaUrl: urls.current.get(id) || '' };
-          }));
-          if (!active || sequence !== refreshSequence) return;
-          setProfile(data.profile); setPages({ eventsHasMore: false, postsHasMore: false, eventsLoading: false, postsLoading: false }); setOwnEvents(data.events.filter(e => e.ownerId === data.profile?.id || Object.hasOwn(e.participants, data.profile?.id || '') || Object.hasOwn(e.waitlist || {}, data.profile?.id || ''))); setBlockedIds(data.blocked[data.profile?.id || ''] || []); setEventNotices(data.notices.filter(n => n.recipientId === data.profile?.id)); setRightsRequests(data.rightsRequests.filter(r => r.userId === data.profile?.id)); setEvents(data.events); setPosts(hydrated); setLikes(data.likes); setComments(data.comments);
+          if (!isCurrentRead() || sequence !== refreshSequence) return;
+          setProfile(data.profile); setPages({ eventsHasMore: false, postsHasMore: false, eventsLoading: false, postsLoading: false }); setOwnEvents(data.events.filter(e => e.ownerId === data.profile?.id || Object.hasOwn(e.participants, data.profile?.id || '') || Object.hasOwn(e.waitlist || {}, data.profile?.id || ''))); setBlockedIds(data.blocked[data.profile?.id || ''] || []); setEventNotices(data.notices.filter(n => n.recipientId === data.profile?.id)); setRightsRequests(data.rightsRequests.filter(r => r.userId === data.profile?.id)); setEvents(data.events); setLikes(data.likes); setComments(data.comments);
           setVerifications(data.verifications.filter(v => v.userId === data.profile?.id)); setReports([]); setLoading(false);
-        } catch (err) { if (active && sequence === refreshSequence) readFailure(err); }
+          void publishLocalPosts(data.posts, localMedia(), setPosts, (post, mediaUrl) => setPosts(previous => previous.map(current => current.id === post.id && current.mediaPath === post.mediaPath ? { ...current, mediaUrl } : current)), () => isCurrentRead() && sequence === refreshSequence);
+        } catch (err) { if (isCurrentRead() && sequence === refreshSequence) readFailure(err); }
       };
       void refresh();
       window.addEventListener('storage', refresh); window.addEventListener('cantera-demo-updated', refresh);
       return () => { active = false; window.removeEventListener('storage', refresh); window.removeEventListener('cantera-demo-updated', refresh); };
     }
-    const runtimeStop = onSnapshot(doc(db, 'communityConfiguration', 'runtime'), snapshot => { if (active) setRuntimeConfig(normalizeRuntime(snapshot.exists() ? snapshot.data() : null)); }, () => { if (active) setRuntimeConfig(normalizeRuntime(null)); });
+    const runtimeStop = onSnapshot(doc(db, 'communityConfiguration', 'runtime'), snapshot => { if (isCurrentRead()) setRuntimeConfig(normalizeRuntime(snapshot.exists() ? snapshot.data() : null)); }, () => { if (isCurrentRead()) setRuntimeConfig(normalizeRuntime(null)); });
     if (!serviceOpen) {
       const stops = [runtimeStop];
-      if (firebaseUser) stops.push(onSnapshot(doc(db, 'communityProfiles', firebaseUser.uid), snapshot => { if (active) setProfile(snapshot.exists() ? normalizeProfile(snapshot.data(), snapshot.id) : null); }, readFailure));
+      if (firebaseUser) stops.push(onSnapshot(doc(db, 'communityProfiles', firebaseUser.uid), snapshot => { if (isCurrentRead()) setProfile(snapshot.exists() ? normalizeProfile(snapshot.data(), snapshot.id) : null); }, failed));
       if (firebaseUser) {
-        stops.push(onSnapshot(query(collection(db, 'communityEventNotices'), where('recipientId', '==', firebaseUser.uid), orderBy('createdAt', 'desc'), limit(100)), snapshot => { if (active) setEventNotices(snapshot.docs.map(d => normalizeNotice(d.data(), d.id)).filter((n): n is EventNotice => n !== null)); }, readFailure));
-        stops.push(onSnapshot(query(collection(db, 'communityRightsRequests'), where('userId', '==', firebaseUser.uid), orderBy('createdAt', 'desc'), limit(30)), snapshot => { if (active) setRightsRequests(snapshot.docs.map(d => normalizeRightsRequest(d.data(), d.id)).filter((r): r is RightsRequest => r !== null)); }, readFailure));
-        stops.push(onSnapshot(query(collection(db, 'communityBlocks'), where('ownerId', '==', firebaseUser.uid)), snapshot => { if (active) setBlockedIds(snapshot.docs.map(d => d.data().blockedId).filter((id): id is string => typeof id === 'string')); }, readFailure));
+        stops.push(onSnapshot(query(collection(db, 'communityEventNotices'), where('recipientId', '==', firebaseUser.uid), orderBy('createdAt', 'desc'), limit(100)), snapshot => { if (isCurrentRead()) setEventNotices(snapshot.docs.map(d => normalizeNotice(d.data(), d.id)).filter((n): n is EventNotice => n !== null)); }, failed));
+        stops.push(onSnapshot(query(collection(db, 'communityRightsRequests'), where('userId', '==', firebaseUser.uid), orderBy('createdAt', 'desc'), limit(30)), snapshot => { if (isCurrentRead()) setRightsRequests(snapshot.docs.map(d => normalizeRightsRequest(d.data(), d.id)).filter((r): r is RightsRequest => r !== null)); }, failed));
+        stops.push(onSnapshot(query(collection(db, 'communityBlocks'), where('ownerId', '==', firebaseUser.uid)), snapshot => { if (isCurrentRead()) setBlockedIds(snapshot.docs.map(d => d.data().blockedId).filter((id): id is string => typeof id === 'string')); }, failed));
         if (isAdmin) {
-          stops.push(onSnapshot(query(collection(db, 'communityVerifications'), where('status', '==', 'pending'), orderBy('createdAt', 'asc'), limit(100)), snapshot => { if (active) { adminCursors.current.verification = snapshot.docs.at(-1) || null; setAdminQueueHasMore(previous => ({ ...previous, verification: snapshot.size === 100 })); setVerifications(snapshot.docs.map(d => normalizeVerification(d.data(), d.id)).filter((v): v is VerificationRequest => v !== null)); } }, readFailure));
-          stops.push(onSnapshot(query(collection(db, 'communityReports'), where('status', '==', 'open'), orderBy('createdAt', 'asc'), limit(100)), snapshot => { if (active) { adminCursors.current.reports = snapshot.docs.at(-1) || null; setAdminQueueHasMore(previous => ({ ...previous, reports: snapshot.size === 100 })); setReports(snapshot.docs.map(d => normalizeReport(d.data(), d.id)).filter((r): r is ContentReport => r !== null)); } }, readFailure));
-          stops.push(onSnapshot(query(collection(db, 'communityRightsRequests'), where('status', 'in', ['pending', 'processing']), orderBy('createdAt', 'asc'), limit(100)), snapshot => { if (active) { adminCursors.current.rights = snapshot.docs.at(-1) || null; setAdminQueueHasMore(previous => ({ ...previous, rights: snapshot.size === 100 })); setAdminRightsRequests(snapshot.docs.map(d => normalizeRightsRequest(d.data(), d.id)).filter((r): r is RightsRequest => r !== null)); } }, readFailure));
+          stops.push(onSnapshot(query(collection(db, 'communityVerifications'), where('status', '==', 'pending'), orderBy('createdAt', 'asc'), limit(100)), snapshot => { if (isCurrentRead()) { adminCursors.current.verification = snapshot.docs.at(-1) || null; setAdminQueueHasMore(previous => ({ ...previous, verification: snapshot.size === 100 })); setVerifications(snapshot.docs.map(d => normalizeVerification(d.data(), d.id)).filter((v): v is VerificationRequest => v !== null)); } }, failed));
+          stops.push(onSnapshot(query(collection(db, 'communityReports'), where('status', '==', 'open'), orderBy('createdAt', 'asc'), limit(100)), snapshot => { if (isCurrentRead()) { adminCursors.current.reports = snapshot.docs.at(-1) || null; setAdminQueueHasMore(previous => ({ ...previous, reports: snapshot.size === 100 })); setReports(snapshot.docs.map(d => normalizeReport(d.data(), d.id)).filter((r): r is ContentReport => r !== null)); } }, failed));
+          stops.push(onSnapshot(query(collection(db, 'communityRightsRequests'), where('status', 'in', ['pending', 'processing']), orderBy('createdAt', 'asc'), limit(100)), snapshot => { if (isCurrentRead()) { adminCursors.current.rights = snapshot.docs.at(-1) || null; setAdminQueueHasMore(previous => ({ ...previous, rights: snapshot.size === 100 })); setAdminRightsRequests(snapshot.docs.map(d => normalizeRightsRequest(d.data(), d.id)).filter((r): r is RightsRequest => r !== null)); } }, failed));
         }
       }
       setLoading(false);
       return () => { active = false; stops.forEach(stop => stop()); };
     }
-    const listen = <T,>(name: string, normalize: (value: unknown, id: string) => T | null, receive: (items: T[]) => void, count = 100) => onSnapshot(
-      query(collection(db, name), orderBy('createdAt', 'desc'), limit(count)), snapshot => {
-        if (active) receive(snapshot.docs.map(d => normalize(d.data(), d.id)).filter((item): item is T => item !== null));
-      }, readFailure);
+    const listen = <T,>(name: 'communityEvents' | 'communityPosts', normalize: (value: unknown, id: string) => T | null, receive: (items: T[]) => void) => {
+      const kind = name === 'communityEvents' ? 'events' : 'posts';
+      const count = contentPageSize[kind];
+      return onSnapshot(query(collection(db, name), orderBy('createdAt', 'desc'), limit(count)), { includeMetadataChanges: true }, snapshot => {
+        if (!isCurrentRead()) return;
+        const paging = pageCursors.current[kind];
+        if (paging.offset === 0 && !paging.busy) paging.cursor = snapshot.docs.at(-1) || null;
+        paging.ready = !snapshot.metadata.fromCache;
+        receive(snapshot.docs.map(d => normalize(d.data(), d.id)).filter((item): item is T => item !== null));
+        setPages(previous => ({ ...previous, [`${kind}Loading`]: paging.busy || !paging.ready, ...(paging.offset === 0 ? { [`${kind}HasMore`]: paging.ready && snapshot.size === count } : {}) }));
+      }, err => { if (isCurrentRead()) { setPages(previous => ({ ...previous, [`${kind}Loading`]: false })); failed(err); } });
+    };
     if (!firebaseUser) {
-      const stops = [runtimeStop, listen('communityEvents', normalizeEvent, values => { setEvents(values); setPages(previous => ({ ...previous, eventsHasMore: values.length === 100 })); setLoading(false); }), listen('communityPosts', normalizePost, values => { setPosts(values); setPages(previous => ({ ...previous, postsHasMore: values.length === 100 })); })];
+      const stops = [runtimeStop, listen('communityEvents', normalizeEvent, values => { setEvents(values); setLoading(false); }), listen('communityPosts', normalizePost, setPosts)];
       return () => { active = false; stops.forEach(stop => stop()); };
     }
     const stops = [runtimeStop,
       onSnapshot(doc(db, 'communityProfiles', firebaseUser.uid), snapshot => {
-        if (!active) return;
+        if (!isCurrentRead()) return;
         const current = snapshot.exists() ? normalizeProfile(snapshot.data(), snapshot.id) : null;
         setProfile(current);
         if (snapshot.exists() && !current) readFailure(new Error('Tu perfil contiene datos no válidos y necesita revisión.'));
-      }, readFailure),
-      listen('communityEvents', normalizeEvent, values => { setEvents(values); setPages(previous => ({ ...previous, eventsHasMore: values.length === 100 })); setLoading(false); }),
-      listen('communityPosts', normalizePost, values => { setPosts(values); setPages(previous => ({ ...previous, postsHasMore: values.length === 100 })); }),
-      ...(['owner', 'joined', 'waiting'] as const).map(source => onSnapshot(query(collection(db, 'communityEvents'), source === 'owner' ? where('ownerId', '==', firebaseUser.uid) : where(source === 'joined' ? 'participantIds' : 'waitlistOrder', 'array-contains', firebaseUser.uid)), snapshot => { if (active) { ownSources.current[source] = snapshot.docs.map(d => normalizeEvent(d.data(), d.id)).filter((e): e is PlayEvent => e !== null); setOwnEvents([...new Map(Object.values(ownSources.current).flat().map(e => [e.id, e])).values()]); } }, readFailure)),
-      onSnapshot(query(collection(db, 'communityBlocks'), where('ownerId', '==', firebaseUser.uid)), snapshot => { if (active) setBlockedIds(snapshot.docs.map(d => d.data().blockedId).filter((id): id is string => typeof id === 'string')); }, readFailure),
-      onSnapshot(query(collection(db, 'communityEventNotices'), where('recipientId', '==', firebaseUser.uid), orderBy('createdAt', 'desc'), limit(100)), snapshot => { if (active) setEventNotices(snapshot.docs.map(d => normalizeNotice(d.data(), d.id)).filter((n): n is EventNotice => n !== null)); }, readFailure),
-      onSnapshot(query(collection(db, 'communityRightsRequests'), where('userId', '==', firebaseUser.uid), orderBy('createdAt', 'desc'), limit(30)), snapshot => { if (active) setRightsRequests(snapshot.docs.map(d => normalizeRightsRequest(d.data(), d.id)).filter((n): n is RightsRequest => n !== null)); }, readFailure)
+      }, failed),
+      listen('communityEvents', normalizeEvent, values => { setEvents(values); setLoading(false); }),
+      listen('communityPosts', normalizePost, setPosts),
+      ...(['owner', 'joined', 'waiting'] as const).map(source => onSnapshot(query(collection(db, 'communityEvents'), source === 'owner' ? where('ownerId', '==', firebaseUser.uid) : where(source === 'joined' ? 'participantIds' : 'waitlistOrder', 'array-contains', firebaseUser.uid)), snapshot => { if (isCurrentRead()) { ownSources.current[source] = snapshot.docs.map(d => normalizeEvent(d.data(), d.id)).filter((e): e is PlayEvent => e !== null); setOwnEvents([...new Map(Object.values(ownSources.current).flat().map(e => [e.id, e])).values()]); } }, failed)),
+      onSnapshot(query(collection(db, 'communityBlocks'), where('ownerId', '==', firebaseUser.uid)), snapshot => { if (isCurrentRead()) setBlockedIds(snapshot.docs.map(d => d.data().blockedId).filter((id): id is string => typeof id === 'string')); }, failed),
+      onSnapshot(query(collection(db, 'communityEventNotices'), where('recipientId', '==', firebaseUser.uid), orderBy('createdAt', 'desc'), limit(100)), snapshot => { if (isCurrentRead()) setEventNotices(snapshot.docs.map(d => normalizeNotice(d.data(), d.id)).filter((n): n is EventNotice => n !== null)); }, failed),
+      onSnapshot(query(collection(db, 'communityRightsRequests'), where('userId', '==', firebaseUser.uid), orderBy('createdAt', 'desc'), limit(30)), snapshot => { if (isCurrentRead()) setRightsRequests(snapshot.docs.map(d => normalizeRightsRequest(d.data(), d.id)).filter((n): n is RightsRequest => n !== null)); }, failed)
     ];
     if (isAdmin) {
-      stops.push(onSnapshot(query(collection(db, 'communityVerifications'), where('status', '==', 'pending'), orderBy('createdAt', 'asc'), limit(100)), snapshot => { if (active) { adminCursors.current.verification = snapshot.docs.at(-1) || null; setAdminQueueHasMore(previous => ({ ...previous, verification: snapshot.size === 100 })); setVerifications(snapshot.docs.map(d => normalizeVerification(d.data(), d.id)).filter((v): v is VerificationRequest => v !== null)); }; }, readFailure));
-      stops.push(onSnapshot(query(collection(db, 'communityReports'), where('status', '==', 'open'), orderBy('createdAt', 'asc'), limit(100)), snapshot => { if (active) { adminCursors.current.reports = snapshot.docs.at(-1) || null; setAdminQueueHasMore(previous => ({ ...previous, reports: snapshot.size === 100 })); setReports(snapshot.docs.map(d => normalizeReport(d.data(), d.id)).filter((v): v is ContentReport => v !== null)); }; }, readFailure));
-      stops.push(onSnapshot(query(collection(db, 'communityRightsRequests'), where('status', 'in', ['pending', 'processing']), orderBy('createdAt', 'asc'), limit(100)), snapshot => { if (active) { adminCursors.current.rights = snapshot.docs.at(-1) || null; setAdminQueueHasMore(previous => ({ ...previous, rights: snapshot.size === 100 })); setAdminRightsRequests(snapshot.docs.map(d => normalizeRightsRequest(d.data(), d.id)).filter((r): r is RightsRequest => r !== null)); } }, readFailure));
+      stops.push(onSnapshot(query(collection(db, 'communityVerifications'), where('status', '==', 'pending'), orderBy('createdAt', 'asc'), limit(100)), snapshot => { if (isCurrentRead()) { adminCursors.current.verification = snapshot.docs.at(-1) || null; setAdminQueueHasMore(previous => ({ ...previous, verification: snapshot.size === 100 })); setVerifications(snapshot.docs.map(d => normalizeVerification(d.data(), d.id)).filter((v): v is VerificationRequest => v !== null)); }; }, failed));
+      stops.push(onSnapshot(query(collection(db, 'communityReports'), where('status', '==', 'open'), orderBy('createdAt', 'asc'), limit(100)), snapshot => { if (isCurrentRead()) { adminCursors.current.reports = snapshot.docs.at(-1) || null; setAdminQueueHasMore(previous => ({ ...previous, reports: snapshot.size === 100 })); setReports(snapshot.docs.map(d => normalizeReport(d.data(), d.id)).filter((v): v is ContentReport => v !== null)); }; }, failed));
+      stops.push(onSnapshot(query(collection(db, 'communityRightsRequests'), where('status', 'in', ['pending', 'processing']), orderBy('createdAt', 'asc'), limit(100)), snapshot => { if (isCurrentRead()) { adminCursors.current.rights = snapshot.docs.at(-1) || null; setAdminQueueHasMore(previous => ({ ...previous, rights: snapshot.size === 100 })); setAdminRightsRequests(snapshot.docs.map(d => normalizeRightsRequest(d.data(), d.id)).filter((r): r is RightsRequest => r !== null)); } }, failed));
     } else {
       stops.push(onSnapshot(doc(db, 'communityVerifications', firebaseUser.uid), snapshot => {
-        if (!active) return;
+        if (!isCurrentRead()) return;
         const current = snapshot.exists() ? normalizeVerification(snapshot.data(), snapshot.id) : null;
         setVerifications(current ? [current] : []);
-      }, readFailure));
+      }, failed));
     }
     return () => { active = false; stops.forEach(stop => stop()); };
-  }, [mode, firebaseUser?.uid, isAdmin, runtimeConfig.serviceStatus, serviceOpen, readFailure]);
+  }, [mode, firebaseUser?.uid, isAdmin, runtimeConfig.serviceStatus, serviceOpen, readFailure, localMedia, readScope]);
 
   useEffect(() => {
     try { setHidden(normalizeHiddenPostIds(JSON.parse(localStorage.getItem(`cantera-hidden-${profile?.id || 'visitor'}`) || '[]'))); } catch { setHidden([]); }
     if (!profile) { setLegacyUser(null); return; }
     setLegacyUser({ uid: mode === 'cloud' ? profile.id : undefined, name: profile.name, email: firebaseUser?.email || '', role: 'PLAYER', bio: profile.bio, avatar: firebaseUser?.photoURL || '', plan: 'GRATUITO' });
   }, [profile, mode, firebaseUser?.email, setLegacyUser]);
-  useEffect(() => () => { urls.current.forEach(url => URL.revokeObjectURL(url)); urls.current.clear(); }, []);
+  useEffect(() => () => { mediaCache.current?.dispose(); mediaCache.current = null; }, []);
 
   async function loadPage(kind: 'events' | 'posts', reset = false) {
-    const paging = pageCursors.current[kind]; if (paging.busy) return;
+    const current = () => currentReadScope.current === readScope && (mode === 'demo' || auth.currentUser?.uid === firebaseUser?.uid);
+    if (!current()) return;
+    const paging = pageCursors.current[kind]; if (paging.busy || !reset && !paging.ready) return;
     if (reset) { paging.cursor = null; paging.offset = 0; kind === 'events' ? setOlderEvents([]) : setOlderPosts([]); }
     paging.busy = true; setPages(previous => ({ ...previous, [`${kind}Loading`]: true }));
     try {
       if (mode === 'demo') { setPages(previous => ({ ...previous, [`${kind}HasMore`]: false })); return; }
       if (!serviceOpen) return;
       const collectionName = kind === 'events' ? 'communityEvents' : 'communityPosts';
-      if (!paging.cursor && !reset) {
-        const first = await getDocs(query(collection(db, collectionName), orderBy('createdAt', 'desc'), limit(100)));
-        paging.cursor = first.docs.at(-1) || null;
-        if (first.size < 100) { setPages(previous => ({ ...previous, [`${kind}HasMore`]: false })); return; }
-      }
-      const snapshot = await getDocs(query(collection(db, collectionName), orderBy('createdAt', 'desc'), ...(paging.cursor ? [startAfter(paging.cursor)] : []), limit(40)));
-      if (currentMode.current !== mode) return;
-      paging.cursor = snapshot.docs.at(-1) || paging.cursor;
+      const snapshot = await getDocs(query(collection(db, collectionName), orderBy('createdAt', 'desc'), ...(paging.cursor ? [startAfter(paging.cursor)] : []), limit(contentPageSize[kind])));
+      if (!current() || pageCursors.current[kind] !== paging) return;
+      paging.cursor = snapshot.docs.at(-1) || paging.cursor; paging.offset += snapshot.size; paging.ready = true;
       if (kind === 'events') setOlderEvents(previous => [...new Map([...previous, ...snapshot.docs.map(d => normalizeEvent(d.data(), d.id)).filter((e): e is PlayEvent => e !== null)].map(e => [e.id, e])).values()]);
       else setOlderPosts(previous => [...new Map([...previous, ...snapshot.docs.map(d => normalizePost(d.data(), d.id)).filter((p): p is CommunityPost => p !== null)].map(p => [p.id, p])).values()]);
-      setPages(previous => ({ ...previous, [`${kind}HasMore`]: snapshot.size === 40 }));
-    } finally { paging.busy = false; setPages(previous => ({ ...previous, [`${kind}Loading`]: false })); }
+      setPages(previous => ({ ...previous, [`${kind}HasMore`]: snapshot.size === contentPageSize[kind] }));
+    } finally { paging.busy = false; if (current() && pageCursors.current[kind] === paging) setPages(previous => ({ ...previous, [`${kind}Loading`]: false })); }
   }
   const watchFixtureData = useCallback((id: string) => {
     if (!validProfileId(id)) return () => {};
@@ -429,14 +439,15 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
             if (active) setPostInteractionStates(previous => ({ ...previous, [id]: { ...(previous[id] || { loading: false, error: '', hasMoreComments: false }), loading: false, error: '', likesCount: likeCount.data().count, commentsCount: commentCount.data().count } }));
           } catch (err) { fail(err); }
         };
+        const refreshCounts = createCoalescedRefresh(counts);
         const stops = [onSnapshot(query(collection(db, 'communityComments'), where('postId', '==', id), orderBy('createdAt', 'desc'), limit(30)), snapshot => {
           if (!active) return; entry.cursor ||= snapshot.docs.at(-1) || null;
           const records = snapshot.docs.map(d => normalizeCommentRecord(d.data(), d.id)).filter((c): c is NonNullable<ReturnType<typeof normalizeCommentRecord>> => c !== null);
           for (const change of snapshot.docChanges()) if (change.type === 'removed') void getDoc(change.doc.ref).then(current => { if (active && !current.exists()) setComments(previous => ({ ...previous, [id]: (previous[id] || []).filter(c => c.id !== change.doc.id) })); }).catch(fail);
           setComments(previous => ({ ...previous, [id]: [...new Map([...(previous[id] || []).filter(c => !records.some(r => r.id === c.id)), ...records].map(c => [c.id, c])).values()].sort((a, b) => a.createdAt.localeCompare(b.createdAt)) }));
-          setPostInteractionStates(previous => ({ ...previous, [id]: { ...(previous[id] || { likesCount: 0, commentsCount: 0 }), loading: previous[id]?.loading ?? true, error: '', hasMoreComments: previous[id]?.hasMoreComments || snapshot.size === 30 } })); void counts();
-        }, fail), onSnapshot(query(collection(db, 'communityLikes'), where('postId', '==', id), orderBy('createdAt', 'desc'), limit(1)), () => { void counts(); }, fail), onSnapshot(doc(db, 'communityLikes', `${id}_${firebaseUser!.uid}`), snapshot => { if (active) { setLikes(previous => ({ ...previous, [id]: snapshot.exists() ? [firebaseUser!.uid] : [] })); void counts(); } }, fail)];
-        entry.stop = () => { active = false; stops.forEach(stop => stop()); };
+          setPostInteractionStates(previous => ({ ...previous, [id]: { ...(previous[id] || { likesCount: 0, commentsCount: 0 }), loading: previous[id]?.loading ?? true, error: '', hasMoreComments: previous[id]?.hasMoreComments || snapshot.size === 30 } })); refreshCounts.refresh();
+        }, fail), onSnapshot(query(collection(db, 'communityLikes'), where('postId', '==', id), orderBy('createdAt', 'desc'), limit(1)), () => { refreshCounts.refresh(); }, fail), onSnapshot(doc(db, 'communityLikes', `${id}_${firebaseUser!.uid}`), snapshot => { if (active) { setLikes(previous => ({ ...previous, [id]: snapshot.exists() ? [firebaseUser!.uid] : [] })); refreshCounts.refresh(); } }, fail)];
+        entry.stop = () => { active = false; refreshCounts.dispose(); stops.forEach(stop => stop()); };
       }
       interactions.current.set(key, entry);
     }
@@ -789,7 +800,7 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
     if (mode === 'demo') {
       mutateDemo(data => { const l = { ...data.likes }, c = { ...data.comments }; delete l[id]; delete c[id];
         return { ...data, posts: data.posts.filter(p => p.id !== id), likes: l, comments: c }; });
-      if (post.mediaPath) await deleteLocalMedia(id);
+      if (post.mediaPath) { const mediaId = post.mediaPath.startsWith('local:') ? post.mediaPath.slice(6) : id; await deleteLocalMedia(mediaId); mediaCache.current?.drop(mediaId); }
     } else {
       await deleteDoc(doc(db, 'communityPosts', id));
       // The server deletion trigger also removes interactions and retries failed media cleanup.
