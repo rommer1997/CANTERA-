@@ -17,6 +17,7 @@ Versión 0.6 · 6 de octubre de 2026. Documento operativo interno, relacionado c
 | Integración continua | Ambos trabajos de la ejecución 37384779319 superados: app Node 24/Java 21 y backend Node 22; 49 pruebas | No habilita ni despliega servicios, ni prueba cuentas reales. |
 | Limpieza de publicaciones | Código Gen2 para base nombrada y 16 pruebas con dobles superadas localmente y en CI Node 22 | Runtime comprobado; bucket, permisos, despliegue e invocación real pendientes. |
 | Financiación | Decisión expresa del propietario: esperar patrocinador para infraestructura de medios | No activar facturación, Storage o funciones antes de financiación; subidas cloud desactivadas por defecto. |
+| Perfiles y seguimiento | Directorio/fichas y relaciones públicas de seguimiento; cuenta privada con edad/aceptación y proyección deportiva pública; 19 pruebas TS y 23 emuladas en el avance social | Reglas/índices autorizados, revisión/migración de cuentas existentes, recorrido con dos cuentas y coherencia de información publicada. |
 
 La [ejecución de GitHub Actions `37384779319`](https://github.com/rommer1997/CANTERA-/actions/runs/37384779319) del 6 de octubre de 2026 comprobó el commit `54fd7e98c9469dac60e0fedd53594e778f7b9751`: ambos trabajos terminaron correctamente y suman 14 pruebas de dominio/normalización, 19 de reglas emuladas y 16 de limpieza con dobles de datos/archivos. Esta evidencia no cierra las pruebas de producción ni los controles legales. La instalación mantiene la política estricta de scripts y decisiones explícitas de `pnpm-workspace.yaml`.
 

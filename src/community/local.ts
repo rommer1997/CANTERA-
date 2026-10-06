@@ -1,8 +1,10 @@
-import type { CommunityPost, CommunityProfile, ContentReport, PlayEvent, PostComment, VerificationRequest } from './types';
+import type { CommunityPost, CommunityProfile, ContentReport, FollowRecord, PlayEvent, PostComment, VerificationRequest } from './types';
 
 export interface DemoData {
   version: 1;
   profile: CommunityProfile | null;
+  profiles: CommunityProfile[];
+  follows: FollowRecord[];
   events: PlayEvent[];
   posts: CommunityPost[];
   likes: Record<string, string[]>;
@@ -17,7 +19,7 @@ export function readDemo(): DemoData {
   if (raw) {
     try { const parsed = JSON.parse(raw); if (parsed.version === 1 && Array.isArray(parsed.events) && Array.isArray(parsed.posts)) return parsed; } catch { /* recover an invalid local demo */ }
   }
-  return { version: 1, profile: null, events: [], posts: [
+  return { version: 1, profile: null, profiles: [], follows: [], events: [], posts: [
     { id: 'demo-welcome', authorId: 'example-community', authorName: 'Comunidad Cantera · ejemplo', kind: 'achievement', title: 'El fútbol empieza con un encuentro',
       text: 'Este es un contenido de ejemplo. Crea tu primer partido, reúne a tu equipo y comparte lo que habéis conseguido. Tus cambios en el modo de prueba se guardan en este navegador.', mediaUrl: '', mediaPath: '', createdAt: now, eventId: '' }
   ], likes: {}, comments: {}, verifications: [], reports: [] };

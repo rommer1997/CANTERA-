@@ -1,26 +1,39 @@
 import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useParams } from 'react-router-dom';
-import { ArrowUpRight, CalendarDays, CheckCircle2, Globe2, House, Image, Play, Plus, ShieldCheck, Trophy, UserRound, Users, X } from 'lucide-react';
+import { ArrowUpRight, CalendarDays, CheckCircle2, Globe2, House, Image, Play, Plus, Search, ShieldCheck, Trophy, UserRound, Users, X } from 'lucide-react';
 import { friendlyError, TERMS_VERSION, useCommunity } from './CommunityContext';
 import { legalDocuments, legalReady, operator } from './legal';
 import type { CommunityProfile } from './types';
 import { MobileHome } from './MobileHome';
 import './community.css';
 import './mobile.css';
+import './brand.css';
 
 const routeNames: Record<string, string> = {
   '/': 'Inicio', '/play': 'Juega', '/feed': 'Comunidad', '/profile': 'Tu perfil',
-  '/about': 'Misión y patrocinio', '/admin': 'Administración',
+  '/about': 'Misión y patrocinio', '/admin': 'Administración', '/people': 'Personas y equipos',
   '/legal/terms': 'Términos de uso', '/legal/privacy': 'Privacidad', '/legal/cookies': 'Cookies y almacenamiento',
 };
 
 export function CommunityLayout() {
   const { profile, mode, error, isAdmin, mediaUploadsEnabled } = useCommunity();
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
+  const mainRef = useRef<HTMLElement>(null);
+  const previousPath = useRef(pathname);
   const [createOpen, setCreateOpen] = useState(false);
   const createDialog = useRef<HTMLDialogElement>(null);
-  const routeName = routeNames[pathname] || (pathname.startsWith('/play/') ? 'Detalle del encuentro' : 'Cantera');
-  useEffect(() => { window.scrollTo({ top: 0, left: 0 }); }, [pathname]);
+  const routeName = routeNames[pathname] || (pathname.startsWith('/play/') ? 'Detalle del encuentro' : pathname.startsWith('/people/') ? 'Perfil de la comunidad' : 'Cantera');
+  useEffect(() => {
+    const changed = previousPath.current !== pathname;
+    previousPath.current = pathname;
+    if (!changed) return;
+    window.scrollTo({ top: 0, left: 0 });
+    if (new URLSearchParams(search).has('create')) return;
+    const frame = requestAnimationFrame(() => {
+      if (!document.querySelector('dialog[open]')) mainRef.current?.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [pathname, search]);
   useEffect(() => {
     const dialog = createDialog.current;
     if (!dialog) return;
@@ -30,19 +43,19 @@ export function CommunityLayout() {
   const createLink = (destination: string) => profile ? destination : '/profile';
   return <div className="c-app"><header className="c-header">
     <Link className="c-brand" to="/" aria-label="Cantera, inicio">cantera<span>●</span></Link>
-    <nav aria-label="Navegación principal" className="c-nav"><NavLink to="/" end>Inicio</NavLink><NavLink to="/play">Juega</NavLink><NavLink to="/feed">Comunidad</NavLink>{isAdmin ? <NavLink to="/admin">Administración</NavLink> : null}</nav>
-    <Link to="/profile" className="c-account" aria-label={profile ? 'Tu perfil' : 'Entrar a Cantera'}>{profile ? <><span className="c-avatar">{profile.name.slice(0, 1).toUpperCase()}</span><span className="c-account-label">{profile.name.split(' ')[0]}</span></> : <><span className="c-account-label">Únete gratis <ArrowUpRight size={17} /></span><UserRound className="c-mobile-account-icon" size={20} /></>}</Link>
+    <nav aria-label="Navegación principal" className="c-nav"><NavLink to="/" end>Inicio</NavLink><NavLink to="/play">Juega</NavLink><NavLink to="/feed">Comunidad</NavLink><NavLink to="/people">Gente</NavLink>{isAdmin ? <NavLink to="/admin">Administración</NavLink> : null}</nav>
+    <div className="c-header-tools"><Link to="/people" className="c-discover-link" aria-label="Buscar personas y clubes"><Search size={21} aria-hidden="true" /></Link><Link to="/profile" className="c-account" aria-label={profile ? 'Tu perfil' : 'Entrar a Cantera'}>{profile ? <><span className="c-avatar">{profile.name.slice(0, 1).toUpperCase()}</span><span className="c-account-label">{profile.name.split(' ')[0]}</span></> : <><span className="c-account-label">Únete gratis <ArrowUpRight size={17} /></span><UserRound className="c-mobile-account-icon" size={20} /></>}</Link></div>
   </header>{mode === 'demo' ? <div className="c-demo" role="status"><span className="c-desktop-only">Entorno de prueba local · tus cambios se guardan sólo en este navegador.</span><span className="c-mobile-only">Prueba local · sólo en este dispositivo.</span> <Link to="/profile">Cuenta real</Link></div> : null}
     {error ? <div className="c-global-error" role="alert">{error} <Link to="/profile">Revisar cuenta</Link></div> : null}
     <div className="c-route-announcement" role="status" aria-live="polite" aria-atomic="true">{routeName}</div>
-    <main className="c-main"><Suspense fallback={<div className="c-app-loading" role="status">Cargando…</div>}><Outlet /></Suspense></main><footer className="c-footer"><div><Link className="c-brand" to="/">cantera<span>●</span></Link><p>El fútbol nos reúne. En cualquier lugar.</p></div>
+    <main ref={mainRef} className="c-main" tabIndex={-1}><Suspense fallback={<div className="c-app-loading" role="status">Cargando…</div>}><Outlet /></Suspense></main><footer className="c-footer"><div><Link className="c-brand" to="/">cantera<span>●</span></Link><p>El fútbol nos reúne. En cualquier lugar.</p></div>
       <nav aria-label="Información"><Link to="/about">Misión y patrocinio</Link><Link to="/legal/terms">Términos</Link><Link to="/legal/privacy">Privacidad</Link><Link to="/legal/cookies">Cookies y almacenamiento</Link></nav><span>Acceso gratuito · sin seguimiento publicitario</span></footer>
     <details className="c-mobile-info"><summary>Sobre Cantera y privacidad</summary><nav aria-label="Información de Cantera"><Link to="/about">Misión y patrocinio</Link><Link to="/legal/terms">Términos de uso</Link><Link to="/legal/privacy">Privacidad</Link><Link to="/legal/cookies">Cookies y almacenamiento</Link>{isAdmin ? <Link to="/admin">Administración</Link> : null}</nav></details>
     <nav className="c-bottom-nav" aria-label="Navegación móvil">
       <NavLink to="/" end><House size={22} aria-hidden="true" /><span>Inicio</span></NavLink>
       <NavLink to="/play"><CalendarDays size={22} aria-hidden="true" /><span>Juega</span></NavLink>
       <button className="c-bottom-create" aria-label="Crear" aria-haspopup="dialog" aria-expanded={createOpen} onClick={() => setCreateOpen(true)}><span className="c-create-icon"><Plus size={25} aria-hidden="true" /></span><span>Crear</span></button>
-      <NavLink to="/feed"><Users size={22} aria-hidden="true" /><span>Comunidad</span></NavLink>
+      <NavLink to="/feed" className={({ isActive }) => isActive || pathname.startsWith('/people') ? 'active' : ''}><Users size={22} aria-hidden="true" /><span>Comunidad</span></NavLink>
       <NavLink to="/profile"><UserRound size={22} aria-hidden="true" /><span>Perfil</span></NavLink>
     </nav>
     <dialog ref={createDialog} className="c-create-sheet" aria-labelledby="c-create-title" onCancel={() => setCreateOpen(false)} onClose={() => setCreateOpen(false)}>
@@ -77,32 +90,40 @@ export function ProfilePage() {
   const api = useCommunity(); const { profile, mode, isAdmin } = api;
   const [name, setName] = useState(''); const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [success, setSuccess] = useState('');
   const [draft, setDraft] = useState<CommunityProfile | null>(null); const [accepted, setAccepted] = useState(false);
+  const draftDirty = useRef(false); const draftUserId = useRef<string | null>(null);
   const [organization, setOrganization] = useState(''); const [evidence, setEvidence] = useState('');
-  useEffect(() => { setDraft(profile); setAccepted(profile?.acceptedTermsVersion === TERMS_VERSION); }, [profile]);
+  useEffect(() => {
+    if (draftUserId.current !== (profile?.id || null) || !draftDirty.current) {
+      draftUserId.current = profile?.id || null; draftDirty.current = false;
+      setDraft(profile); setAccepted(profile?.acceptedTermsVersion === TERMS_VERSION);
+    }
+  }, [profile]);
   async function action(work: () => Promise<void>, message = '') { setBusy(true); setError(''); setSuccess(''); try { await work(); setSuccess(message); } catch (err) { setError(friendlyError(err)); } finally { setBusy(false); } }
   const pending = api.verificationRequests.find(r => r.userId === profile?.id);
   if (!profile || !draft) return <section className="c-profile-intro"><div><p className="c-eyebrow">TU SITIO EN CANTERA</p><h1>Juega. Comparte.<br />Forma parte.</h1><p className="c-lead">Una cuenta para crear encuentros, inscribirte con tu equipo y contar tu historia. Sin cuotas.</p><p>Esta primera versión de cuentas está dirigida a mayores de 18 años. El acceso con tutores para menores forma parte del plan de expansión.</p></div>
     <div className="c-panel c-login"><h2>Únete a la comunidad</h2><p>Elige tu nombre público después de entrar.</p><button disabled={busy} className="c-button" onClick={() => action(api.login)}>Continuar con Google <ArrowUpRight size={17} /></button><p className="c-small">Al acceder podrás consultar los <Link to="/legal/terms">términos</Link> y la <Link to="/legal/privacy">privacidad</Link> antes de completar tu cuenta.</p>
       {api.demoEnabled ? <details><summary>Probar en este dispositivo</summary><p className="c-small">Entorno aislado para comprobar funciones. No publica en la comunidad.</p><label>Tu nombre<input className="c-input" value={name} onChange={e => setName(e.target.value)} maxLength={100} placeholder="Tu nombre o grupo" /></label><button disabled={busy || !name.trim()} className="c-button secondary" onClick={() => action(() => api.beginDemo(name))}>Abrir entorno de prueba</button></details> : null}{error ? <p className="c-error" role="alert">{error}</p> : null}
     </div></section>;
-  const update = <K extends keyof CommunityProfile>(key: K, value: CommunityProfile[K]) => setDraft({ ...draft, [key]: value });
+  const update = <K extends keyof CommunityProfile>(key: K, value: CommunityProfile[K]) => { draftDirty.current = true; setDraft({ ...draft, [key]: value }); };
   return <section className="c-section c-profile"><div className="c-section-head"><div><p className="c-eyebrow">TU IDENTIDAD DEPORTIVA</p><h1>Tu perfil</h1></div><div className="c-actions">{mode === 'demo' ? <button className="c-button" disabled={busy} onClick={() => action(api.login)}>Entrar con Google</button> : null}<button className="c-button secondary" disabled={busy} onClick={() => action(api.signOut)}>Cerrar sesión</button></div></div>
+    <div className="c-profile-links"><Link to={`/people/${encodeURIComponent(profile.id)}`}>Ver mi perfil público <ArrowUpRight size={16} aria-hidden="true" /></Link><Link to="/people">Explorar personas y clubes <Search size={16} aria-hidden="true" /></Link></div>
     <div className="c-profile-grid"><form className="c-panel" onSubmit={e => { e.preventDefault(); void action(async () => {
       if (mode === 'cloud' && !legalReady) throw new Error('El responsable debe completar los datos legales del servicio antes de abrir el registro.');
       const { id, verification, createdAt, ...input } = draft;
       await api.saveProfile({ ...input, acceptedTermsVersion: accepted ? TERMS_VERSION : '', acceptedTermsAt: profile.acceptedTermsVersion === TERMS_VERSION ? profile.acceptedTermsAt : new Date().toISOString() });
+      draftDirty.current = false;
     }, 'Perfil guardado. Ya puedes organizar y participar.'); }}>
-      <div className="c-form-grid"><label>Nombre público<input className="c-input" value={draft.name} onChange={e => update('name', e.target.value)} maxLength={100} required /></label><label>Tipo de cuenta<select className="c-input" value={draft.entityType} onChange={e => update('entityType', e.target.value as CommunityProfile['entityType'])}><option value="individual">Persona</option><option value="group">Grupo</option><option value="club">Club o entidad</option></select></label>
+      <fieldset className="c-profile-fields" disabled={busy}><div className="c-form-grid"><label>Nombre público<input className="c-input" value={draft.name} onChange={e => update('name', e.target.value)} maxLength={100} required /></label><label>Tipo de cuenta<select className="c-input" value={draft.entityType} onChange={e => update('entityType', e.target.value as CommunityProfile['entityType'])}><option value="individual">Persona</option><option value="group">Grupo</option><option value="club">Club o entidad</option></select></label>
       <label>País<input className="c-input" value={draft.country} onChange={e => update('country', e.target.value)} maxLength={100} required /></label><label>Ciudad<input className="c-input" value={draft.city} onChange={e => update('city', e.target.value)} maxLength={100} required /></label><label>Equipo o grupo<input className="c-input" value={draft.team} onChange={e => update('team', e.target.value)} maxLength={100} /></label><label>Posición o función<input className="c-input" value={draft.position} onChange={e => update('position', e.target.value)} maxLength={100} /></label><label>Nivel<select className="c-input" value={draft.level} onChange={e => update('level', e.target.value as CommunityProfile['level'])}><option value="amateur">Amateur</option><option value="professional">Profesional</option></select></label></div>
       <label>Tu historia<textarea className="c-input" value={draft.bio} onChange={e => update('bio', e.target.value)} maxLength={1000} rows={4} /></label>
-      <label className="c-check"><input type="checkbox" checked={draft.adultConfirmed} onChange={e => update('adultConfirmed', e.target.checked)} required />Soy mayor de 18 años y, si represento a una entidad, tengo autorización para hacerlo.</label><label className="c-check"><input type="checkbox" checked={accepted} onChange={e => setAccepted(e.target.checked)} required /><span>Acepto los <Link to="/legal/terms">términos de uso</Link> y he leído la <Link to="/legal/privacy">privacidad</Link>. Versión {TERMS_VERSION}.</span></label>
-      <p className="c-small">Tu perfil, tus publicaciones y los nombres de inscripción son públicos. No incluyas datos privados.</p><button disabled={busy} className="c-button" type="submit">{busy ? 'Guardando…' : 'Guardar perfil'}</button>
+      <label className="c-check"><input type="checkbox" checked={draft.adultConfirmed} onChange={e => update('adultConfirmed', e.target.checked)} required />Soy mayor de 18 años y, si represento a una entidad, tengo autorización para hacerlo.</label><label className="c-check"><input type="checkbox" checked={accepted} onChange={e => { draftDirty.current = true; setAccepted(e.target.checked); }} required /><span>Acepto los <Link to="/legal/terms">términos de uso</Link> y he leído la <Link to="/legal/privacy">privacidad</Link>. Versión {TERMS_VERSION}.</span></label>
+      <p className="c-small">Tu perfil, tus publicaciones y los nombres de inscripción son públicos. No incluyas datos privados.</p><button disabled={busy} className="c-button" type="submit">{busy ? 'Guardando…' : 'Guardar perfil'}</button></fieldset>
     </form><aside className="c-panel c-verify"><ShieldCheck size={32} /><h2>{profile.verification === 'verified' ? 'Cuenta verificada' : 'El reconocimiento se comprueba.'}</h2><p>Personas, grupos y clubes pueden pedir una verificación voluntaria. El administrador revisa cada solicitud. Nunca depende de pagar.</p>
       {profile.verification === 'verified' ? <p className="c-success"><CheckCircle2 size={18} /> Identidad revisada por el administrador.</p> : <form onSubmit={e => { e.preventDefault(); void action(() => api.requestVerification(organization, evidence), mode === 'demo' ? 'Solicitud guardada en el entorno local de prueba.' : 'Solicitud enviada al administrador.'); }}>
         {pending ? <p className="c-small">Estado: {pending.status === 'pending' ? 'pendiente de revisión' : pending.status === 'rejected' ? 'no aprobada; puedes enviar más información' : 'aprobada'}</p> : null}<label>Persona o entidad a verificar<input className="c-input" value={organization} onChange={e => setOrganization(e.target.value)} maxLength={100} required /></label><label>Información y enlaces para comprobarla<textarea className="c-input" value={evidence} onChange={e => setEvidence(e.target.value)} rows={4} maxLength={2000} required placeholder="Web oficial, perfil público o información de representación" /></label><p className="c-small">Sólo tú y el administrador podéis leer esta solicitud. No envíes documentos de identidad.</p><button className="c-button secondary" disabled={busy || pending?.status === 'pending'}>Solicitar verificación</button>
       </form>}{operator.email ? <a className="c-contact" href={`mailto:${operator.email}`}>Contactar con el administrador</a> : null}{isAdmin ? <Link className="c-button secondary" to="/admin">Abrir administración</Link> : null}
     </aside></div>{error ? <p className="c-error" role="alert">{error}</p> : null}{success ? <p className="c-success" role="status">{success}</p> : null}
-    <div className="c-section-head"><h2>Tu actividad</h2><span>{api.events.filter(e => e.ownerId === profile.id).length} encuentros · {api.posts.filter(p => p.authorId === profile.id).length} publicaciones</span></div><div className="c-upcoming">{api.events.filter(e => e.ownerId === profile.id || e.participants[profile.id]).map(e => <Link key={e.id} className="c-upcoming-card" to={`/play/${e.id}`}><h3>{e.title}</h3><p>{e.city}, {e.country}</p><span>{e.ownerId === profile.id ? 'Organizas este encuentro' : 'Estás inscrito'}</span></Link>)}</div>
+    <div className="c-section-head"><h2>Tu actividad reciente</h2><span>{api.events.filter(e => e.ownerId === profile.id).length} encuentros · {api.posts.filter(p => p.authorId === profile.id).length} publicaciones cargadas</span></div><div className="c-upcoming">{api.events.filter(e => e.ownerId === profile.id || e.participants[profile.id]).map(e => <Link key={e.id} className="c-upcoming-card" to={`/play/${e.id}`}><h3>{e.title}</h3><p>{e.city}, {e.country}</p><span>{e.ownerId === profile.id ? 'Organizas este encuentro' : 'Estás inscrito'}</span></Link>)}</div>
   </section>;
 }
 export function LegalPage() {

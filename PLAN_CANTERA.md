@@ -2,7 +2,7 @@
 
 Fecha de actualización: 6 de octubre de 2026. Responsable de producto y administrador inicial: propietario de Cantera.
 
-Versión del plan: 0.7. Documentos relacionados: [Whitepaper 0.6](WHITEPAPER.md) y [checklist de publicación legal 0.6](docs/LEGAL_RELEASE_CHECKLIST.md).
+Versión del plan: 0.8. Documentos relacionados: [Whitepaper 0.7](WHITEPAPER.md) y [checklist de publicación legal](docs/LEGAL_RELEASE_CHECKLIST.md).
 
 Este documento define el producto completo, su primera versión y las condiciones para lanzarlo. Los porcentajes describen hitos del plan; **no indican que ese porcentaje esté construido, probado o publicado**. La interfaz comunitaria y su integración Firebase están implementadas en la copia local. TypeScript, compilación, 14 pruebas de dominio/normalización, 19 de seguridad con emuladores y 16 de limpieza con dobles de datos/archivos han pasado también en la [ejecución de GitHub Actions del 6 de octubre](https://github.com/rommer1997/CANTERA-/actions/runs/37384779319): 49 pruebas en total, con alcances distintos. El navegador integrado también permitió comprobar recorridos locales de liga, copa y feed. La auditoría del servicio real encontró configuración que todavía impide el lanzamiento. La sección 22 distingue esta evidencia de las tareas pendientes; la CI no despliega servicios ni prueba cuentas reales, y no se declara la aplicación lista para clientes ni desplegada en producción.
 
@@ -71,7 +71,7 @@ Reservas de campos, pagos, escrow, aplicaciones nativas, retransmisión en direc
 
 ## 5. Experiencia y navegación
 
-La entrada principal ofrece el feed y un acceso claro a «Jugar». La navegación móvil contiene Inicio, Jugar, Crear y Perfil. En escritorio, los mismos destinos permanecen visibles. «Crear» permite elegir Partido, Torneo, Reel, Foto o Logro. La verificación y el soporte se encuentran en el perfil; las herramientas administrativas aparecen solo a cuentas autorizadas.
+La entrada móvil ofrece agenda y accesos a jugar, organizar y comunidad; la navegación inferior contiene Inicio, Juega, Crear, Comunidad y Perfil. En escritorio se conserva la landing y la cabecera añade Gente para descubrir cuentas. «Crear» permite elegir Partido, Torneo, Reel, Foto o Logro; los medios cloud permanecen pendientes de patrocinio. La verificación y el soporte se encuentran en el perfil; las herramientas administrativas aparecen solo a cuentas autorizadas.
 
 Las rutas deben permitir compartir enlaces a eventos, publicaciones, perfiles y, después, equipos. Abrir un enlace conserva su destino durante el inicio de sesión. Nadie necesita crear una cuenta para entender qué ofrece Cantera; las acciones de escritura sí exigen una cuenta válida. La visibilidad pública de participantes y ubicación se decide de forma explícita para cada tipo de evento.
 
@@ -139,7 +139,7 @@ El feed combina tres formatos en una identidad común. Su diferencia útil es la
 | Foto | Imagen amplia y texto | Imagen, pie, autor y evento opcional; texto alternativo cuando sea posible. |
 | Logro | Tarjeta deportiva que se conserva en el perfil | Título, descripción, fecha y referencia a un evento o evidencia opcional. Mostrar si es declarado por el autor. |
 
-La primera versión usa orden cronológico y filtros por tipo, país/ciudad y eventos. El contenido seguido y las recomendaciones llegan cuando haya relaciones y datos suficientes. No presentar un feed pequeño como un algoritmo que entiende el talento.
+La entrega social usa orden cronológico, filtros por formato y las vistas Comunidad/Siguiendo con relaciones persistentes. La búsqueda opera sobre las publicaciones mostradas y explica su alcance. Cada autor enlaza a su perfil público; el directorio permite buscar nombre, país y ciudad entre las cuentas cargadas, con paginación. Los filtros globales de ubicación/evento y las recomendaciones requieren más trabajo; no se presentan como funciones ya disponibles. No presentar un feed pequeño como un algoritmo que entiende el talento.
 
 Las reacciones y comentarios se vinculan a un usuario autenticado y respetan bloqueos y retirada del contenido. Compartir utiliza un enlace estable. El autor puede eliminar su publicación; una eliminación debe contemplar también el archivo almacenado y las referencias. Los estados de envío y fallo deben evitar publicaciones duplicadas.
 
@@ -442,3 +442,14 @@ Las subidas de medios en producción están desactivadas por defecto mediante `V
 | Versión del plan | Fecha | Cambio |
 |---|---|---|
 | 0.7 | 6 de octubre de 2026 | Registra ambos trabajos de GitHub Actions superados sobre `54fd7e98c9469dac60e0fedd53594e778f7b9751`, 49 pruebas y política explícita de scripts de dependencias. Mantiene abiertas las puertas de lanzamiento, financiación y datos reales. |
+| 0.8 | 6 de octubre de 2026 | Feed social, perfiles públicos, seguimiento, directorio y actividad paginados, interfaz móvil y nueva identidad. Separación de edad/aceptación en cuenta privada y proyección deportiva pública; 19 pruebas TS y 23 de seguridad emulada, más 16 de backend. Registra migración/índices y pruebas cloud pendientes. |
+
+## 24. Entrega social y visual del 6 de octubre de 2026
+
+El feed reúne Comunidad/Siguiendo, autores navegables, creación compacta y búsqueda de publicaciones mostradas. Juega ofrece Explorar/Mis encuentros, filtros y una ficha con navegación por información, participantes, cruces y clasificación. La identidad usa superficies blancas, texto negro y acento rojo, sin fuentes externas ni contenido de relleno. La landing de escritorio y la navegación móvil conservan sus recorridos.
+
+Las rutas `/people` y `/people/:profileId` consultan datos deportivos públicos y actividad del autor en páginas. Los seguidores/seguidos se cuentan mediante consultas de agregación, sin inferir totales desde el feed. Las relaciones de seguimiento son públicas. La declaración de edad y el registro de aceptación residen en `communityProfiles`, restringido a dueño/administrador; `communityPublicProfiles` sólo proyecta datos deportivos. Un alta Auth incompleta no publica una ficha. Altas completas, cambios y verificación administrativa mantienen el espejo mediante lotes/transacciones y reglas comprobadas en emuladores.
+
+Las nuevas pruebas verifican la proyección sin campos privados, seguimiento inválido o ajeno, compatibilidad de la prueba local anterior, persistencia de cuentas de prueba y coherencia del espejo. Pasan 19 pruebas TS y 23 emuladas; el backend conserva 16 pruebas. TypeScript y build pasan. Ninguna de estas comprobaciones usa cuentas reales ni constituye un despliegue.
+
+Para activar en nube se requieren los índices por autor/organizador incluidos en `firestore.indexes.json` y una revisión de las cuentas existentes. La migración `scripts/project-public-profiles.cjs` está preparada con modo sólo lectura por defecto y `--apply` explícito; copia exclusivamente campos deportivos de cuentas completas con condiciones vigentes. No se ha ejecutado. Reglas, dominio Auth, responsable/contacto/país, privilegio del propietario y pruebas con dos cuentas siguen pendientes. Medios cloud y funciones continúan esperando patrocinador. El listado general y sus interacciones aún necesitan ampliar paginación/agregación antes de crecer.

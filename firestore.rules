@@ -29,12 +29,28 @@ service cloud.firestore {
         && (data.acceptedTermsVersion == '' && data.acceptedTermsAt == ''
           || data.acceptedTermsVersion == '2026-10-05' && iso(data.acceptedTermsAt));
     }
+    function publicProjection(data, profile) {
+      return data.keys().hasAll(['id', 'name', 'bio', 'city', 'country', 'position', 'team', 'level', 'verification', 'entityType', 'createdAt'])
+        && data.keys().hasOnly(['id', 'name', 'bio', 'city', 'country', 'position', 'team', 'level', 'verification', 'entityType', 'createdAt'])
+        && data.id == profile.id && data.name == profile.name && data.bio == profile.bio
+        && data.city == profile.city && data.country == profile.country && data.position == profile.position
+        && data.team == profile.team && data.level == profile.level && data.verification == profile.verification
+        && data.entityType == profile.entityType && data.createdAt == profile.createdAt;
+    }
+    function completedProfile(profile) {
+      return profile.adultConfirmed == true && profile.acceptedTermsVersion == '2026-10-05' && iso(profile.acceptedTermsAt);
+    }
+    function mirroredPublic(uid, profile) {
+      return completedProfile(profile)
+        ? publicProjection(getAfter(/databases/$(database)/documents/communityPublicProfiles/$(uid)).data, profile)
+        : !exists(/databases/$(database)/documents/communityPublicProfiles/$(uid));
+    }
     match /communityProfiles/{uid} {
-      // This schema contains public sporting details only: no emails or identity documents.
-      allow read: if true;
+      // Consent and age declarations are accessible only to the owner and administrator.
+      allow read: if owner(uid) || admin();
       allow create: if owner(uid) && validProfile(request.resource.data, uid)
-        && request.resource.data.verification == 'unverified';
-      allow update: if validProfile(request.resource.data, uid) && (
+        && request.resource.data.verification == 'unverified' && mirroredPublic(uid, request.resource.data);
+      allow update: if validProfile(request.resource.data, uid) && mirroredPublic(uid, request.resource.data) && (
         owner(uid) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
           ['name', 'bio', 'city', 'country', 'position', 'team', 'level', 'adultConfirmed', 'entityType',
            'acceptedTermsVersion', 'acceptedTermsAt'])
@@ -43,6 +59,27 @@ service cloud.firestore {
             || getAfter(/databases/$(database)/documents/communityVerifications/$(uid)).data.status == 'approved')
       );
       allow delete: if false;
+    }
+    match /communityPublicProfiles/{uid} {
+      allow read: if true;
+      allow create, update: if (owner(uid) || active() && admin())
+        && completedProfile(getAfter(/databases/$(database)/documents/communityProfiles/$(uid)).data)
+        && publicProjection(request.resource.data, getAfter(/databases/$(database)/documents/communityProfiles/$(uid)).data);
+      allow delete: if false;
+    }
+    match /communityFollows/{id} {
+      // Sporting relationships are public; the collection stores no contact or consent data.
+      allow read: if true;
+      allow create: if active() && request.resource.data.keys().hasAll(['followerId', 'followingId', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['followerId', 'followingId', 'createdAt'])
+        && request.resource.data.followerId == request.auth.uid
+        && text(request.resource.data.followingId, 1, 128)
+        && request.resource.data.followingId != request.auth.uid
+        && id == request.auth.uid + '_' + request.resource.data.followingId
+        && exists(/databases/$(database)/documents/communityPublicProfiles/$(request.resource.data.followingId))
+        && iso(request.resource.data.createdAt);
+      allow update: if false;
+      allow delete: if owner(resource.data.followerId);
     }
     function validEvent(data, id) {
       return data.keys().hasAll(['id', 'ownerId', 'ownerName', 'title', 'type', 'format', 'level', 'city',

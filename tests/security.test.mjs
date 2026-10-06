@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { assertFails, assertSucceeds, initializeTestEnvironment } from '@firebase/rules-unit-testing';
 import { initializeApp, deleteApp } from 'firebase/app';
-import { collection, connectFirestoreEmulator, deleteDoc, doc, getDoc, getDocs, getFirestore, limit, orderBy, query, runTransaction, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, connectFirestoreEmulator, deleteDoc, doc, getDoc, getDocs, getFirestore, limit, orderBy, query, runTransaction, setDoc, updateDoc, where, getCountFromServer, writeBatch } from 'firebase/firestore';
 import { deleteObject, getMetadata, listAll, ref, updateMetadata, uploadBytes } from 'firebase/storage';
 
 // Never run these tests against cloud services or production project identifiers.
@@ -15,6 +15,14 @@ const DATABASE_ID = 'ai-studio-647af55f-499b-43f3-9268-9bf5f62701bb';
 const TERMS_VERSION = '2026-10-05';
 const stamp = () => new Date().toISOString();
 const profile = (id, overrides = {}) => ({ id, name: id, bio: '', city: 'Madrid', country: 'España', position: 'Centro', team: 'Cantera', level: 'amateur', adultConfirmed: true, verification: 'unverified', entityType: 'individual', createdAt: stamp(), acceptedTermsVersion: TERMS_VERSION, acceptedTermsAt: stamp(), ...overrides });
+const publicProfile = data => { const { adultConfirmed, acceptedTermsAt, acceptedTermsVersion, ...sports } = data; return sports; };
+async function writeProfile(client, value) {
+  const target = doc(client, 'communityProfiles', value.id); const current = await getDoc(target);
+  const next = current.exists() ? { ...value, createdAt: current.data().createdAt } : value;
+  const batch = writeBatch(client); batch.set(target, next);
+  if (next.adultConfirmed && next.acceptedTermsVersion === TERMS_VERSION) batch.set(doc(client, 'communityPublicProfiles', next.id), publicProfile(next));
+  return batch.commit();
+}
 const event = (id = 'event', overrides = {}) => {
   const startAtMs = Date.now() + 86400000;
   return { id, ownerId: 'alice', ownerName: 'alice', title: 'Partido de la comunidad', type: 'match', format: '7', level: 'amateur', city: 'Madrid', country: 'España', timeZone: 'Europe/Madrid', venue: 'Campo municipal', startAt: new Date(startAtMs).toISOString(), startAtMs, capacity: 4, entry: 'players', description: 'Jugamos juntos.', status: 'open', tournamentFormat: 'league', participants: {}, fixtures: [], createdAt: stamp(), ...overrides };
@@ -36,7 +44,7 @@ beforeEach(async () => {
   await env.clearStorage();
   await env.withSecurityRulesDisabled(async ctx => {
     const firestore = ctx.firestore();
-    await Promise.all(['alice', 'bob', 'carol', 'admin'].map(uid => setDoc(doc(firestore, 'communityProfiles', uid), profile(uid))));
+    await Promise.all(['alice', 'bob', 'carol', 'admin'].map(uid => writeProfile(firestore, profile(uid))));
     await setDoc(doc(firestore, 'communityProfiles', 'inactive'), profile('inactive', { acceptedTermsVersion: '', acceptedTermsAt: '' }));
     await setDoc(doc(firestore, 'communityProfiles', 'minor'), profile('minor', { adultConfirmed: false }));
   });
@@ -48,7 +56,10 @@ describe('Identidad, consentimiento y datos privados', { concurrency: false }, (
     await seed('communityEvents/event', event('event', { participants: { alice: 'alice', bob: 'bob' } }));
     await seed('communityPosts/post', post());
     const guest = db();
-    await assertSucceeds(getDoc(doc(guest, 'communityProfiles/alice')));
+    await assertSucceeds(getDoc(doc(guest, 'communityPublicProfiles/alice')));
+    await assertFails(getDoc(doc(guest, 'communityProfiles/alice')));
+    await assertFails(getDoc(doc(db('bob'), 'communityProfiles/alice')));
+    await assertSucceeds(getDoc(doc(db('alice'), 'communityProfiles/alice')));
     await assertSucceeds(getDoc(doc(guest, 'communityEvents/event')));
     await assertSucceeds(getDocs(query(collection(guest, 'communityPosts'), orderBy('createdAt', 'desc'), limit(100))));
     await assertFails(setDoc(doc(guest, 'communityProfiles/visitor'), profile('visitor')));
@@ -60,7 +71,7 @@ describe('Identidad, consentimiento y datos privados', { concurrency: false }, (
     const alice = db('alice');
     const newcomer = db('newcomer');
     await assertSucceeds(setDoc(doc(newcomer, 'communityProfiles/newcomer'), profile('newcomer', { adultConfirmed: false, acceptedTermsVersion: '', acceptedTermsAt: '' })));
-    await assertSucceeds(updateDoc(doc(alice, 'communityProfiles/alice'), { name: 'Alicia', bio: 'Jugador amateur.' }));
+    await assertSucceeds(writeProfile(alice, profile('alice', { name: 'Alicia', bio: 'Jugador amateur.' })));
     await assertFails(updateDoc(doc(alice, 'communityProfiles/bob'), { bio: 'Suplantado' }));
     await assertFails(updateDoc(doc(alice, 'communityProfiles/alice'), { verification: 'verified' }));
     await assertFails(updateDoc(doc(alice, 'communityProfiles/alice'), { role: 'ADMIN' }));
@@ -81,7 +92,7 @@ describe('Identidad, consentimiento y datos privados', { concurrency: false }, (
       await assertFails(setDoc(doc(client, 'communityComments', uid), { id: uid, authorId: uid, authorName: uid, text: 'Buen partido', postId: 'post', createdAt: stamp() }));
       await assertFails(setDoc(doc(client, 'communityVerifications', uid), verification(uid)));
     }
-    await assertSucceeds(updateDoc(doc(db('inactive'), 'communityProfiles/inactive'), { acceptedTermsVersion: TERMS_VERSION, acceptedTermsAt: stamp() }));
+    await assertSucceeds(writeProfile(db('inactive'), profile('inactive')));
     await assertSucceeds(setDoc(doc(db('inactive'), 'communityPosts/accepted'), post('accepted', { authorId: 'inactive', authorName: 'inactive' })));
   });
 
@@ -99,6 +110,64 @@ describe('Identidad, consentimiento y datos privados', { concurrency: false }, (
     await assertSucceeds(setDoc(doc(alice, 'users/alice/likes/player'), { timestamp: stamp() }));
     await assertFails(setDoc(doc(db('bob'), 'users/alice/likes/other'), { timestamp: stamp() }));
     await assertFails(getDocs(collection(db('bob'), 'users/alice/likes')));
+  });
+});
+
+describe('Proyección pública y seguimiento', { concurrency: false }, () => {
+  test('alta incompleta permanece privada; completar requiere espejo deportivo consistente', async () => {
+    const client = db('new-public'); const initial = profile('new-public', { adultConfirmed: false, acceptedTermsVersion: '', acceptedTermsAt: '' });
+    await assertSucceeds(setDoc(doc(client, 'communityProfiles/new-public'), initial));
+    assert.equal((await getDoc(doc(db(), 'communityPublicProfiles/new-public'))).exists(), false);
+    await assertFails(setDoc(doc(client, 'communityPublicProfiles/new-public'), publicProfile(initial)));
+    const completed = { ...initial, adultConfirmed: true, acceptedTermsVersion: TERMS_VERSION, acceptedTermsAt: stamp() };
+    await assertFails(setDoc(doc(client, 'communityProfiles/new-public'), completed));
+    await assertSucceeds(writeProfile(client, completed));
+    const sports = (await getDoc(doc(db(), 'communityPublicProfiles/new-public'))).data();
+    assert.deepEqual(Object.keys(sports).sort(), Object.keys(publicProfile(completed)).sort());
+    assert.equal('acceptedTermsAt' in sports, false); assert.equal('adultConfirmed' in sports, false);
+  });
+
+  test('proyección no admite nombre divergente, información privada ni verificaciones inventadas', async () => {
+    const client = db('alice'); const sports = (await getDoc(doc(client, 'communityPublicProfiles/alice'))).data();
+    await assertFails(setDoc(doc(client, 'communityPublicProfiles/alice'), { ...sports, name: 'Otra identidad' }));
+    await assertFails(setDoc(doc(client, 'communityPublicProfiles/alice'), { ...sports, email: 'private@example.test' }));
+    await assertFails(setDoc(doc(client, 'communityPublicProfiles/alice'), { ...sports, adultConfirmed: true }));
+    await assertFails(setDoc(doc(client, 'communityPublicProfiles/alice'), { ...sports, verification: 'verified' }));
+    await assertFails(updateDoc(doc(client, 'communityProfiles/alice'), { name: 'Sin espejo' }));
+    await assertFails(setDoc(doc(db('bob'), 'communityPublicProfiles/alice'), sports));
+    await assertFails(deleteDoc(doc(client, 'communityPublicProfiles/alice')));
+  });
+
+  test('seguir y dejar de seguir son propios y los recuentos públicos incluyen todas las relaciones', async () => {
+    const alice = db('alice'); const bob = db('bob'); const relation = { followerId: 'alice', followingId: 'bob', createdAt: stamp() };
+    await assertSucceeds(setDoc(doc(alice, 'communityFollows/alice_bob'), relation));
+    await assertSucceeds(setDoc(doc(db('carol'), 'communityFollows/carol_bob'), { ...relation, followerId: 'carol' }));
+    const count = await assertSucceeds(getCountFromServer(query(collection(db(), 'communityFollows'), where('followingId', '==', 'bob'))));
+    assert.equal(count.data().count, 2);
+    await assertFails(updateDoc(doc(alice, 'communityFollows/alice_bob'), { createdAt: stamp() }));
+    await assertFails(deleteDoc(doc(bob, 'communityFollows/alice_bob')));
+    await assertSucceeds(deleteDoc(doc(alice, 'communityFollows/alice_bob')));
+    assert.equal((await getCountFromServer(query(collection(db(), 'communityFollows'), where('followingId', '==', 'bob')))).data().count, 1);
+    // An owned relationship may be withdrawn even after consent lapses or the target disappears.
+    for (const uid of ['inactive', 'minor']) {
+      await seed(`communityFollows/${uid}_gone`, { followerId: uid, followingId: 'gone', createdAt: stamp() });
+      await assertFails(deleteDoc(doc(db('alice'), 'communityFollows', `${uid}_gone`)));
+      await assertSucceeds(deleteDoc(doc(db(uid), 'communityFollows', `${uid}_gone`)));
+      await assertFails(setDoc(doc(db(uid), 'communityFollows', `${uid}_bob`), { followerId: uid, followingId: 'bob', createdAt: stamp() }));
+    }
+  });
+
+  test('seguimiento bloquea visitantes, suplantación, auto-seguir, perfiles inexistentes y campos extra', async () => {
+    const alice = db('alice'); const relation = { followerId: 'alice', followingId: 'bob', createdAt: stamp() };
+    await assertFails(setDoc(doc(db(), 'communityFollows/alice_bob'), relation));
+    await assertFails(setDoc(doc(db('bob'), 'communityFollows/alice_bob'), relation));
+    await assertFails(setDoc(doc(alice, 'communityFollows/alice_alice'), { ...relation, followingId: 'alice' }));
+    await assertFails(setDoc(doc(alice, 'communityFollows/alice_missing'), { ...relation, followingId: 'missing' }));
+    await assertFails(setDoc(doc(alice, 'communityFollows/alice_inactive'), { ...relation, followingId: 'inactive' }));
+    await assertFails(setDoc(doc(alice, 'communityFollows/wrong'), relation));
+    await assertFails(setDoc(doc(alice, 'communityFollows/alice_bob'), { ...relation, role: 'ADMIN' }));
+    await assertFails(setDoc(doc(alice, 'communityFollows/alice_bob'), { ...relation, createdAt: 'ayer' }));
+    for (const uid of ['inactive', 'minor', 'no-profile']) await assertFails(setDoc(doc(db(uid), 'communityFollows', `${uid}_bob`), { ...relation, followerId: uid }));
   });
 });
 
@@ -182,7 +251,7 @@ describe('Partidos, permisos de organizador y aforo atómico', { concurrency: fa
     const [host, port] = process.env.FIRESTORE_EMULATOR_HOST.split(':');
     connectFirestoreEmulator(client, host, Number(port), { mockUserToken: { sub: 'named-owner', user_id: 'named-owner' } });
     try {
-      await assertSucceeds(setDoc(doc(client, 'communityProfiles/named-owner'), profile('named-owner')));
+      await assertSucceeds(writeProfile(client, profile('named-owner')));
       await assertSucceeds(setDoc(doc(client, 'communityEvents/named-event'), event('named-event', { ownerId: 'named-owner', ownerName: 'named-owner' })));
       await assertFails(setDoc(doc(client, 'communityProfiles/named-other'), profile('named-other')));
       await assertFails(updateDoc(doc(client, 'communityProfiles/named-owner'), { verification: 'verified' }));
@@ -258,8 +327,9 @@ describe('Verificación privada y moderación administrativa', { concurrency: fa
       await tx.get(request);
       tx.update(request, { status: 'approved', reviewedAt: stamp() });
       tx.update(doc(admin, 'communityProfiles/alice'), { verification: 'verified' });
+      tx.update(doc(admin, 'communityPublicProfiles/alice'), { verification: 'verified' });
     }));
-    assert.equal((await getDoc(doc(db(), 'communityProfiles/alice'))).data().verification, 'verified');
+    assert.equal((await getDoc(doc(db(), 'communityPublicProfiles/alice'))).data().verification, 'verified');
     await assertFails(updateDoc(doc(db('alice'), 'communityProfiles/alice'), { verification: 'unverified' }));
   });
 

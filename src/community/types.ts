@@ -16,6 +16,13 @@ export interface CommunityProfile {
   acceptedTermsVersion: string;
   acceptedTermsAt: string;
 }
+export type PublicProfile = Pick<CommunityProfile, 'id' | 'name' | 'bio' | 'city' | 'country' | 'position' | 'team' | 'level' | 'verification' | 'entityType' | 'createdAt'>;
+export interface FollowRecord {
+  id: string;
+  followerId: string;
+  followingId: string;
+  createdAt: string;
+}
 export interface Fixture {
   id: string;
   round: number;

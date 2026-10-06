@@ -1,5 +1,5 @@
 import type { DemoData } from './local';
-import type { CommunityPost, CommunityProfile, ContentReport, Fixture, PlayEvent, PostComment, VerificationRequest } from './types';
+import type { CommunityPost, CommunityProfile, ContentReport, Fixture, FollowRecord, PlayEvent, PostComment, PublicProfile, VerificationRequest } from './types';
 
 type Data = Record<string, unknown>;
 export interface LikeRecord { postId: string; userId: string; createdAt: string }
@@ -54,6 +54,24 @@ export function normalizeProfile(value: unknown, documentId?: string): Community
     position: value.position, team: value.team, level: value.level, adultConfirmed: value.adultConfirmed,
     verification: value.verification, entityType: value.entityType, createdAt: value.createdAt,
     acceptedTermsVersion: value.acceptedTermsVersion, acceptedTermsAt: value.acceptedTermsAt };
+}
+
+export function normalizePublicProfile(value: unknown, documentId?: string): PublicProfile | null {
+  if (!object(value) || !documentIdentity(value, documentId) || !text(value.name, 1, 100)
+    || !text(value.bio, 0, 1000) || !text(value.city, 0, 100) || !text(value.country, 0, 100)
+    || !text(value.position, 0, 100) || !text(value.team, 0, 100)
+    || !enumValue(value.level, ['amateur', 'professional'] as const)
+    || !enumValue(value.verification, ['unverified', 'verified'] as const)
+    || !enumValue(value.entityType, ['individual', 'group', 'club'] as const) || !date(value.createdAt)) return null;
+  return { id: value.id, name: value.name, bio: value.bio, city: value.city, country: value.country,
+    position: value.position, team: value.team, level: value.level, verification: value.verification,
+    entityType: value.entityType, createdAt: value.createdAt };
+}
+export function normalizeFollow(value: unknown, documentId?: string): FollowRecord | null {
+  if (!object(value) || !id(value.followerId) || !id(value.followingId) || value.followerId === value.followingId || !date(value.createdAt)) return null;
+  const expectedId = `${value.followerId}_${value.followingId}`;
+  if (documentId !== undefined && documentId !== expectedId || value.id !== undefined && value.id !== expectedId) return null;
+  return { id: expectedId, followerId: value.followerId, followingId: value.followingId, createdAt: value.createdAt };
 }
 
 export function normalizeEvent(value: unknown, documentId?: string): PlayEvent | null {
@@ -154,7 +172,11 @@ export function normalizeDemoData(value: unknown): DemoData {
   if (object(data.comments)) for (const [postId, entries] of Object.entries(data.comments)) {
     if (id(postId)) comments[postId] = list(entries, normalizeComment);
   }
-  return { version: 1, profile: normalizeProfile(data.profile), events: list(data.events, normalizeEvent),
+  const profile = normalizeProfile(data.profile);
+  const profiles = new Map(list(data.profiles, normalizeProfile).map(item => [item.id, item]));
+  if (profile) profiles.set(profile.id, profile);
+  const follows = new Map(list(data.follows, normalizeFollow).filter(item => profiles.has(item.followerId)).map(item => [item.id, item]));
+  return { version: 1, profile, profiles: [...profiles.values()], follows: [...follows.values()], events: list(data.events, normalizeEvent),
     posts: list(data.posts, value => normalizePost(value, undefined, 'demo')), likes, comments,
     verifications: list(data.verifications, normalizeVerification), reports: list(data.reports, normalizeReport) };
 }

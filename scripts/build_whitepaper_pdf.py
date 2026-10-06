@@ -44,13 +44,13 @@ FONT_ROOT = RUNTIME / 'native/libreoffice-headless/libreoffice/LibreOfficeDev.ap
 PAGE_WIDTH, PAGE_HEIGHT = A4
 MARGIN = 48
 CONTENT_WIDTH = PAGE_WIDTH - 2 * MARGIN
-INK = colors.HexColor('#19352c')
-FOREST = colors.HexColor('#176747')
-DEEP = colors.HexColor('#173f2f')
-LIME = colors.HexColor('#c6e779')
-MUTED = colors.HexColor('#6f8076')
-LINE = colors.HexColor('#dde7dc')
-PALE = colors.HexColor('#f3f6ed')
+INK = colors.HexColor('#171719')
+FOREST = colors.HexColor('#cf302b')
+DEEP = colors.HexColor('#171719')
+LIME = colors.HexColor('#ff7770')
+MUTED = colors.HexColor('#696970')
+LINE = colors.HexColor('#e4e4e7')
+PALE = colors.HexColor('#f5f5f6')
 WHITE = colors.white
 
 
@@ -97,10 +97,10 @@ class MarkdownRenderer:
                 label, url = link.groups()
                 if url.startswith(('https://', 'http://')):
                     self.external_links[url] = label
-                    result.append(f'<a href="{html.escape(url, quote=True)}" color="#176747"><u>{self.inline(label, table=table)}</u></a>')
+                    result.append(f'<a href="{html.escape(url, quote=True)}" color="#cf302b"><u>{self.inline(label, table=table)}</u></a>')
                 else:
                     self.local_references[url] = label
-                    result.append(f'<font color="#176747">{self.inline(label, table=table)}</font>')
+                    result.append(f'<font color="#cf302b">{self.inline(label, table=table)}</font>')
             elif piece.startswith('**') and piece.endswith('**'):
                 result.append(f'<b>{self.inline(piece[2:-2], table=table)}</b>')
             elif piece.startswith('`') and piece.endswith('`'):
@@ -157,7 +157,7 @@ class Cover(Flowable):
         c.saveState()
         c.translate(PAGE_WIDTH - 245, 325)
         c.rotate(-14)
-        c.setStrokeColor(colors.HexColor('#38583d'))
+        c.setStrokeColor(colors.HexColor('#55555d'))
         c.setLineWidth(1)
         c.rect(-70, -96, 370, 225, stroke=1, fill=0)
         c.line(115, -96, 115, 129)
@@ -174,8 +174,8 @@ class Cover(Flowable):
         c.drawString(MARGIN, PAGE_HEIGHT - 87, 'cantera')
         brand_width = pdfmetrics.stringWidth('cantera', 'CanteraTitleBold', 42)
         c.setFillColor(LIME)
-        c.circle(MARGIN + brand_width + 7, PAGE_HEIGHT - 83, 4.1, stroke=0, fill=1)
-        c.setFillColor(colors.HexColor('#bdd2b7'))
+        c.rect(MARGIN + brand_width + 3, PAGE_HEIGHT - 87, 7, 7, stroke=0, fill=1)
+        c.setFillColor(colors.HexColor('#ccccd2'))
         c.setFont('CanteraTitleBold', 8.3)
         c.drawString(MARGIN, PAGE_HEIGHT - 137, 'DOCUMENTO DE PROYECTO')
         c.setFillColor(WHITE)
@@ -186,12 +186,12 @@ class Cover(Flowable):
         c.setFillColor(LIME)
         c.drawString(MARGIN, PAGE_HEIGHT - 358, 'Del barrio al mundo.')
         description_style = ParagraphStyle('CoverDescription', fontName='CanteraBody', fontSize=12,
-                                           leading=19, textColor=colors.HexColor('#e0e9db'))
+                                           leading=19, textColor=colors.HexColor('#e6e6ea'))
         p = Paragraph('Misión, producto, gobernanza, sostenibilidad y trazabilidad de una comunidad deportiva global de acceso gratuito.', description_style)
         _, height = p.wrap(430, 100)
         p.drawOn(c, MARGIN, PAGE_HEIGHT - 392 - height)
 
-        c.setFillColor(colors.HexColor('#dce9bf'))
+        c.setFillColor(colors.HexColor('#d7d7de'))
         c.setFont('CanteraTitleBold', 7.8)
         c.drawString(MARGIN, 314, 'ACCESO GRATUITO   /   ALCANCE GLOBAL PREVISTO')
         c.setFillColor(PALE)
@@ -206,7 +206,7 @@ class Cover(Flowable):
         if status_height > 106:
             raise ValueError('La situación documental excede el espacio de portada.')
         status.drawOn(c, MARGIN + 18, 216 - status_height)
-        c.setFillColor(colors.HexColor('#c3d4bd'))
+        c.setFillColor(colors.HexColor('#c3c3cc'))
         c.setFont('CanteraTitle', 8.1)
         c.drawString(MARGIN, 55, f'VERSIÓN {self.version}  |  {self.date.upper()}')
         c.drawRightString(PAGE_WIDTH - MARGIN, 55, 'CANTERA / WHITEPAPER')
@@ -412,7 +412,7 @@ def build(source: Path, output: Path, publish: bool, expected_sha: str | None) -
                   Paragraph(f'<font name="CanteraMono" size="8.0">{source_sha}</font>', style['body']),
                   Spacer(1, 7), Paragraph('Fuentes enlazadas en el texto', style['h3'])])
     for url, label in renderer.external_links.items():
-        story.append(Paragraph(f'<a href="{html.escape(url, quote=True)}" color="#176747"><u>{renderer.inline(label)}</u></a><br/><font size="8" color="#6f8076">{html.escape(url)}</font>', style['body']))
+        story.append(Paragraph(f'<a href="{html.escape(url, quote=True)}" color="#cf302b"><u>{renderer.inline(label)}</u></a><br/><font size="8" color="#696970">{html.escape(url)}</font>', style['body']))
     if renderer.local_references:
         story.extend([Paragraph('Documentación de esta entrega', style['h3']),
                       Paragraph('Las referencias a archivos locales designan documentos del proyecto. Su publicación web deberá acompañar la versión de código a la que se refieren.', style['note'])])

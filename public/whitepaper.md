@@ -1,5 +1,5 @@
 # CANTERA
-## Whitepaper del proyecto · Versión 0.6
+## Whitepaper del proyecto · Versión 0.7
 
 **Fecha de edición:** 6 de octubre de 2026  
 **Objeto:** misión, producto, gobernanza, sostenibilidad y trazabilidad de una comunidad deportiva global de acceso gratuito.  
@@ -267,8 +267,9 @@ La interfaz y la integración de datos están construidas localmente. TypeScript
 | 0.4 | 6 de octubre de 2026 | Backend de limpieza preparado, 16 pruebas adicionales y CI separada para su runtime Node 22; despliegue e invocación cloud pendientes. |
 | 0.5 | 6 de octubre de 2026 | Decisión D-09 de esperar patrocinador, medios cloud desactivados por defecto y QA local MP4 de 2 s/rechazo de 91 s. |
 | 0.6 | 6 de octubre de 2026 | Ambos trabajos de GitHub Actions superados, 49 pruebas y política explícita de scripts de dependencias. Conserva los requisitos de activación cloud y lanzamiento pendientes. |
+| 0.7 | 6 de octubre de 2026 | Feed social, perfiles públicos y seguimiento, actividad paginada, interfaz móvil e identidad visual; cuenta privada separada de proyección deportiva. Amplía la suite a 58 casos, manteniendo pendientes migración, configuración y lanzamiento real. |
 
-La referencia de partida del proyecto es `79591442a6e8938f07b3c1154f1b363af5672cce`. El código comprobado en la [ejecución de CI `37384779319`](https://github.com/rommer1997/CANTERA-/actions/runs/37384779319) corresponde al commit `54fd7e98c9469dac60e0fedd53594e778f7b9751`. Esta versión 0.6 registra esa evidencia mediante una actualización documental posterior. Ninguno de estos identificadores acredita una versión desplegada o cuentas reales comprobadas.
+La referencia de partida del proyecto es `79591442a6e8938f07b3c1154f1b363af5672cce`. El código comprobado en la [ejecución de CI `37384779319`](https://github.com/rommer1997/CANTERA-/actions/runs/37384779319) corresponde al commit `54fd7e98c9469dac60e0fedd53594e778f7b9751`. La edición 0.6 registró esa evidencia mediante una actualización documental posterior; la edición 0.7 añade el avance social y su comprobación local en la sección 16.4. Ninguno de estos identificadores acredita una versión desplegada o cuentas reales comprobadas.
 
 Cada entrega debe añadir identificador de código, cambios, pruebas con entorno y fecha, documentos revisados, estado de despliegue y límites abiertos. No publicar evidencia de pruebas de desarrollo como tracción de usuarios. No sustituir la identidad o forma jurídica pendiente por datos ficticios.
 
@@ -308,3 +309,15 @@ La auditoría del 6 de octubre encontró una base Firestore nombrada en región 
 Para lanzar: completar y autorizar configuración de datos y dominio; identificar al responsable y canal de atención; conceder al propietario su permiso administrativo de forma segura; publicar y comprobar el recorrido con cuentas reales. Los medios y funciones esperan patrocinador antes de habilitar facturación y servicios. La configuración de producción mantiene `VITE_ENABLE_MEDIA_UPLOADS=false` por defecto; la prueba explícita permite medios locales. Las reglas locales probadas no demuestran que el servicio esté activo. La comprobación con dos cuentas y dispositivos queda pendiente.
 
 **Estado documentado:** código integrado y comprobaciones locales y de CI superadas; aplicación todavía no declarada lista para clientes ni publicada como servicio productivo final. La gratuidad, el alcance global y la vocación sin finalidad lucrativa permanecen como decisiones y objetivos; no se presenta una entidad registrada ni financiación confirmada.
+
+### 16.4 Avance social y visual de la edición 0.7
+
+La comunidad incorpora perfiles públicos por enlace, directorio de personas/grupos/clubes, seguimiento persistente y las vistas Comunidad/Siguiendo. Los autores de publicaciones y comentarios permiten navegar al perfil. La actividad de cada cuenta se consulta en páginas de 20 y el directorio en páginas de 40, con búsqueda entre cuentas mostradas. Los recuentos de seguidores y seguidos utilizan consultas de agregación en servidor; no proceden de cifras de ejemplo ni del lote de publicaciones recientes.
+
+El rediseño organiza el contenido como feed social, con creación compacta y superficies blancas, tipografía de sistema, texto negro y acento rojo. En móvil mantiene la navegación inferior y la agenda; en escritorio conserva la landing de inicio. Juega presenta Explorar/Mis encuentros y fichas con secciones claras. No se añadieron perfiles, actividad o tracción ficticia al servicio; el entorno de prueba conserva su aviso y sus datos separados.
+
+La cuenta privada `communityProfiles` conserva declaración de edad y aceptación de condiciones, con acceso de su dueño/administrador. `communityPublicProfiles` contiene únicamente la proyección deportiva. Un alta Auth incompleta no aparece en el directorio. La publicación/edición de perfil y la verificación administrativa mantienen la proyección mediante lotes/transacciones y reglas de espejo. Las relaciones de seguimiento son públicas y sólo su actor puede crearlas o retirarlas; no se permite auto-seguimiento.
+
+Esta actualización supera localmente TypeScript, compilación, 19 pruebas TS y 23 de seguridad emulada. Junto con las 16 del backend, la suite contiene 58 casos. La evidencia de CI de 49 casos descrita arriba corresponde a una entrega anterior identificada; la ejecución de cada nueva revisión puede consultarse en el PR del proyecto. Estas comprobaciones no acreditan autenticación, sincronización ni medios con cuentas reales en la nube.
+
+Antes de activar el servicio deben desplegarse, con autorización, las reglas y los índices incluidos para consultar actividad por autor/organizador. La migración de proyecciones de cuentas existentes está preparada con sólo lectura por defecto, copia exclusiva de campos deportivos y omisión de cuentas incompletas; no se ha ejecutado en nube. El listado general de eventos/feed y sus interacciones aún necesitan ampliar paginación/agregación para crecer. Las puertas de configuración, responsable/contacto/país, administrador, pruebas con dos cuentas y financiación de medios permanecen abiertas. Esta edición no declara el producto al 100 % ni listo para clientes.
