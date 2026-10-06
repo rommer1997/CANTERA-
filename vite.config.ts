@@ -2,10 +2,11 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig} from 'vite';
+import {canteraShell} from './scripts/pwa-plugin';
 
 export default defineConfig(({mode}) => {
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [react(), tailwindcss(), canteraShell()],
     base: './',
     build: { rollupOptions: { output: { manualChunks: { 'firebase': ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/storage'], 'react': ['react', 'react-dom', 'react-router-dom'] } } } },
     resolve: {

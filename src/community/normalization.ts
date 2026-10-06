@@ -1,7 +1,26 @@
 import type { DemoData } from './local';
-import type { CommunityPost, CommunityProfile, ContentReport, Fixture, FollowRecord, PlayEvent, PostComment, PublicProfile, VerificationRequest } from './types';
+import type { CommunityPost, CommunityProfile, ContentReport, Fixture, FollowRecord, PlayEvent, EventNotice, RightsRequest, RuntimeConfig, PostComment, PublicProfile, VerificationRequest } from './types';
 
 type Data = Record<string, unknown>;
+// Firestore timestamps are converted only at the boundary; legacy ISO records stay readable.
+function dates(value: unknown): unknown {
+  if (!object(value)) return value;
+  const result = { ...value };
+  for (const field of ['createdAt', 'updatedAt', 'acceptedTermsAt', 'reviewedAt', 'readAt', 'changedAt', 'joinedAt']) {
+    const raw = result[field] as { toDate?: () => Date } | undefined;
+    if (raw && typeof raw.toDate === 'function') { try { result[field] = raw.toDate().toISOString(); } catch { result[field] = ''; } }
+  }
+  return result;
+}
+export function searchText(value: string): string { return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es').trim().replace(/\s+/g, ' ').slice(0, 100); }
+export function profileSearchTokens(value: Pick<CommunityProfile, 'name' | 'city' | 'country'>): string[] {
+  const tokens = new Set<string>();
+  for (const field of ['name', 'city', 'country'] as const) {
+    const clean = searchText(value[field]);
+    for (const part of new Set([clean, ...clean.split(' ')])) for (let length = 1; length <= part.length; length++) tokens.add(`${field}:${part.slice(0, length)}`);
+  }
+  return [...tokens].slice(0, 600);
+}
 export interface LikeRecord { postId: string; userId: string; createdAt: string }
 export interface CommentRecord extends PostComment { postId: string }
 
@@ -42,6 +61,7 @@ function dictionary<T>(): Record<string, T> { return Object.create(null) as Reco
 // Reconstruct known fields instead of casting Firestore or localStorage data into UI types.
 // Invalid sporting records are excluded as a whole; partial brackets can misrepresent results.
 export function normalizeProfile(value: unknown, documentId?: string): CommunityProfile | null {
+  value = dates(value);
   if (!object(value) || !documentIdentity(value, documentId) || !text(value.name, 1, 100)
     || !text(value.bio, 0, 1000) || !text(value.city, 0, 100) || !text(value.country, 0, 100)
     || !text(value.position, 0, 100) || !text(value.team, 0, 100)
@@ -57,6 +77,7 @@ export function normalizeProfile(value: unknown, documentId?: string): Community
 }
 
 export function normalizePublicProfile(value: unknown, documentId?: string): PublicProfile | null {
+  value = dates(value);
   if (!object(value) || !documentIdentity(value, documentId) || !text(value.name, 1, 100)
     || !text(value.bio, 0, 1000) || !text(value.city, 0, 100) || !text(value.country, 0, 100)
     || !text(value.position, 0, 100) || !text(value.team, 0, 100)
@@ -68,6 +89,7 @@ export function normalizePublicProfile(value: unknown, documentId?: string): Pub
     entityType: value.entityType, createdAt: value.createdAt };
 }
 export function normalizeFollow(value: unknown, documentId?: string): FollowRecord | null {
+  value = dates(value);
   if (!object(value) || !id(value.followerId) || !id(value.followingId) || value.followerId === value.followingId || !date(value.createdAt)) return null;
   const expectedId = `${value.followerId}_${value.followingId}`;
   if (documentId !== undefined && documentId !== expectedId || value.id !== undefined && value.id !== expectedId) return null;
@@ -75,15 +97,17 @@ export function normalizeFollow(value: unknown, documentId?: string): FollowReco
 }
 
 export function normalizeEvent(value: unknown, documentId?: string): PlayEvent | null {
-  if (!object(value) || !documentIdentity(value, documentId) || !id(value.ownerId) || !text(value.ownerName, 1, 100)
+  value = dates(value);
+  if (!object(value) || !documentIdentity(value, documentId) || value.teamId !== undefined && value.teamId !== '' && !id(value.teamId) || !id(value.ownerId) || !text(value.ownerName, 1, 100)
     || !text(value.title, 1, 100) || !enumValue(value.type, ['match', 'tournament'] as const)
     || !enumValue(value.format, ['5', '7', '11'] as const) || !enumValue(value.level, ['amateur', 'professional'] as const)
     || !text(value.city, 1, 100) || !text(value.country, 1, 100) || !timeZone(value.timeZone)
     || !text(value.venue, 1, 200) || !date(value.startAt) || !integer(value.capacity, 2, value.type === 'tournament' ? 32 : 64)
     || !enumValue(value.entry, ['players', 'teams'] as const) || !text(value.description, 0, 2000)
-    || !enumValue(value.status, ['open', 'closed', 'cancelled'] as const)
+    || !enumValue(value.status, ['open', 'closed', 'cancelled', 'completed'] as const)
     || !enumValue(value.tournamentFormat, ['league', 'knockout'] as const) || !date(value.createdAt)
     || !object(value.participants) || !Array.isArray(value.fixtures) || value.fixtures.length > 496) return null;
+  if (value.fixtureIds !== undefined && (!Array.isArray(value.fixtureIds) || value.fixtureIds.length > 496 || !value.fixtureIds.every(id) || new Set(value.fixtureIds).size !== value.fixtureIds.length)) return null;
   const startAtMs = Date.parse(value.startAt);
   if (value.startAtMs !== undefined && (!integer(value.startAtMs, 0, Number.MAX_SAFE_INTEGER) || value.startAtMs !== startAtMs)) return null;
   const entries = Object.entries(value.participants);
@@ -100,13 +124,24 @@ export function normalizeEvent(value: unknown, documentId?: string): PlayEvent |
       || raw.awayId === '' && (value.tournamentFormat !== 'knockout' || raw.homeScore !== null)
       || value.tournamentFormat === 'knockout' && raw.awayId !== '' && raw.homeScore !== null && raw.homeScore === raw.awayScore) return null;
     fixtureIds.add(raw.id);
-    fixtures.push({ id: raw.id, round: raw.round, homeId: raw.homeId, awayId: raw.awayId, homeScore: raw.homeScore, awayScore: raw.awayScore });
+    if (raw.startAt !== undefined && (!date(raw.startAt) || !timeZone(raw.timeZone) || !text(raw.venue, 1, 200))) return null;
+    fixtures.push({ id: raw.id, round: raw.round, homeId: raw.homeId, awayId: raw.awayId, homeScore: raw.homeScore, awayScore: raw.awayScore, ...(raw.startAt === undefined ? {} : { startAt: raw.startAt as string, timeZone: raw.timeZone as string, venue: raw.venue as string }) });
   }
   return { id: value.id, ownerId: value.ownerId, ownerName: value.ownerName, title: value.title, type: value.type,
     format: value.format, level: value.level, city: value.city, country: value.country, timeZone: value.timeZone,
     venue: value.venue, startAt: value.startAt, ...(value.startAtMs === undefined ? {} : { startAtMs }),
     capacity: value.capacity, entry: value.entry, description: value.description, status: value.status,
-    tournamentFormat: value.tournamentFormat, participants, fixtures, createdAt: value.createdAt };
+    tournamentFormat: value.tournamentFormat, participants, fixtures, createdAt: value.createdAt,
+    ...(integer(value.revision, 0, Number.MAX_SAFE_INTEGER) ? { revision: value.revision } : {}),
+    ...(date(value.updatedAt) ? { updatedAt: value.updatedAt } : {}),
+    ...(Array.isArray(value.history) ? { history: value.history.slice(-50).map(item => dates(item)).filter((item): item is Data => object(item) && integer(item.revision, 1, Number.MAX_SAFE_INTEGER) && date(item.changedAt) && text(item.summary, 1, 500)).map(item => ({ revision: item.revision as number, changedAt: item.changedAt as string, summary: item.summary as string })) } : {}),
+    ...(object(value.rsvps) ? { rsvps: Object.fromEntries(Object.entries(value.rsvps).filter(([uid, response]) => id(uid) && enumValue(response, ['yes', 'no', 'maybe'] as const))) as PlayEvent['rsvps'] } : {}),
+    ...(object(value.waitlist) ? { waitlist: Object.fromEntries(Object.entries(value.waitlist).map(([uid, item]) => [uid, dates(item)]).filter(([uid, item]) => id(uid) && object(item) && text(item.name, 1, 100) && date(item.joinedAt))) as NonNullable<PlayEvent['waitlist']> } : {}),
+    ...(Array.isArray(value.waitlistOrder) ? { waitlistOrder: value.waitlistOrder.filter(id).slice(0, 64) } : {}),
+    participantIds: Object.keys(participants),
+    ...(Array.isArray(value.fixtureIds) && value.fixtureIds.length <= 496 && value.fixtureIds.every(id) && new Set(value.fixtureIds).size === value.fixtureIds.length ? { fixtureIds: value.fixtureIds } : {}),
+    ...(value.teamId === '' || id(value.teamId) ? { teamId: value.teamId } : {}),
+    ...(object(value.result) && text(value.result.homeName, 1, 100) && text(value.result.awayName, 1, 100) && integer(value.result.homeScore, 0, 99) && integer(value.result.awayScore, 0, 99) ? { result: { homeName: value.result.homeName, awayName: value.result.awayName, homeScore: value.result.homeScore, awayScore: value.result.awayScore } } : {}) };
 }
 
 function publicMediaUrl(value: string, mediaPath: string): boolean {
@@ -118,6 +153,7 @@ function publicMediaUrl(value: string, mediaPath: string): boolean {
   } catch { return false; }
 }
 export function normalizePost(value: unknown, documentId?: string, mode: 'cloud' | 'demo' = 'cloud'): CommunityPost | null {
+  value = dates(value);
   if (!object(value) || !documentIdentity(value, documentId) || !id(value.authorId) || !text(value.authorName, 1, 100)
     || !enumValue(value.kind, ['reel', 'photo', 'achievement'] as const) || !text(value.text, 1, 2000)
     || !text(value.title, 0, 100) || !text(value.mediaUrl, 0, 2000) || !text(value.mediaPath, 0, 400)
@@ -135,11 +171,13 @@ export function normalizePost(value: unknown, documentId?: string, mode: 'cloud'
     title: value.title, mediaUrl: value.mediaUrl, mediaPath: value.mediaPath, createdAt: value.createdAt, eventId: value.eventId };
 }
 export function normalizeLike(value: unknown, documentId?: string): LikeRecord | null {
+  value = dates(value);
   if (!object(value) || !id(value.postId) || !id(value.userId) || !date(value.createdAt)
     || documentId !== undefined && documentId !== `${value.postId}_${value.userId}`) return null;
   return { postId: value.postId, userId: value.userId, createdAt: value.createdAt };
 }
 export function normalizeComment(value: unknown, documentId?: string): PostComment | null {
+  value = dates(value);
   if (!object(value) || !documentIdentity(value, documentId) || !id(value.authorId) || !text(value.authorName, 1, 100)
     || !text(value.text, 1, 1000) || !date(value.createdAt)) return null;
   return { id: value.id, authorId: value.authorId, authorName: value.authorName, text: value.text, createdAt: value.createdAt };
@@ -149,6 +187,7 @@ export function normalizeCommentRecord(value: unknown, documentId?: string): Com
   return comment && object(value) && id(value.postId) ? { ...comment, postId: value.postId } : null;
 }
 export function normalizeVerification(value: unknown, documentId?: string): VerificationRequest | null {
+  value = dates(value);
   if (!object(value) || !documentIdentity(value, documentId) || value.userId !== value.id || !text(value.name, 1, 100)
     || !text(value.organization, 1, 100) || !text(value.evidence, 1, 2000)
     || !enumValue(value.status, ['pending', 'approved', 'rejected'] as const) || !date(value.createdAt)
@@ -157,9 +196,27 @@ export function normalizeVerification(value: unknown, documentId?: string): Veri
     status: value.status, createdAt: value.createdAt, reviewedAt: value.reviewedAt as string };
 }
 export function normalizeReport(value: unknown, documentId?: string): ContentReport | null {
+  value = dates(value);
   if (!object(value) || !documentIdentity(value, documentId) || !id(value.reporterId) || !id(value.postId)
     || !text(value.reason, 1, 1000) || !enumValue(value.status, ['open', 'resolved'] as const) || !date(value.createdAt)) return null;
-  return { id: value.id, reporterId: value.reporterId, postId: value.postId, reason: value.reason, status: value.status, createdAt: value.createdAt };
+  return { id: value.id, reporterId: value.reporterId, postId: value.postId, reason: value.reason, status: value.status, createdAt: value.createdAt, ...(id(value.commentId) ? { commentId: value.commentId } : {}) };
+}
+
+export function normalizeRuntime(value: unknown): RuntimeConfig {
+  const data = dates(value);
+  return object(data) && enumValue(data.serviceStatus, ['setup', 'open', 'paused'] as const) && typeof data.mediaUploadsEnabled === 'boolean' && text(data.contactEmail, 0, 200) && date(data.updatedAt)
+    ? { serviceStatus: data.serviceStatus, mediaUploadsEnabled: data.mediaUploadsEnabled, contactEmail: data.contactEmail, updatedAt: data.updatedAt }
+    : { serviceStatus: 'setup', mediaUploadsEnabled: false, contactEmail: '', updatedAt: '' };
+}
+export function normalizeNotice(value: unknown, documentId?: string): EventNotice | null {
+  const data = dates(value);
+  if (!object(data) || !documentIdentity(data, documentId) || !id(data.eventId) || !id(data.recipientId) || !integer(data.revision, 1, Number.MAX_SAFE_INTEGER) || !text(data.title, 1, 100) || !text(data.summary, 1, 500) || !date(data.createdAt) || !(data.readAt === '' || date(data.readAt))) return null;
+  return { id: data.id, eventId: data.eventId, recipientId: data.recipientId, revision: data.revision, title: data.title, summary: data.summary, createdAt: data.createdAt, readAt: data.readAt, ...(data.kind === 'place' ? { kind: 'place' as const } : {}), ...(id(data.deliveryId) ? { deliveryId: data.deliveryId } : {}) };
+}
+export function normalizeRightsRequest(value: unknown, documentId?: string): RightsRequest | null {
+  const data = dates(value);
+  if (!object(data) || !documentIdentity(data, documentId) || !id(data.userId) || !enumValue(data.kind, ['export', 'delete'] as const) || !enumValue(data.status, ['pending', 'processing', 'completed', 'rejected'] as const) || !date(data.createdAt) || !(data.reviewedAt === '' || date(data.reviewedAt))) return null;
+  return { id: data.id, userId: data.userId, kind: data.kind, status: data.status, createdAt: data.createdAt, reviewedAt: data.reviewedAt };
 }
 
 export function normalizeDemoData(value: unknown): DemoData {
@@ -178,7 +235,7 @@ export function normalizeDemoData(value: unknown): DemoData {
   const follows = new Map(list(data.follows, normalizeFollow).filter(item => profiles.has(item.followerId)).map(item => [item.id, item]));
   return { version: 1, profile, profiles: [...profiles.values()], follows: [...follows.values()], events: list(data.events, normalizeEvent),
     posts: list(data.posts, value => normalizePost(value, undefined, 'demo')), likes, comments,
-    verifications: list(data.verifications, normalizeVerification), reports: list(data.reports, normalizeReport) };
+    verifications: list(data.verifications, normalizeVerification), reports: list(data.reports, normalizeReport), blocked: object(data.blocked) ? Object.fromEntries(Object.entries(data.blocked).filter(([uid, values]) => id(uid) && Array.isArray(values)).map(([uid, values]) => [uid, (values as unknown[]).filter(id)])) : {}, notices: list(data.notices, normalizeNotice), rightsRequests: list(data.rightsRequests, normalizeRightsRequest) };
 }
 
 export function normalizeHiddenPostIds(value: unknown): string[] {

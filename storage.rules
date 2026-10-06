@@ -8,20 +8,10 @@ service firebase.storage {
       // Published media is public. Download-token URLs also remain public to their holders.
       allow get: if true;
       allow list: if false;
-      // This app uses named Firestore: do not validate a different (default) profile here.
-      // Publication requires accepted terms and adult confirmation in Firestore.
-      // Server upload quotas and file inspection are launch gates.
-      allow create: if owner(uid) && resource == null && fileName.size() <= 128 && request.resource.size > 0 && (
-        request.resource.size <= 10 * 1024 * 1024 && (
-          request.resource.contentType == 'image/jpeg' && fileName.matches('[a-zA-Z0-9_-]+[.]jpg')
-          || request.resource.contentType == 'image/png' && fileName.matches('[a-zA-Z0-9_-]+[.]png')
-          || request.resource.contentType == 'image/webp' && fileName.matches('[a-zA-Z0-9_-]+[.]webp')
-        )
-        || request.resource.size <= 50 * 1024 * 1024 && (
-          request.resource.contentType == 'video/mp4' && fileName.matches('[a-zA-Z0-9_-]+[.]mp4')
-          || request.resource.contentType == 'video/webm' && fileName.matches('[a-zA-Z0-9_-]+[.]webm')
-        )
-      );
+      // Uploads are closed on the server while sponsorship is pending.
+      // Named Firestore cannot be consulted by Storage rules: a client feature
+      // flag cannot authorize consent, quotas or inspected uploads safely.
+      allow create: if false;
       allow update: if false;
       allow delete: if owner(uid) || admin();
     }

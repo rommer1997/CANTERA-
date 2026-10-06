@@ -13,7 +13,7 @@ const requireFunctions = createRequire(resolve(__dirname, '../functions/package.
   const apply = args.includes('--apply');
   const { initializeApp, applicationDefault } = requireFunctions('firebase-admin/app');
   const { getFirestore, FieldPath } = requireFunctions('firebase-admin/firestore');
-  const { normalizeProfile, normalizePublicProfile } = await import('../src/community/normalization.ts');
+  const { normalizeProfile, normalizePublicProfile, profileSearchTokens } = await import('../src/community/normalization.ts');
   const { TERMS_VERSION } = await import('../src/community/policy.ts');
   const config = JSON.parse(readFileSync(resolve(__dirname, '../firebase-applet-config.json'), 'utf8'));
   if (!config.projectId || !config.firestoreDatabaseId) throw new Error('Falta la base nombrada de Cantera.');
@@ -36,13 +36,14 @@ const requireFunctions = createRequire(resolve(__dirname, '../functions/package.
         const profile = current.exists ? normalizeProfile(current.data(), current.id) : null;
         if (!profile) return 'invalid';
         if (!profile.adultConfirmed || profile.acceptedTermsVersion !== TERMS_VERSION) return 'incomplete';
-        const projection = normalizePublicProfile(profile, current.id);
+        const publicProfile = normalizePublicProfile(profile, current.id);
+        const projection = publicProfile ? { ...publicProfile, createdAt: current.data().createdAt, searchTokens: profileSearchTokens(profile) } : null;
         if (!projection) return 'invalid';
         const publicRef = target.doc(current.id);
         const existing = await transaction.get(publicRef);
         const fields = existing.exists ? existing.data() : null;
         const same = fields && Object.keys(fields).length === Object.keys(projection).length
-          && Object.entries(projection).every(([key, value]) => fields[key] === value);
+          && Object.entries(projection).every(([key, value]) => (key === 'searchTokens' ? JSON.stringify(fields[key]) === JSON.stringify(value) : key === 'createdAt' && typeof value?.isEqual === 'function' ? value.isEqual(fields[key]) : fields[key] === value));
         if (same) return 'unchanged';
         // Replace, never merge: legacy private fields must not survive in the projection.
         if (apply) transaction.set(publicRef, projection);

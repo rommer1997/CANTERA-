@@ -267,3 +267,62 @@
 }
 @media (max-width: 350px) { .cf-follow-button { width: 44px; padding: 6px; justify-content: center; } .cf-follow-button span { display: none; } }
 @media (prefers-reduced-motion: reduce) { .cf-spin { animation: none; } .cf-stream--reels { scroll-behavior: auto; } }
+/* Social reading controls and dedicated publication dialog. */
+.cf-compose-trigger { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.cf-compose-trigger svg { flex-shrink: 0; }
+.cf-page .cf-composer { background: transparent; border: 0; padding: 6px 0; }
+.cf-join-composer { min-height: 44px; }
+.cf-join-composer a { display: flex; align-items: center; gap: 8px; min-height: 44px; font-size: 14px; font-weight: 600; }
+.cf-dialog .cf-compose-form { border: 0; margin: 0; padding: 0; gap: 16px; }
+.cf-dialog .cf-kind-picker button { min-height: 44px; font-size: 14px; }
+.cf-dialog .cf-media-notice { margin: 0; font-size: 14px; line-height: 1.5; color: var(--c-muted, #737373); }
+.cf-dialog .cf-field { font-size: 14px; }
+.cf-dialog .cf-upload-label { min-height: 130px; margin: 0; }
+.cf-dialog .cf-upload-label span { font-size: 14px; }
+.cf-dialog .cf-compose-footer p { font-size: 14px; max-width: 230px; }
+.cf-post-meta, .cf-comment-list time { font-size: 14px; }
+.cf-author-name strong { font-size: 14px; }
+.cf-comment-body { min-width: 0; flex: 1; }
+.cf-comment-row > .cf-post-menu { flex-shrink: 0; }
+.cf-comment-list .cf-author-name strong, .cf-page .cf-comment-list p { font-size: 14px; }
+.cf-comment-list { overflow: visible; max-height: none; }
+.cf-comments > .c-button { margin-bottom: 12px; }
+.cf-post-actions button, .cf-post-actions a { min-height: 44px; min-width: 44px; font-size: 14px; }
+.cf-post-actions .cf-share-action { min-width: 44px; }
+.cf-icon-button, .cf-follow-button { min-width: 44px; min-height: 44px; }
+.cf-menu-options button, .cf-menu-options a { min-height: 44px; font-size: 14px; }
+.cf-search-toggle { display: none; }
+.cf-feed-pagination { display: grid; justify-items: center; gap: 12px; margin: 22px 0; }
+.cf-feed-pagination p { font-size: 14px; color: var(--c-muted, #737373); margin: 0; }
+.cf-stream--reels { scroll-snap-type: y mandatory; }
+.cf-stream--reels .cf-media video { min-height: 250px; max-height: min(680px, calc(100dvh - 300px)); }
+@media (max-width: 700px) {
+  .cf-page { padding-top: 4px; }
+  .cf-page .cf-page-head { height: 0; margin: 0; }
+  .cf-page-head h1 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .cf-page-head .cf-publish-action { display: none; }
+  .cf-page .cf-composer { padding: 4px 0; border-radius: 0; }
+  .cf-composer-top { min-height: 44px; }
+  .cf-compose-trigger { font-size: 14px; min-height: 44px; }
+  .cf-join-composer { display: flex; gap: 9px; }
+  .cf-feed-controls { margin: 0 0 8px; }
+  .cf-source-tabs { margin: 0; }
+  .cf-source-tabs button { min-height: 44px; }
+  .cf-source-tabs .cf-search-toggle { display: inline-flex; width: 44px; max-width: 44px; align-items: center; justify-content: center; border: 0; color: var(--c-ink, #171717); }
+  .cf-feed-search { display: none; margin: 8px 0 4px; }
+  .cf-feed-search.is-open { display: flex; }
+  .cf-filters button { font-size: 14px; min-height: 44px; padding: 6px 1px; gap: 4px; }
+  .cf-filters button svg { display: none; }
+  .cf-post-meta { font-size: 14px; }
+  .cf-author-name strong { font-size: 14px; }
+  .cf-follow-button { font-size: 12px; }
+  .cf-comment-list .cf-author-name strong, .cf-page .cf-comment-list p, .cf-comment-list time { font-size: 14px; }
+  .cf-stream--reels { max-height: calc(100dvh - 158px - env(safe-area-inset-bottom)); padding: 3px; }
+  .cf-stream--reels .cf-media video { min-height: 220px; max-height: max(220px, calc(100dvh - 290px - env(safe-area-inset-bottom))); }
+}
+@media (max-width: 700px) {
+  .cf-page { padding-top: 0; }
+  .cf-page .cf-composer { padding: 0; }
+  .cf-stream--reels { max-height: calc(100dvh - 320px - env(safe-area-inset-bottom)); }
+  .cf-stream--reels .cf-media video { max-height: max(220px, calc(100dvh - 480px - env(safe-area-inset-bottom))); }
+}

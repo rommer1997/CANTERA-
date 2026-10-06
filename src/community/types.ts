@@ -23,6 +23,16 @@ export interface FollowRecord {
   followingId: string;
   createdAt: string;
 }
+export type Rsvp = 'yes' | 'no' | 'maybe';
+export interface EventChange { revision: number; changedAt: string; summary: string; }
+export interface MatchResult { homeName: string; awayName: string; homeScore: number; awayScore: number; }
+export interface FixtureSchedule { startAt: string; timeZone: string; venue: string; }
+export interface AccountModeration { status: 'active' | 'suspended'; reason: string; updatedAt: string; }
+export interface RuntimeConfig { serviceStatus: 'setup' | 'open' | 'paused'; mediaUploadsEnabled: boolean; contactEmail: string; updatedAt: string; }
+export interface EventNotice { id: string; eventId: string; recipientId: string; revision: number; title: string; summary: string; createdAt: string; readAt: string; kind?: 'change' | 'place'; deliveryId?: string; }
+export interface RightsRequest { id: string; userId: string; kind: 'export' | 'delete'; status: 'pending' | 'processing' | 'completed' | 'rejected'; createdAt: string; reviewedAt: string; }
+export interface PostInteractionState { loading: boolean; error: string; hasMoreComments: boolean; likesCount: number; commentsCount: number; }
+export type PeopleSearchField = 'name' | 'city' | 'country';
 export interface Fixture {
   id: string;
   round: number;
@@ -30,6 +40,9 @@ export interface Fixture {
   awayId: string;
   homeScore: number | null;
   awayScore: number | null;
+  startAt?: string;
+  timeZone?: string;
+  venue?: string;
 }
 export interface PlayEvent {
   id: string;
@@ -48,13 +61,23 @@ export interface PlayEvent {
   capacity: number;
   entry: 'players' | 'teams';
   description: string;
-  status: 'open' | 'closed' | 'cancelled';
+  status: 'open' | 'closed' | 'cancelled' | 'completed';
   tournamentFormat: 'league' | 'knockout';
   participants: Record<string, string>;
   fixtures: Fixture[];
+  fixtureIds?: string[];
   createdAt: string;
+  revision?: number;
+  updatedAt?: string;
+  history?: EventChange[];
+  rsvps?: Record<string, Rsvp>;
+  waitlist?: Record<string, { name: string; joinedAt: string }>;
+  waitlistOrder?: string[];
+  participantIds?: string[];
+  result?: MatchResult;
+  teamId?: string;
 }
-export type EventInput = Omit<PlayEvent, 'id' | 'ownerId' | 'ownerName' | 'status' | 'participants' | 'fixtures' | 'createdAt'>;
+export type EventInput = Omit<PlayEvent, 'id' | 'ownerId' | 'ownerName' | 'status' | 'participants' | 'fixtures' | 'createdAt' | 'revision' | 'updatedAt' | 'history' | 'rsvps' | 'waitlist' | 'waitlistOrder' | 'participantIds' | 'result' | 'fixtureIds'>;
 export interface CommunityPost {
   id: string;
   authorId: string;
@@ -106,6 +129,7 @@ export interface ContentReport {
   id: string;
   reporterId: string;
   postId: string;
+  commentId?: string;
   reason: string;
   status: 'open' | 'resolved';
   createdAt: string;

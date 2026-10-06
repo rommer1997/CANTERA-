@@ -1,0 +1,12 @@
+import React, { useEffect, useState } from 'react';
+import { Download, RefreshCw, WifiOff } from 'lucide-react';
+interface InstallPrompt extends Event { prompt(): Promise<void>; userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>; }
+export function AppAvailability() {
+ const [offline, setOffline] = useState(!navigator.onLine); const [registration, setRegistration] = useState<ServiceWorkerRegistration | null>(null); const [install, setInstall] = useState<InstallPrompt | null>(null);
+ useEffect(() => { const network = () => setOffline(!navigator.onLine); const prompt = (event: Event) => { event.preventDefault(); setInstall(event as InstallPrompt); }; const installed = () => setInstall(null); window.addEventListener('online', network); window.addEventListener('offline', network); window.addEventListener('beforeinstallprompt', prompt); window.addEventListener('appinstalled', installed);
+  let active = true;
+  if (import.meta.env.PROD && 'serviceWorker' in navigator) { void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).then(reg => { if (!active) return; const waiting = () => { if (active && reg.waiting && navigator.serviceWorker.controller) setRegistration(reg); }; waiting(); reg.addEventListener('updatefound', () => { const worker = reg.installing; worker?.addEventListener('statechange', waiting); }); }).catch(() => { /* Installation is optional; normal browsing remains available. */ }); }
+  return () => { active = false; window.removeEventListener('online', network); window.removeEventListener('offline', network); window.removeEventListener('beforeinstallprompt', prompt); window.removeEventListener('appinstalled', installed); };
+ }, []);
+ return <>{offline ? <div className="c-service-status" role="status"><WifiOff size={17} /> Sin conexión. Los cambios en la comunidad requieren volver a conectarte.</div> : null}{registration ? <div className="c-service-status" role="status">Hay una nueva versión de Cantera. <button className="c-button secondary" onClick={() => { navigator.serviceWorker.addEventListener('controllerchange', () => location.reload(), { once: true }); registration.waiting?.postMessage({ type: 'ACTIVATE_UPDATE' }); }}><RefreshCw size={16} />Actualizar app</button></div> : null}{install ? <div className="c-install-bar"><span>Tu fútbol, a un toque.</span><button className="c-button secondary" onClick={() => { void install.prompt().then(() => install.userChoice).then(() => setInstall(null)); }}><Download size={16} />Instalar Cantera</button></div> : null}</>;
+}

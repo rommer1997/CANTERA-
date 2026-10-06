@@ -1,20 +1,35 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { onAuthStateChanged, type User } from 'firebase/auth';
-import { collection, deleteDoc, doc, getDoc, getDocs, limit, onSnapshot, orderBy, query, runTransaction, setDoc, startAfter, updateDoc, where, writeBatch, type DocumentData, type QueryDocumentSnapshot } from 'firebase/firestore';
+import { collection, deleteDoc, getCountFromServer, serverTimestamp, doc, getDoc, getDocs, limit, onSnapshot, orderBy, query, runTransaction, setDoc, startAfter, updateDoc, where, writeBatch, type DocumentData, type QueryDocumentSnapshot } from 'firebase/firestore';
 import { deleteObject, getDownloadURL, ref, uploadBytesResumable } from 'firebase/storage';
 import { auth, db, logout, signInWithGoogle, storage } from '../firebase';
 import { useAppStore } from '../store/useAppStore';
 import { deleteLocalMedia, getLocalMedia, readDemo, saveLocalMedia, writeDemo, type DemoData } from './local';
+import { legalReady, operator } from './legal';
+import { normalizeFixtureRecord, fixtureFields, sameFixture } from './fixtureRecords';
+import { commitDeliveryBatches } from './deliveryBatches';
 import { TERMS_VERSION } from './policy';
 export { TERMS_VERSION } from './policy';
-import { joinParticipants, makeFixtures, recordScore, requireText, validateEvent } from './logic';
-import { normalizeCommentRecord, normalizeDemoData, normalizeEvent, normalizeFollow, normalizeHiddenPostIds, normalizeLike, normalizePost, normalizeProfile, normalizePublicProfile, normalizeReport, normalizeVerification } from './normalization';
-import type { CommunityPost, CommunityProfile, ContentReport, EventInput, PlayEvent, PostComment, PostInput, PublicProfile, VerificationRequest } from './types';
+import { joinParticipants, makeFixtures, recordScore, requireText, validateEvent, validateEventEdit, validateFixtureSchedule, validateMatchResult } from './logic';
+import { normalizeCommentRecord, normalizeDemoData, normalizeEvent, normalizeFollow, normalizeHiddenPostIds, normalizeLike, normalizePost, normalizeProfile, normalizePublicProfile, normalizeReport, normalizeVerification, normalizeNotice, normalizeRightsRequest, normalizeRuntime, profileSearchTokens, searchText } from './normalization';
+import type { CommunityPost, CommunityProfile, ContentReport, EventInput, PlayEvent, PostComment, PostInput, PublicProfile, VerificationRequest, RuntimeConfig, AccountModeration, EventNotice, RightsRequest, FixtureSchedule, MatchResult, Rsvp, EventChange, Fixture, PeopleSearchField, PostInteractionState } from './types';
 
 type Mode = 'demo' | 'cloud';
 interface CommunityAPI {
   profile: CommunityProfile | null; mode: Mode; loading: boolean; error: string; isAdmin: boolean;
-  demoEnabled: boolean; mediaUploadsEnabled: boolean;
+  demoEnabled: boolean; mediaUploadsEnabled: boolean; runtimeConfig: RuntimeConfig; accountModeration: AccountModeration | null;
+  ownEvents: PlayEvent[]; ownEventsHasMore: boolean; ownEventsLoading: boolean; loadMoreOwnEvents(): Promise<void>; eventsHasMore: boolean; postsHasMore: boolean; eventsLoading: boolean; postsLoading: boolean;
+  loadMoreEvents(reset?: boolean): Promise<void>; loadMorePosts(reset?: boolean): Promise<void>;
+  adminRightsRequests: RightsRequest[]; adminQueueHasMore: Record<'verification' | 'reports' | 'rights', boolean>; adminQueueLoading: Record<'verification' | 'reports' | 'rights', boolean>; loadMoreAdminQueue(kind: 'verification' | 'reports' | 'rights'): Promise<void>;
+  suspendAccount(userId: string, reason: string, suspend?: boolean): Promise<void>; reviewRightsRequest(id: string, status: 'processing' | 'completed' | 'rejected'): Promise<void>; updateRuntimeStatus(status: RuntimeConfig['serviceStatus']): Promise<void>;
+  fixtureData: Record<string, Fixture[]>; fixtureStates: Record<string, 'loading' | 'ready' | 'error'>; watchFixtureData(id: string): () => void;
+  eventHistories: Record<string, EventChange[]>; watchEventHistory(id: string): () => void;
+  eventNotices: EventNotice[]; rightsRequests: RightsRequest[]; markNoticeRead(id: string): Promise<void>; requestRights(kind: 'export' | 'delete'): Promise<void>;
+  retryEventNotices(id: string): Promise<{ created: number; inspected: number; hasMore: boolean }>;
+  blockedIds: string[]; toggleBlock(id: string): Promise<void>;
+  postInteractionStates: Record<string, PostInteractionState>; watchPostInteractions(id: string): () => void; loadMoreComments(id: string): Promise<void>;
+  deleteComment(postId: string, commentId: string): Promise<void>; reportComment(postId: string, commentId: string, reason: string): Promise<void>;
+  searchPeople(value: string, field: PeopleSearchField, reset?: boolean): Promise<void>;
   events: PlayEvent[]; posts: CommunityPost[]; likes: Record<string, string[]>; comments: Record<string, PostComment[]>;
   verificationRequests: VerificationRequest[]; reports: ContentReport[]; hiddenPostIds: string[];
   profiles: PublicProfile[]; publicProfiles: Record<string, PublicProfile>;
@@ -22,10 +37,13 @@ interface CommunityAPI {
   followingIds: string[]; peopleLoading: boolean; peopleError: string; peopleHasMore: boolean;
   linkedPostStates: Record<string, 'loading' | 'ready' | 'missing' | 'error'>; watchPost(id: string): () => void;
   loadMorePeople(reset?: boolean): Promise<void>; watchPublicProfile(id: string): () => void; toggleFollow(id: string): Promise<void>;
-  login(): Promise<void>; signOut(): Promise<void>; beginDemo(name: string): Promise<void>;
+  login(): Promise<void>; loginAdmin(): Promise<void>; signOut(): Promise<void>; beginDemo(name: string): Promise<void>;
   saveProfile(input: Omit<CommunityProfile, 'id' | 'verification' | 'createdAt'>): Promise<void>;
-  createEvent(input: EventInput): Promise<string>; joinEvent(id: string, name: string): Promise<void>; leaveEvent(id: string): Promise<void>;
-  addGuest(id: string, name: string): Promise<void>; setEventStatus(id: string, status: PlayEvent['status']): Promise<void>;
+  createEvent(input: EventInput): Promise<string>; createEventSeries(inputs: EventInput[]): Promise<string[]>; joinEvent(id: string, name: string): Promise<void>; leaveEvent(id: string): Promise<void>;
+  updateEvent(id: string, input: EventInput, changeReason: string): Promise<void>; removeGuest(id: string, guestId: string): Promise<void>;
+  setRsvp(id: string, response: Rsvp): Promise<void>; joinWaitlist(id: string, name: string): Promise<void>; leaveWaitlist(id: string): Promise<void>;
+  saveMatchResult(id: string, result: MatchResult): Promise<void>; scheduleFixture(id: string, fixtureId: string, schedule: FixtureSchedule): Promise<void>;
+  addGuest(id: string, name: string): Promise<void>; setEventStatus(id: string, status: PlayEvent['status'], reason?: string): Promise<void>;
   generateFixtures(id: string): Promise<void>; saveScore(id: string, fixture: string, home: number, away: number): Promise<void>;
   createPost(input: PostInput, progress?: (n: number) => void): Promise<string>; deletePost(id: string): Promise<void>;
   toggleLike(id: string): Promise<void>; addComment(id: string, text: string): Promise<void>;
@@ -56,6 +74,27 @@ function defaultProfile(id: string, name: string): CommunityProfile {
 export function CommunityProvider({ children }: { children: React.ReactNode }) {
   const [mode, setMode] = useState<Mode>(() => demoEnabled && localStorage.getItem('cantera-demo-active') === 'true' ? 'demo' : 'cloud');
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
+  const [runtimeConfig, setRuntimeConfig] = useState<RuntimeConfig>(normalizeRuntime(null));
+  const [accountModeration, setAccountModeration] = useState<AccountModeration | null>(null);
+  const [ownEvents, setOwnEvents] = useState<PlayEvent[]>([]);
+  const [fixtureData, setFixtureData] = useState<Record<string, Fixture[]>>({});
+  const [fixtureStates, setFixtureStates] = useState<Record<string, 'loading' | 'ready' | 'error'>>({});
+  const [eventHistories, setEventHistories] = useState<Record<string, EventChange[]>>({});
+  const [eventNotices, setEventNotices] = useState<EventNotice[]>([]);
+  const [adminRightsRequests, setAdminRightsRequests] = useState<RightsRequest[]>([]);
+  const [adminQueueHasMore, setAdminQueueHasMore] = useState({ verification: true, reports: true, rights: true });
+  const [adminQueueLoading, setAdminQueueLoading] = useState({ verification: false, reports: false, rights: false });
+  const adminCursors = useRef<Record<'verification' | 'reports' | 'rights', QueryDocumentSnapshot<DocumentData> | null>>({ verification: null, reports: null, rights: null });
+  const deliveryCursors = useRef(new Map<string, { stage: 'changes' | 'promotions' | 'done'; cursor: QueryDocumentSnapshot<DocumentData> | null; candidates: Array<{ id: string; value: DocumentData }>; busy: boolean }>());
+  const [rightsRequests, setRightsRequests] = useState<RightsRequest[]>([]);
+  const [blockedIds, setBlockedIds] = useState<string[]>([]);
+  const [postInteractionStates, setPostInteractionStates] = useState<Record<string, PostInteractionState>>({});
+  const interactions = useRef(new Map<string, { count: number; stop: () => void; cursor: QueryDocumentSnapshot<DocumentData> | null; offset: number; busy: boolean }>());
+  const [pages, setPages] = useState({ eventsHasMore: true, postsHasMore: true, eventsLoading: false, postsLoading: false });
+  const pageCursors = useRef<Record<'events' | 'posts', { cursor: QueryDocumentSnapshot<DocumentData> | null; offset: number; busy: boolean }>>({ events: { cursor: null, offset: 0, busy: false }, posts: { cursor: null, offset: 0, busy: false } });
+  const [olderEvents, setOlderEvents] = useState<PlayEvent[]>([]);
+  const [olderPosts, setOlderPosts] = useState<CommunityPost[]>([]);
+  const peopleSearch = useRef<{ value: string; field: PeopleSearchField }>({ value: '', field: 'name' });
   const [profile, setProfile] = useState<CommunityProfile | null>(null);
   const [events, setEvents] = useState<PlayEvent[]>([]);
   const [posts, setPosts] = useState<CommunityPost[]>([]);
@@ -79,10 +118,18 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
   const profileWatches = useRef(new Map<string, { count: number; stop: () => void }>());
   const urls = useRef(new Map<string, string>());
   const setLegacyUser = useAppStore(s => s.setUser);
+  const serviceOpen = mode === 'demo' || import.meta.env.VITE_SERVICE_OPEN === 'true' && legalReady && runtimeConfig.serviceStatus === 'open';
+  const serviceOpenRef = useRef(serviceOpen); serviceOpenRef.current = serviceOpen;
+  const ownSources = useRef<{ owner: PlayEvent[]; joined: PlayEvent[]; waiting: PlayEvent[] }>({ owner: [], joined: [], waiting: [] });
   const readFailure = useCallback((err: unknown) => { setError(friendlyError(err)); setLoading(false); }, []);
 
+  useEffect(() => {
+    setAccountModeration(null); if (mode !== 'cloud' || !firebaseUser) return;
+    return onSnapshot(doc(db, 'communityAccountModeration', firebaseUser.uid), snapshot => { const data = snapshot.data(); const at = data?.updatedAt?.toDate?.(); setAccountModeration(data && ['active', 'suspended'].includes(data.status) && typeof data.reason === 'string' && at instanceof Date ? { status: data.status, reason: data.reason, updatedAt: at.toISOString() } : null); }, readFailure);
+  }, [mode, firebaseUser?.uid, readFailure]);
+
   const watchPublicProfile = useCallback((id: string) => {
-    if (!validProfileId(id)) return () => {};
+    if (!validProfileId(id) || mode === 'cloud' && !serviceOpen) return () => {};
     const key = `${mode}:${id}`;
     const current = profileWatches.current.get(key);
     if (current) current.count += 1;
@@ -96,7 +143,7 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
       };
       let unsubscribe: () => void;
       if (mode === 'demo') {
-        const refresh = () => { const record = normalizeDemoData(readDemo()).profiles.find(item => item.id === id); receive(record?.adultConfirmed && record.acceptedTermsVersion === TERMS_VERSION ? normalizePublicProfile(record, id) : null); };
+        const refresh = () => { const record = normalizeDemoData(readDemo()).profiles.find(item => item.id === id); receive(record?.adultConfirmed && record.acceptedTermsVersion === TERMS_VERSION && record.city.trim() && record.country.trim() ? normalizePublicProfile(record, id) : null); };
         refresh(); window.addEventListener('storage', refresh); window.addEventListener('cantera-demo-updated', refresh);
         unsubscribe = () => { window.removeEventListener('storage', refresh); window.removeEventListener('cantera-demo-updated', refresh); };
       } else unsubscribe = onSnapshot(doc(db, 'communityPublicProfiles', id), snapshot => receive(snapshot.exists() ? normalizePublicProfile(snapshot.data(), snapshot.id) : null), () => receive(null, true));
@@ -104,11 +151,11 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
     }
     let released = false;
     return () => { if (released) return; released = true; const entry = profileWatches.current.get(key); if (!entry) return; entry.count -= 1; if (!entry.count) { entry.stop(); profileWatches.current.delete(key); } };
-  }, [mode]);
+  }, [mode, serviceOpen]);
   useEffect(() => () => { profileWatches.current.forEach(entry => entry.stop()); profileWatches.current.clear(); }, []);
 
   const watchPost = useCallback((id: string) => {
-    if (!validProfileId(id)) return () => {};
+    if (!validProfileId(id) || mode === 'cloud' && !serviceOpen) return () => {};
     const key = `${mode}:${id}`; const existing = postWatches.current.get(key);
     if (existing) existing.count += 1;
     else {
@@ -143,10 +190,11 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
       setLinkedPosts(previous => { const next = { ...previous[mode] }; delete next[id]; return { ...previous, [mode]: next }; });
       setLinkedStates(previous => { const next = { ...previous[mode] }; delete next[id]; return { ...previous, [mode]: next }; });
     } };
-  }, [mode]);
+  }, [mode, serviceOpen]);
   useEffect(() => () => { postWatches.current.forEach(entry => entry.stop()); postWatches.current.clear(); }, []);
 
   const loadMorePeople = useCallback(async (reset = false) => {
+    if (mode === 'cloud' && !serviceOpen) { setPeoplePage({ mode, profiles: [], loading: false, error: '', hasMore: false }); return; }
     if (reset || peopleCursor.current.mode !== mode) peopleCursor.current = { mode, cursor: null, offset: 0, sequence: peopleCursor.current.sequence + 1, busy: false };
     const paging = peopleCursor.current;
     if (paging.busy) return;
@@ -155,11 +203,13 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
     try {
       let records: PublicProfile[]; let hasMore: boolean;
       if (mode === 'demo') {
-        const all = normalizeDemoData(readDemo()).profiles.filter(item => item.adultConfirmed && item.acceptedTermsVersion === TERMS_VERSION).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+        const search = peopleSearch.current;
+        const all = normalizeDemoData(readDemo()).profiles.filter(item => !search.value || profileSearchTokens(item).includes(`${search.field}:${search.value}`)).filter(item => item.adultConfirmed && item.acceptedTermsVersion === TERMS_VERSION && item.city.trim() && item.country.trim()).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
         const batch = all.slice(paging.offset, paging.offset + peoplePageSize); paging.offset += batch.length;
         records = batch.map(item => normalizePublicProfile(item)!).filter(Boolean); hasMore = paging.offset < all.length;
       } else {
-        const base = [orderBy('createdAt', 'desc'), limit(peoplePageSize)];
+        const search = peopleSearch.current;
+        const base = [...(search.value ? [where('searchTokens', 'array-contains', `${search.field}:${search.value}`)] : []), orderBy('createdAt', 'desc'), limit(peoplePageSize)];
         const snapshot = await getDocs(query(collection(db, 'communityPublicProfiles'), ...base, ...(paging.cursor ? [startAfter(paging.cursor)] : [])));
         records = snapshot.docs.map(item => normalizePublicProfile(item.data(), item.id)).filter((item): item is PublicProfile => item !== null);
         paging.cursor = snapshot.docs.at(-1) || paging.cursor; hasMore = snapshot.size === peoplePageSize;
@@ -169,7 +219,9 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
       setPublicCaches(previous => ({ ...previous, [mode]: { ...previous[mode], ...Object.fromEntries(records.map(item => [item.id, item])) } }));
     } catch (err) { if (currentMode.current === mode && peopleCursor.current.sequence === sequence) setPeoplePage(previous => ({ ...previous, mode, loading: false, error: friendlyError(err) })); }
     finally { if (peopleCursor.current === paging) paging.busy = false; }
-  }, [mode]);
+  }, [mode, serviceOpen]);
+
+  const searchPeople = useCallback(async (value: string, field: PeopleSearchField, reset = true) => { peopleSearch.current = { value: searchText(value), field }; await loadMorePeople(reset); }, [loadMorePeople]);
 
   useEffect(() => {
     if (mode === 'demo') {
@@ -179,7 +231,8 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
         setPeoplePage(previous => {
           if (previous.mode !== 'demo' || !previous.profiles.length) return previous;
           const windowSize = Math.max(peoplePageSize, peopleCursor.current.offset);
-          const all = data.profiles.filter(item => item.adultConfirmed && item.acceptedTermsVersion === TERMS_VERSION).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+          const search = peopleSearch.current;
+          const all = data.profiles.filter(item => !search.value || profileSearchTokens(item).includes(`${search.field}:${search.value}`)).filter(item => item.adultConfirmed && item.acceptedTermsVersion === TERMS_VERSION && item.city.trim() && item.country.trim()).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
           const loaded = all.slice(0, windowSize).map(item => normalizePublicProfile(item)!);
           if (peopleCursor.current.mode === 'demo') peopleCursor.current.offset = loaded.length;
           return { ...previous, profiles: loaded, hasMore: all.length > windowSize };
@@ -189,11 +242,11 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
       return () => { window.removeEventListener('storage', refresh); window.removeEventListener('cantera-demo-updated', refresh); };
     }
     setFollowingIds([]);
-    if (!firebaseUser) return;
+    if (!firebaseUser || !serviceOpen) return;
     return onSnapshot(query(collection(db, 'communityFollows'), where('followerId', '==', firebaseUser.uid)), snapshot => {
       setFollowingIds(snapshot.docs.map(item => normalizeFollow(item.data(), item.id)).filter(item => item !== null).map(item => item.followingId));
     }, readFailure);
-  }, [mode, firebaseUser?.uid, readFailure]);
+  }, [mode, firebaseUser?.uid, runtimeConfig.serviceStatus, serviceOpen, readFailure]);
 
   useEffect(() => {
     let active = true;
@@ -201,18 +254,19 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
       setFirebaseUser(user);
       setAdmin(false);
       if (!user) { setLoading(false); return; }
-      setMode('cloud'); setLoading(true); setError('');
+      setMode('cloud'); setRuntimeConfig(normalizeRuntime(null)); setLoading(true); setError('');
       localStorage.removeItem('cantera-demo-active');
       try {
         const [snapshot, token] = await Promise.all([getDoc(doc(db, 'communityProfiles', user.uid)), user.getIdTokenResult()]);
         if (!active || auth.currentUser?.uid !== user.uid) return;
         setAdmin(token.claims.admin === true);
+        if (!snapshot.exists() && !serviceOpenRef.current && token.claims.admin !== true) { setProfile(null); setLoading(false); return; }
         if (!snapshot.exists()) {
           const fresh = defaultProfile(user.uid, user.displayName || 'Mi perfil');
-          await setDoc(doc(db, 'communityProfiles', user.uid), fresh);
+          await setDoc(doc(db, 'communityProfiles', user.uid), { ...fresh, createdAt: serverTimestamp() });
         } else {
           const current = normalizeProfile(snapshot.data(), snapshot.id);
-          if (current?.adultConfirmed && current.acceptedTermsVersion === TERMS_VERSION) await setDoc(doc(db, 'communityPublicProfiles', user.uid), normalizePublicProfile(current)!);
+          if (serviceOpenRef.current && current?.adultConfirmed && current.acceptedTermsVersion === TERMS_VERSION && current.city.trim() && current.country.trim()) await setDoc(doc(db, 'communityPublicProfiles', user.uid), { ...normalizePublicProfile(current)!, createdAt: snapshot.data().createdAt, searchTokens: profileSearchTokens(current) });
         }
       } catch (err) { if (active) readFailure(err); }
     });
@@ -221,7 +275,7 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let active = true;
-    setError(''); setEvents([]); setPosts([]); setLikes({}); setComments({}); setVerifications([]); setReports([]); setProfile(null);
+    setError(''); setFixtureData({}); setFixtureStates({}); setEventHistories({}); if (mode === 'cloud' && !serviceOpen) { setLinkedPosts(previous => ({ ...previous, cloud: {} })); setPublicCaches(previous => ({ ...previous, cloud: {} })); } ownSources.current = { owner: [], joined: [], waiting: [] }; setOlderEvents([]); setOlderPosts([]); setOwnEvents([]); setEventNotices([]); setRightsRequests([]); setBlockedIds([]); setPostInteractionStates({}); pageCursors.current = { events: { cursor: null, offset: 0, busy: false }, posts: { cursor: null, offset: 0, busy: false } }; setPages({ eventsHasMore: true, postsHasMore: true, eventsLoading: false, postsLoading: false }); setEvents([]); setPosts([]); setLikes({}); setComments({}); setVerifications([]); setReports([]); setProfile(null);
     setLoading(true);
     if (mode === 'demo') {
       let refreshSequence = 0;
@@ -236,7 +290,7 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
             return { ...p, mediaUrl: urls.current.get(id) || '' };
           }));
           if (!active || sequence !== refreshSequence) return;
-          setProfile(data.profile); setEvents(data.events); setPosts(hydrated); setLikes(data.likes); setComments(data.comments);
+          setProfile(data.profile); setPages({ eventsHasMore: false, postsHasMore: false, eventsLoading: false, postsLoading: false }); setOwnEvents(data.events.filter(e => e.ownerId === data.profile?.id || Object.hasOwn(e.participants, data.profile?.id || '') || Object.hasOwn(e.waitlist || {}, data.profile?.id || ''))); setBlockedIds(data.blocked[data.profile?.id || ''] || []); setEventNotices(data.notices.filter(n => n.recipientId === data.profile?.id)); setRightsRequests(data.rightsRequests.filter(r => r.userId === data.profile?.id)); setEvents(data.events); setPosts(hydrated); setLikes(data.likes); setComments(data.comments);
           setVerifications(data.verifications.filter(v => v.userId === data.profile?.id)); setReports([]); setLoading(false);
         } catch (err) { if (active && sequence === refreshSequence) readFailure(err); }
       };
@@ -244,33 +298,49 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
       window.addEventListener('storage', refresh); window.addEventListener('cantera-demo-updated', refresh);
       return () => { active = false; window.removeEventListener('storage', refresh); window.removeEventListener('cantera-demo-updated', refresh); };
     }
+    const runtimeStop = onSnapshot(doc(db, 'communityConfiguration', 'runtime'), snapshot => { if (active) setRuntimeConfig(normalizeRuntime(snapshot.exists() ? snapshot.data() : null)); }, () => { if (active) setRuntimeConfig(normalizeRuntime(null)); });
+    if (!serviceOpen) {
+      const stops = [runtimeStop];
+      if (firebaseUser) stops.push(onSnapshot(doc(db, 'communityProfiles', firebaseUser.uid), snapshot => { if (active) setProfile(snapshot.exists() ? normalizeProfile(snapshot.data(), snapshot.id) : null); }, readFailure));
+      if (firebaseUser) {
+        stops.push(onSnapshot(query(collection(db, 'communityEventNotices'), where('recipientId', '==', firebaseUser.uid), orderBy('createdAt', 'desc'), limit(100)), snapshot => { if (active) setEventNotices(snapshot.docs.map(d => normalizeNotice(d.data(), d.id)).filter((n): n is EventNotice => n !== null)); }, readFailure));
+        stops.push(onSnapshot(query(collection(db, 'communityRightsRequests'), where('userId', '==', firebaseUser.uid), orderBy('createdAt', 'desc'), limit(30)), snapshot => { if (active) setRightsRequests(snapshot.docs.map(d => normalizeRightsRequest(d.data(), d.id)).filter((r): r is RightsRequest => r !== null)); }, readFailure));
+        stops.push(onSnapshot(query(collection(db, 'communityBlocks'), where('ownerId', '==', firebaseUser.uid)), snapshot => { if (active) setBlockedIds(snapshot.docs.map(d => d.data().blockedId).filter((id): id is string => typeof id === 'string')); }, readFailure));
+        if (isAdmin) {
+          stops.push(onSnapshot(query(collection(db, 'communityVerifications'), where('status', '==', 'pending'), orderBy('createdAt', 'asc'), limit(100)), snapshot => { if (active) { adminCursors.current.verification = snapshot.docs.at(-1) || null; setAdminQueueHasMore(previous => ({ ...previous, verification: snapshot.size === 100 })); setVerifications(snapshot.docs.map(d => normalizeVerification(d.data(), d.id)).filter((v): v is VerificationRequest => v !== null)); } }, readFailure));
+          stops.push(onSnapshot(query(collection(db, 'communityReports'), where('status', '==', 'open'), orderBy('createdAt', 'asc'), limit(100)), snapshot => { if (active) { adminCursors.current.reports = snapshot.docs.at(-1) || null; setAdminQueueHasMore(previous => ({ ...previous, reports: snapshot.size === 100 })); setReports(snapshot.docs.map(d => normalizeReport(d.data(), d.id)).filter((r): r is ContentReport => r !== null)); } }, readFailure));
+          stops.push(onSnapshot(query(collection(db, 'communityRightsRequests'), where('status', 'in', ['pending', 'processing']), orderBy('createdAt', 'asc'), limit(100)), snapshot => { if (active) { adminCursors.current.rights = snapshot.docs.at(-1) || null; setAdminQueueHasMore(previous => ({ ...previous, rights: snapshot.size === 100 })); setAdminRightsRequests(snapshot.docs.map(d => normalizeRightsRequest(d.data(), d.id)).filter((r): r is RightsRequest => r !== null)); } }, readFailure));
+        }
+      }
+      setLoading(false);
+      return () => { active = false; stops.forEach(stop => stop()); };
+    }
     const listen = <T,>(name: string, normalize: (value: unknown, id: string) => T | null, receive: (items: T[]) => void, count = 100) => onSnapshot(
       query(collection(db, name), orderBy('createdAt', 'desc'), limit(count)), snapshot => {
         if (active) receive(snapshot.docs.map(d => normalize(d.data(), d.id)).filter((item): item is T => item !== null));
       }, readFailure);
     if (!firebaseUser) {
-      const stops = [listen('communityEvents', normalizeEvent, values => { setEvents(values); setLoading(false); }), listen('communityPosts', normalizePost, setPosts)];
+      const stops = [runtimeStop, listen('communityEvents', normalizeEvent, values => { setEvents(values); setPages(previous => ({ ...previous, eventsHasMore: values.length === 100 })); setLoading(false); }), listen('communityPosts', normalizePost, values => { setPosts(values); setPages(previous => ({ ...previous, postsHasMore: values.length === 100 })); })];
       return () => { active = false; stops.forEach(stop => stop()); };
     }
-    const stops = [
+    const stops = [runtimeStop,
       onSnapshot(doc(db, 'communityProfiles', firebaseUser.uid), snapshot => {
         if (!active) return;
         const current = snapshot.exists() ? normalizeProfile(snapshot.data(), snapshot.id) : null;
         setProfile(current);
         if (snapshot.exists() && !current) readFailure(new Error('Tu perfil contiene datos no válidos y necesita revisión.'));
       }, readFailure),
-      listen('communityEvents', normalizeEvent, values => { setEvents(values); setLoading(false); }),
-      listen('communityPosts', normalizePost, setPosts),
-      listen('communityLikes', normalizeLike, values => {
-        const grouped: Record<string, string[]> = Object.create(null); for (const v of values) (grouped[v.postId] ||= []).push(v.userId); setLikes(grouped);
-      }, 1000),
-      listen('communityComments', normalizeCommentRecord, values => {
-        const grouped: Record<string, PostComment[]> = Object.create(null); for (const v of [...values].reverse()) (grouped[v.postId] ||= []).push(v); setComments(grouped);
-      }, 1000)
+      listen('communityEvents', normalizeEvent, values => { setEvents(values); setPages(previous => ({ ...previous, eventsHasMore: values.length === 100 })); setLoading(false); }),
+      listen('communityPosts', normalizePost, values => { setPosts(values); setPages(previous => ({ ...previous, postsHasMore: values.length === 100 })); }),
+      ...(['owner', 'joined', 'waiting'] as const).map(source => onSnapshot(query(collection(db, 'communityEvents'), source === 'owner' ? where('ownerId', '==', firebaseUser.uid) : where(source === 'joined' ? 'participantIds' : 'waitlistOrder', 'array-contains', firebaseUser.uid)), snapshot => { if (active) { ownSources.current[source] = snapshot.docs.map(d => normalizeEvent(d.data(), d.id)).filter((e): e is PlayEvent => e !== null); setOwnEvents([...new Map(Object.values(ownSources.current).flat().map(e => [e.id, e])).values()]); } }, readFailure)),
+      onSnapshot(query(collection(db, 'communityBlocks'), where('ownerId', '==', firebaseUser.uid)), snapshot => { if (active) setBlockedIds(snapshot.docs.map(d => d.data().blockedId).filter((id): id is string => typeof id === 'string')); }, readFailure),
+      onSnapshot(query(collection(db, 'communityEventNotices'), where('recipientId', '==', firebaseUser.uid), orderBy('createdAt', 'desc'), limit(100)), snapshot => { if (active) setEventNotices(snapshot.docs.map(d => normalizeNotice(d.data(), d.id)).filter((n): n is EventNotice => n !== null)); }, readFailure),
+      onSnapshot(query(collection(db, 'communityRightsRequests'), where('userId', '==', firebaseUser.uid), orderBy('createdAt', 'desc'), limit(30)), snapshot => { if (active) setRightsRequests(snapshot.docs.map(d => normalizeRightsRequest(d.data(), d.id)).filter((n): n is RightsRequest => n !== null)); }, readFailure)
     ];
     if (isAdmin) {
-      stops.push(listen('communityVerifications', normalizeVerification, setVerifications));
-      stops.push(listen('communityReports', normalizeReport, setReports));
+      stops.push(onSnapshot(query(collection(db, 'communityVerifications'), where('status', '==', 'pending'), orderBy('createdAt', 'asc'), limit(100)), snapshot => { if (active) { adminCursors.current.verification = snapshot.docs.at(-1) || null; setAdminQueueHasMore(previous => ({ ...previous, verification: snapshot.size === 100 })); setVerifications(snapshot.docs.map(d => normalizeVerification(d.data(), d.id)).filter((v): v is VerificationRequest => v !== null)); }; }, readFailure));
+      stops.push(onSnapshot(query(collection(db, 'communityReports'), where('status', '==', 'open'), orderBy('createdAt', 'asc'), limit(100)), snapshot => { if (active) { adminCursors.current.reports = snapshot.docs.at(-1) || null; setAdminQueueHasMore(previous => ({ ...previous, reports: snapshot.size === 100 })); setReports(snapshot.docs.map(d => normalizeReport(d.data(), d.id)).filter((v): v is ContentReport => v !== null)); }; }, readFailure));
+      stops.push(onSnapshot(query(collection(db, 'communityRightsRequests'), where('status', 'in', ['pending', 'processing']), orderBy('createdAt', 'asc'), limit(100)), snapshot => { if (active) { adminCursors.current.rights = snapshot.docs.at(-1) || null; setAdminQueueHasMore(previous => ({ ...previous, rights: snapshot.size === 100 })); setAdminRightsRequests(snapshot.docs.map(d => normalizeRightsRequest(d.data(), d.id)).filter((r): r is RightsRequest => r !== null)); } }, readFailure));
     } else {
       stops.push(onSnapshot(doc(db, 'communityVerifications', firebaseUser.uid), snapshot => {
         if (!active) return;
@@ -279,7 +349,7 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
       }, readFailure));
     }
     return () => { active = false; stops.forEach(stop => stop()); };
-  }, [mode, firebaseUser?.uid, isAdmin, readFailure]);
+  }, [mode, firebaseUser?.uid, isAdmin, runtimeConfig.serviceStatus, serviceOpen, readFailure]);
 
   useEffect(() => {
     try { setHidden(normalizeHiddenPostIds(JSON.parse(localStorage.getItem(`cantera-hidden-${profile?.id || 'visitor'}`) || '[]'))); } catch { setHidden([]); }
@@ -288,33 +358,280 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
   }, [profile, mode, firebaseUser?.email, setLegacyUser]);
   useEffect(() => () => { urls.current.forEach(url => URL.revokeObjectURL(url)); urls.current.clear(); }, []);
 
-  const availablePosts = [...new Map([...Object.values(linkedPosts[mode]), ...posts].map(post => [post.id, post])).values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  async function loadPage(kind: 'events' | 'posts', reset = false) {
+    const paging = pageCursors.current[kind]; if (paging.busy) return;
+    if (reset) { paging.cursor = null; paging.offset = 0; kind === 'events' ? setOlderEvents([]) : setOlderPosts([]); }
+    paging.busy = true; setPages(previous => ({ ...previous, [`${kind}Loading`]: true }));
+    try {
+      if (mode === 'demo') { setPages(previous => ({ ...previous, [`${kind}HasMore`]: false })); return; }
+      if (!serviceOpen) return;
+      const collectionName = kind === 'events' ? 'communityEvents' : 'communityPosts';
+      if (!paging.cursor && !reset) {
+        const first = await getDocs(query(collection(db, collectionName), orderBy('createdAt', 'desc'), limit(100)));
+        paging.cursor = first.docs.at(-1) || null;
+        if (first.size < 100) { setPages(previous => ({ ...previous, [`${kind}HasMore`]: false })); return; }
+      }
+      const snapshot = await getDocs(query(collection(db, collectionName), orderBy('createdAt', 'desc'), ...(paging.cursor ? [startAfter(paging.cursor)] : []), limit(40)));
+      if (currentMode.current !== mode) return;
+      paging.cursor = snapshot.docs.at(-1) || paging.cursor;
+      if (kind === 'events') setOlderEvents(previous => [...new Map([...previous, ...snapshot.docs.map(d => normalizeEvent(d.data(), d.id)).filter((e): e is PlayEvent => e !== null)].map(e => [e.id, e])).values()]);
+      else setOlderPosts(previous => [...new Map([...previous, ...snapshot.docs.map(d => normalizePost(d.data(), d.id)).filter((p): p is CommunityPost => p !== null)].map(p => [p.id, p])).values()]);
+      setPages(previous => ({ ...previous, [`${kind}HasMore`]: snapshot.size === 40 }));
+    } finally { paging.busy = false; setPages(previous => ({ ...previous, [`${kind}Loading`]: false })); }
+  }
+  const watchFixtureData = useCallback((id: string) => {
+    if (!validProfileId(id)) return () => {};
+    if (mode === 'demo') { const refresh = () => { setFixtureData(previous => ({ ...previous, [id]: normalizeDemoData(readDemo()).events.find(event => event.id === id)?.fixtures || [] })); setFixtureStates(previous => ({ ...previous, [id]: 'ready' })); }; refresh(); window.addEventListener('cantera-demo-updated', refresh); return () => window.removeEventListener('cantera-demo-updated', refresh); }
+    if (!serviceOpen) return () => {};
+    let active = true; let raw: DocumentData | null = null; let receivedFixtures = false; let records: Fixture[] = [];
+    setFixtureStates(previous => ({ ...previous, [id]: 'loading' }));
+    const publish = () => {
+      if (!active || !raw) return;
+      const manifest = raw.fixtureIds;
+      if (!Array.isArray(manifest)) { const event = normalizeEvent(raw, id); setFixtureData(previous => ({ ...previous, [id]: event?.fixtures || [] })); setFixtureStates(previous => ({ ...previous, [id]: event ? 'ready' : 'error' })); return; }
+      if (!receivedFixtures) return;
+      const byId = new Map(records.map(record => [record.id, record]));
+      const fixtures = manifest.map(fixtureId => byId.get(fixtureId)).filter((fixture): fixture is Fixture => !!fixture);
+      const event = fixtures.length === manifest.length ? normalizeEvent({ ...raw, fixtures }, id) : null;
+      setFixtureData(previous => ({ ...previous, [id]: event?.fixtures || [] })); setFixtureStates(previous => ({ ...previous, [id]: event ? 'ready' : 'error' }));
+    };
+    const fail = () => { if (active) setFixtureStates(previous => ({ ...previous, [id]: 'error' })); };
+    const stops = [onSnapshot(doc(db, 'communityEvents', id), snapshot => { raw = snapshot.exists() ? snapshot.data() : null; if (!raw) fail(); else publish(); }, fail), onSnapshot(query(collection(db, 'communityFixtures'), where('eventId', '==', id)), snapshot => { records = snapshot.docs.map(record => normalizeFixtureRecord(record.data(), id)).filter((record): record is Fixture => record !== null); receivedFixtures = true; publish(); }, fail)];
+    return () => { active = false; stops.forEach(stop => stop()); };
+  }, [mode, serviceOpen]);
+  const watchEventHistory = useCallback((id: string) => {
+    if (!validProfileId(id)) return () => {};
+    if (mode === 'demo') { const refresh = () => { const event = normalizeDemoData(readDemo()).events.find(event => event.id === id); setEventHistories(previous => ({ ...previous, [id]: event?.history || [] })); }; refresh(); window.addEventListener('cantera-demo-updated', refresh); return () => window.removeEventListener('cantera-demo-updated', refresh); }
+    if (!serviceOpen) return () => {};
+    return onSnapshot(query(collection(db, 'communityEventChanges'), where('eventId', '==', id), orderBy('revision', 'desc'), limit(50)), snapshot => { const values = snapshot.docs.map(record => { const value = record.data(); const date = value.createdAt?.toDate?.(); return Number.isSafeInteger(value.revision) && value.revision > 0 && typeof value.summary === 'string' && date instanceof Date ? { revision: value.revision, summary: value.summary, changedAt: date.toISOString() } as EventChange : null; }).filter((entry): entry is EventChange => entry !== null); setEventHistories(previous => ({ ...previous, [id]: values.reverse() })); }, readFailure);
+  }, [mode, serviceOpen, readFailure]);
+  const loadMoreEvents = (reset = false) => loadPage('events', reset);
+  const loadMorePosts = (reset = false) => loadPage('posts', reset);
+  async function loadMoreOwnEvents() { /* Own subscriptions query by UID, without a global window. */ }
 
-  function actor() {
+  const watchPostInteractions = useCallback((id: string) => {
+    if (!validProfileId(id) || mode === 'cloud' && (!firebaseUser || !serviceOpen)) return () => {};
+    const key = `${mode}:${firebaseUser?.uid || profile?.id || ''}:${id}`;
+    const existing = interactions.current.get(key);
+    if (existing) existing.count += 1;
+    else {
+      let active = true;
+      const entry = { count: 1, stop: () => {}, cursor: null as QueryDocumentSnapshot<DocumentData> | null, offset: 0, busy: false };
+      const fail = (err: unknown) => { if (active) setPostInteractionStates(previous => ({ ...previous, [id]: { ...(previous[id] || { likesCount: 0, commentsCount: 0, hasMoreComments: false }), loading: false, error: friendlyError(err) } })); };
+      setPostInteractionStates(previous => ({ ...previous, [id]: { loading: true, error: '', hasMoreComments: false, likesCount: 0, commentsCount: 0 } }));
+      if (mode === 'demo') {
+        const refresh = () => { const data = normalizeDemoData(readDemo()); if (active) { entry.offset = Math.max(30, entry.offset); const all = data.comments[id] || []; setComments(previous => ({ ...previous, [id]: all.slice(-entry.offset) })); setLikes(previous => ({ ...previous, [id]: data.likes[id] || [] })); setPostInteractionStates(previous => ({ ...previous, [id]: { loading: false, error: '', hasMoreComments: all.length > entry.offset, likesCount: (data.likes[id] || []).length, commentsCount: all.length } })); } };
+        refresh(); window.addEventListener('storage', refresh); window.addEventListener('cantera-demo-updated', refresh);
+        entry.stop = () => { active = false; window.removeEventListener('storage', refresh); window.removeEventListener('cantera-demo-updated', refresh); };
+      } else {
+        const counts = async () => {
+          try { const [likeCount, commentCount] = await Promise.all([getCountFromServer(query(collection(db, 'communityLikes'), where('postId', '==', id))), getCountFromServer(query(collection(db, 'communityComments'), where('postId', '==', id)))]);
+            if (active) setPostInteractionStates(previous => ({ ...previous, [id]: { ...(previous[id] || { loading: false, error: '', hasMoreComments: false }), loading: false, error: '', likesCount: likeCount.data().count, commentsCount: commentCount.data().count } }));
+          } catch (err) { fail(err); }
+        };
+        const stops = [onSnapshot(query(collection(db, 'communityComments'), where('postId', '==', id), orderBy('createdAt', 'desc'), limit(30)), snapshot => {
+          if (!active) return; entry.cursor ||= snapshot.docs.at(-1) || null;
+          const records = snapshot.docs.map(d => normalizeCommentRecord(d.data(), d.id)).filter((c): c is NonNullable<ReturnType<typeof normalizeCommentRecord>> => c !== null);
+          for (const change of snapshot.docChanges()) if (change.type === 'removed') void getDoc(change.doc.ref).then(current => { if (active && !current.exists()) setComments(previous => ({ ...previous, [id]: (previous[id] || []).filter(c => c.id !== change.doc.id) })); }).catch(fail);
+          setComments(previous => ({ ...previous, [id]: [...new Map([...(previous[id] || []).filter(c => !records.some(r => r.id === c.id)), ...records].map(c => [c.id, c])).values()].sort((a, b) => a.createdAt.localeCompare(b.createdAt)) }));
+          setPostInteractionStates(previous => ({ ...previous, [id]: { ...(previous[id] || { likesCount: 0, commentsCount: 0 }), loading: previous[id]?.loading ?? true, error: '', hasMoreComments: previous[id]?.hasMoreComments || snapshot.size === 30 } })); void counts();
+        }, fail), onSnapshot(query(collection(db, 'communityLikes'), where('postId', '==', id), orderBy('createdAt', 'desc'), limit(1)), () => { void counts(); }, fail), onSnapshot(doc(db, 'communityLikes', `${id}_${firebaseUser!.uid}`), snapshot => { if (active) { setLikes(previous => ({ ...previous, [id]: snapshot.exists() ? [firebaseUser!.uid] : [] })); void counts(); } }, fail)];
+        entry.stop = () => { active = false; stops.forEach(stop => stop()); };
+      }
+      interactions.current.set(key, entry);
+    }
+    let released = false;
+    return () => { if (released) return; released = true; const entry = interactions.current.get(key); if (!entry) return; if (--entry.count === 0) { entry.stop(); interactions.current.delete(key); } };
+  }, [mode, firebaseUser?.uid, profile?.id, runtimeConfig.serviceStatus, serviceOpen]);
+  useEffect(() => () => { interactions.current.forEach(entry => entry.stop()); interactions.current.clear(); }, []);
+  async function loadMoreComments(id: string) {
+    const entry = [...interactions.current.entries()].find(([key]) => key.endsWith(`:${id}`))?.[1]; if (!entry || entry.busy) return;
+    entry.busy = true;
+    try {
+      if (mode === 'demo') { entry.offset += 30; window.dispatchEvent(new Event('cantera-demo-updated')); return; }
+      const snapshot = await getDocs(query(collection(db, 'communityComments'), where('postId', '==', id), orderBy('createdAt', 'desc'), ...(entry.cursor ? [startAfter(entry.cursor)] : []), limit(30)));
+      entry.cursor = snapshot.docs.at(-1) || entry.cursor;
+      const records = snapshot.docs.map(d => normalizeCommentRecord(d.data(), d.id)).filter((c): c is NonNullable<ReturnType<typeof normalizeCommentRecord>> => c !== null);
+      setComments(previous => ({ ...previous, [id]: [...new Map([...(previous[id] || []), ...records].map(c => [c.id, c])).values()].sort((a, b) => a.createdAt.localeCompare(b.createdAt)) }));
+      setPostInteractionStates(previous => ({ ...previous, [id]: { ...previous[id], hasMoreComments: snapshot.size === 30, error: '' } }));
+    } catch (err) { setPostInteractionStates(previous => ({ ...previous, [id]: { ...previous[id], error: friendlyError(err) } })); throw err; }
+    finally { entry.busy = false; }
+  }
+
+  async function toggleBlock(id: string) {
+    const user = sessionActor(); if (!validProfileId(id) || id === user.id) throw new Error('Cuenta inválida.');
+    if (mode === 'demo') mutateDemo(data => { const current = data.blocked[user.id] || []; return { ...data, blocked: { ...data.blocked, [user.id]: current.includes(id) ? current.filter(uid => uid !== id) : [...current, id] } }; });
+    else await runTransaction(db, async tx => { const target = doc(db, 'communityBlocks', `${user.id}_${id}`); const current = await tx.get(target); if (current.exists()) tx.delete(target); else tx.set(target, { ownerId: user.id, blockedId: id, createdAt: serverTimestamp() }); });
+  }
+  async function deleteComment(postId: string, commentId: string) {
+    const user = sessionActor();
+    if (mode === 'demo') mutateDemo(data => { const current = (data.comments[postId] || []).find(c => c.id === commentId); if (!current || current.authorId !== user.id) throw new Error('No puedes borrar este comentario.'); return { ...data, comments: { ...data.comments, [postId]: data.comments[postId].filter(c => c.id !== commentId) } }; });
+    else { const target = doc(db, 'communityComments', commentId); const current = await getDoc(target); if (!current.exists() || current.data().postId !== postId || current.data().authorId !== user.id && !isAdmin) throw new Error('No puedes borrar este comentario.'); await deleteDoc(target); setComments(previous => ({ ...previous, [postId]: (previous[postId] || []).filter(c => c.id !== commentId) })); }
+  }
+  async function reportComment(postId: string, commentId: string, reason: string) {
+    const user = sessionActor(); const report: ContentReport = { id: newId(), reporterId: user.id, postId, commentId, reason: requireText(reason, 'Motivo', 1000), status: 'open', createdAt: stamp() };
+    if (mode === 'demo') mutateDemo(data => { if (!(data.comments[postId] || []).some(c => c.id === commentId)) throw new Error('Comentario no encontrado.'); return { ...data, reports: [...data.reports, report] }; });
+    else await setDoc(doc(db, 'communityReports', report.id), { ...report, createdAt: serverTimestamp() });
+  }
+  async function loadMoreAdminQueue(kind: 'verification' | 'reports' | 'rights') {
+    sessionActor(); if (!isAdmin || mode !== 'cloud' || adminQueueLoading[kind]) return;
+    setAdminQueueLoading(previous => ({ ...previous, [kind]: true }));
+    try { const names = { verification: 'communityVerifications', reports: 'communityReports', rights: 'communityRightsRequests' }; const condition = kind === 'rights' ? where('status', 'in', ['pending', 'processing']) : where('status', '==', kind === 'verification' ? 'pending' : 'open');
+      const cursor = adminCursors.current[kind]; const snapshot = await getDocs(query(collection(db, names[kind]), condition, orderBy('createdAt', 'asc'), ...(cursor ? [startAfter(cursor)] : []), limit(100)));
+      adminCursors.current[kind] = snapshot.docs.at(-1) || cursor; setAdminQueueHasMore(previous => ({ ...previous, [kind]: snapshot.size === 100 }));
+      if (kind === 'verification') { const values = snapshot.docs.map(d => normalizeVerification(d.data(), d.id)).filter((v): v is VerificationRequest => v !== null); setVerifications(previous => [...new Map([...previous, ...values].map(v => [v.id, v])).values()]); }
+      else if (kind === 'reports') { const values = snapshot.docs.map(d => normalizeReport(d.data(), d.id)).filter((v): v is ContentReport => v !== null); setReports(previous => [...new Map([...previous, ...values].map(v => [v.id, v])).values()]); }
+      else { const values = snapshot.docs.map(d => normalizeRightsRequest(d.data(), d.id)).filter((v): v is RightsRequest => v !== null); setAdminRightsRequests(previous => [...new Map([...previous, ...values].map(v => [v.id, v])).values()]); }
+    } finally { setAdminQueueLoading(previous => ({ ...previous, [kind]: false })); }
+  }
+  async function suspendAccount(userId: string, reason: string, suspend = true) {
+    const user = sessionActor(); if (!isAdmin || mode !== 'cloud') throw new Error('Esta acción requiere la cuenta administradora.'); if (!validProfileId(userId) || userId === user.id) throw new Error('Cuenta inválida o propia.');
+    await setDoc(doc(db, 'communityAccountModeration', userId), { status: suspend ? 'suspended' : 'active', reason: requireText(reason, 'Motivo', 1000), updatedAt: serverTimestamp() });
+  }
+  async function reviewRightsRequest(id: string, status: 'processing' | 'completed' | 'rejected') {
+    sessionActor(); if (!isAdmin || mode !== 'cloud' || !['processing', 'completed', 'rejected'].includes(status)) throw new Error('Esta acción requiere la cuenta administradora.');
+    await updateDoc(doc(db, 'communityRightsRequests', id), { status, reviewedAt: serverTimestamp() }); setAdminRightsRequests(previous => status === 'processing' ? previous.map(r => r.id === id ? { ...r, status } : r) : previous.filter(r => r.id !== id));
+  }
+  async function updateRuntimeStatus(status: RuntimeConfig['serviceStatus']) {
+    sessionActor(); if (!isAdmin || mode !== 'cloud' || !['setup', 'open', 'paused'].includes(status)) throw new Error('Esta acción requiere la cuenta administradora.');
+    if (status === 'open' && !legalReady) throw new Error('Completa el nombre, país y contacto del responsable antes de abrir el servicio.');
+    await setDoc(doc(db, 'communityConfiguration', 'runtime'), { serviceStatus: status, mediaUploadsEnabled: false, contactEmail: operator.email || runtimeConfig.contactEmail, updatedAt: serverTimestamp() });
+  }
+  async function markNoticeRead(id: string) {
+    const user = sessionActor(); if (mode === 'demo') mutateDemo(data => ({ ...data, notices: data.notices.map(n => n.id === id && n.recipientId === user.id ? { ...n, readAt: stamp() } : n) }));
+    else await updateDoc(doc(db, 'communityEventNotices', id), { readAt: serverTimestamp() });
+  }
+  async function retryEventNotices(id: string) {
+    const user = actor();
+    if (mode === 'demo') return { created: 0, inspected: 0, hasMore: false };
+    const snapshot = await getDoc(doc(db, 'communityEvents', id));
+    if (!snapshot.exists() || snapshot.data().ownerId !== user.id) throw new Error('Solo el organizador puede recuperar los avisos.');
+    const key = `${user.id}:${id}`;
+    let state = deliveryCursors.current.get(key);
+    if (!state) { state = { stage: 'changes', cursor: null, candidates: [], busy: false }; deliveryCursors.current.set(key, state); }
+    if (state.busy) throw new Error('Ya se están recuperando los avisos de este encuentro.');
+    state.busy = true;
+    try {
+      while (state.candidates.length < 200 && state.stage !== 'done') {
+        const isChange = state.stage === 'changes';
+        const base = query(collection(db, isChange ? 'communityEventChanges' : 'communityEventPromotions'), where('eventId', '==', id), orderBy(isChange ? 'revision' : 'createdAt', 'asc'), limit(50));
+        const page = await getDocs(state.cursor ? query(base, startAfter(state.cursor)) : base);
+        for (const record of page.docs) {
+          const data = record.data();
+          if (isChange) {
+            if (data.ownerId !== user.id || !Array.isArray(data.audienceIds)) throw new Error('El historial de avisos necesita revisión.');
+            for (const recipientId of data.audienceIds.filter((uid: unknown): uid is string => typeof uid === 'string' && !uid.startsWith('guest-'))) {
+              const noticeId = `${id}_${data.revision}_${recipientId}`;
+              state.candidates.push({ id: noticeId, value: { id: noticeId, eventId: id, recipientId, revision: data.revision, title: data.title, summary: data.summary, createdAt: serverTimestamp(), readAt: '' } });
+            }
+          } else {
+            const deliveryId = record.id.slice(id.length + 1);
+            if (!deliveryId || typeof data.recipientId !== 'string') throw new Error('El registro de una plaza necesita revisión.');
+            const noticeId = `${id}_place_${deliveryId}`;
+            state.candidates.push({ id: noticeId, value: { id: noticeId, eventId: id, recipientId: data.recipientId, revision: Math.max(1, snapshot.data().revision || 0), title: data.title, summary: data.summary, createdAt: serverTimestamp(), readAt: '', kind: 'place', deliveryId } });
+          }
+        }
+        state.cursor = page.docs.at(-1) || state.cursor;
+        if (page.size < 50) { state.stage = isChange ? 'promotions' : 'done'; state.cursor = null; }
+      }
+      const candidates = state.candidates.slice(0, 200);
+      const receipts = await Promise.all(candidates.map(candidate => getDoc(doc(db, 'communityEventDeliveries', candidate.id))));
+      const missing = candidates.filter((_, index) => !receipts[index].exists());
+      if (missing.length) {
+        await commitDeliveryBatches(missing, async candidates => {
+          const batch = writeBatch(db);
+          for (const notice of candidates) {
+            batch.set(doc(db, 'communityEventNotices', notice.id), notice.value);
+            batch.set(doc(db, 'communityEventDeliveries', notice.id), { actorId: user.id, eventId: id, recipientId: notice.value.recipientId, createdAt: serverTimestamp() });
+          }
+          await batch.commit();
+        });
+      }
+      state.candidates.splice(0, candidates.length);
+      const hasMore = state.candidates.length > 0 || state.stage !== 'done';
+      if (!hasMore) deliveryCursors.current.delete(key);
+      return { created: missing.length, inspected: candidates.length, hasMore };
+    } catch (error) {
+      deliveryCursors.current.delete(key);
+      throw new Error(`La recuperación no se ha completado. Los avisos entregados se conservan y puedes volver a intentarlo. ${friendlyError(error)}`);
+    } finally { state.busy = false; }
+  }
+  async function requestRights(kind: 'export' | 'delete') {
+    const user = sessionActor(); if (!['export', 'delete'].includes(kind)) throw new Error('Solicitud inválida.');
+    const id = `${user.id}_${kind}`; const request: RightsRequest = { id, userId: user.id, kind, status: 'pending', createdAt: stamp(), reviewedAt: '' };
+    if (mode === 'demo') mutateDemo(data => { if (data.rightsRequests.some(r => r.id === id && ['pending', 'processing'].includes(r.status))) throw new Error('Ya hay una solicitud pendiente.'); return { ...data, rightsRequests: [...data.rightsRequests.filter(r => r.id !== id), request] }; });
+    else await setDoc(doc(db, 'communityRightsRequests', id), { ...request, createdAt: serverTimestamp() });
+  }
+
+  const availableEvents = [...new Map([...olderEvents, ...events, ...ownEvents].map(event => [event.id, event])).values()].map(event => event.fixtureIds && fixtureStates[event.id] === 'ready' ? { ...event, fixtures: fixtureData[event.id] || [] } : event).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const availablePosts = [...new Map([...olderPosts, ...Object.values(linkedPosts[mode]), ...posts].map(post => [post.id, post])).values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+  function sessionActor() {
     if (!profile) throw new Error('Entra con tu cuenta o activa el modo de prueba.');
+    if (mode === 'cloud' && auth.currentUser?.uid !== profile.id) throw new Error('Tu sesión ha caducado.');
+    return profile;
+  }
+  function actor() {
+    const profile = sessionActor();
+    if (mode === 'cloud' && accountModeration?.status === 'suspended') throw new Error(`Tu cuenta está suspendida: ${accountModeration.reason}`);
+    if (mode === 'cloud' && !serviceOpen) throw new Error(runtimeConfig.serviceStatus === 'paused' ? 'El servicio está temporalmente pausado.' : 'El servicio todavía está en preparación.');
+    if (!profile.city.trim() || !profile.country.trim()) throw new Error('Completa la ciudad y el país de tu perfil antes de participar.');
     if (!profile.adultConfirmed) throw new Error('Completa tu perfil y confirma que eres mayor de edad para participar en esta beta.');
     if (profile.acceptedTermsVersion !== TERMS_VERSION) throw new Error('Revisa y acepta los términos actuales en tu perfil.');
     if (mode === 'cloud' && auth.currentUser?.uid !== profile.id) throw new Error('Tu sesión ha caducado.');
     return profile;
   }
   function mutateDemo(change: (data: DemoData) => DemoData) { writeDemo(normalizeDemoData(change(normalizeDemoData(readDemo())))); }
-  async function mutateEvent(id: string, change: (event: PlayEvent, user: CommunityProfile) => PlayEvent, ownerOnly = false) {
-    const user = actor();
+  async function mutateEvent(id: string, change: (event: PlayEvent, user: CommunityProfile) => PlayEvent, ownerOnly = false, reason = 'Se ha actualizado el encuentro.', withdrawal = false, notifyOnly?: string[]) {
+    const user = withdrawal ? sessionActor() : actor();
     const apply = (event: PlayEvent) => {
       if (ownerOnly && event.ownerId !== user.id) throw new Error('Solo el organizador puede realizar esta acción.');
-      return change(event, user);
+      const changed = change(event, user);
+      const promoted = Object.keys(changed.participants).find(uid => !event.participants[uid] && event.waitlist?.[uid]);
+      if (promoted) { changed.rsvps = { ...(changed.rsvps || {}) }; delete changed.rsvps[promoted]; }
+      return { ...changed, participantIds: Object.keys(changed.participants), ...(ownerOnly ? { revision: (event.revision || 0) + 1, updatedAt: stamp(), history: [...(event.history || []), { revision: (event.revision || 0) + 1, changedAt: stamp(), summary: requireText(reason, 'Motivo del cambio', 500) }].slice(-50) } : {}) };
     };
     if (mode === 'demo') {
       mutateDemo(data => { const event = data.events.find(e => e.id === id); if (!event) throw new Error('Evento no encontrado.');
-        return { ...data, events: data.events.map(e => e.id === id ? apply(e) : e) }; }); return;
+        const next = apply(event); const recipients = [...new Set([event.ownerId, ...Object.keys(event.participants), ...Object.keys(next.participants), ...Object.keys(event.waitlist || {}), ...Object.keys(next.waitlist || {})])].filter(uid => !uid.startsWith('guest-'));
+        const notices: EventNotice[] = ownerOnly ? (notifyOnly || recipients).map(uid => ({ id: `${id}_${next.revision}_${uid}`, eventId: id, recipientId: uid, revision: next.revision!, title: next.title, summary: reason, createdAt: stamp(), readAt: '' })) : [];
+        const promoted = Object.keys(next.participants).find(uid => !event.participants[uid] && event.waitlist?.[uid]);
+        if (promoted) { const deliveryId = newId(); notices.push({ id: `${id}_place_${deliveryId}`, eventId: id, recipientId: promoted, revision: Math.max(1, next.revision || 0), title: next.title, summary: 'Has conseguido una plaza al liberarse un puesto.', createdAt: stamp(), readAt: '', kind: 'place', deliveryId }); }
+        return { ...data, events: data.events.map(e => e.id === id ? next : e), notices: [...notices, ...data.notices] }; }); return;
     }
-    await runTransaction(db, async tx => { const eventRef = doc(db, 'communityEvents', id); const snapshot = await tx.get(eventRef);
+    const notifications: Array<{ id: string; value: DocumentData }> = []; let notificationOwnerId = '';
+    await runTransaction(db, async tx => { notifications.length = 0; const eventRef = doc(db, 'communityEvents', id); const snapshot = await tx.get(eventRef);
       if (!snapshot.exists()) throw new Error('Evento no encontrado.');
-      const current = normalizeEvent(snapshot.data(), snapshot.id);
+      const raw = snapshot.data(); const canonical = new Map<string, { fixture: Fixture; raw: DocumentData }>();
+      if (Array.isArray(raw.fixtureIds)) { const records = await Promise.all(raw.fixtureIds.map((fixtureId: string) => tx.get(doc(db, 'communityFixtures', `${id}_${fixtureId}`)))); for (const record of records) { const fixture = record.exists() ? normalizeFixtureRecord(record.data(), id) : null; if (!fixture) throw new Error('El calendario está incompleto o contiene un cruce inválido.'); canonical.set(fixture.id, { fixture, raw: record.data()! }); } }
+      const current = normalizeEvent({ ...raw, ...(Array.isArray(raw.fixtureIds) ? { fixtures: raw.fixtureIds.map((fixtureId: string) => canonical.get(fixtureId)?.fixture) } : {}) }, snapshot.id);
       if (!current) throw new Error('El evento contiene datos no válidos y necesita revisión.');
-      tx.set(eventRef, { ...snapshot.data(), ...apply(current) }); });
+      notificationOwnerId = current.ownerId;
+      const next = apply(current);
+      const waitlist = Object.fromEntries(Object.entries(next.waitlist || {}).map(([uid, item]) => [uid, { ...item, joinedAt: raw.waitlist?.[uid]?.joinedAt || serverTimestamp() }]));
+      const useCanonical = Array.isArray(raw.fixtureIds) || ownerOnly && next.fixtures.length > 0;
+      if (useCanonical && ownerOnly) for (const fixture of next.fixtures) { const existing = canonical.get(fixture.id); if (!existing || !sameFixture(existing.fixture, fixture)) tx.set(doc(db, 'communityFixtures', `${id}_${fixture.id}`), { ...fixtureFields(existing ? { ...next, timeZone: existing.raw.timeZone, venue: existing.raw.venue } : next, fixture), createdAt: existing?.raw.createdAt || serverTimestamp(), updatedAt: serverTimestamp() }); }
+      const { history: _clientHistory, ...nextFields } = next;
+      tx.set(eventRef, { ...raw, ...nextFields, fixtures: raw.fixtures || [], ...(useCanonical ? { fixtureIds: next.fixtures.map(fixture => fixture.id) } : {}), ...(raw.waitlist !== undefined || next.waitlist !== undefined ? { waitlist } : {}), ...(raw.history !== undefined ? { history: raw.history } : {}), createdAt: raw.createdAt, ...(ownerOnly ? { updatedAt: serverTimestamp() } : raw.updatedAt ? { updatedAt: raw.updatedAt } : {}) });
+      const promoted = Object.keys(next.participants).find(uid => !current.participants[uid] && current.waitlist?.[uid]);
+      if (promoted) { const deliveryId = newId(); tx.set(doc(db, 'communityEventPromotions', `${id}_${deliveryId}`), { eventId: id, authorId: user.id, recipientId: promoted, title: next.title, summary: 'Has conseguido una plaza al liberarse un puesto.', createdAt: serverTimestamp() }); notifications.push({ id: `${id}_place_${deliveryId}`, value: { id: `${id}_place_${deliveryId}`, eventId: id, recipientId: promoted, revision: Math.max(1, next.revision || 0), title: next.title, summary: 'Has conseguido una plaza al liberarse un puesto.', createdAt: serverTimestamp(), readAt: '', kind: 'place', deliveryId } }); }
+      if (ownerOnly) {
+        const revision = next.revision!; const summary = requireText(reason, 'Motivo del cambio', 500);
+        const audienceIds = [...new Set([current.ownerId, ...Object.keys(current.participants), ...Object.keys(next.participants), ...Object.keys(current.waitlist || {}), ...Object.keys(next.waitlist || {})])];
+        tx.set(doc(db, 'communityEventChanges', `${id}_${revision}`), { audienceIds, id: `${id}_${revision}`, eventId: id, ownerId: user.id, revision, summary, title: next.title, createdAt: serverTimestamp() });
+        const recipients = [...new Set([current.ownerId, ...Object.keys(current.participants), ...Object.keys(next.participants), ...Object.keys(current.waitlist || {}), ...Object.keys(next.waitlist || {})])].filter(uid => !uid.startsWith('guest-'));
+        for (const uid of notifyOnly || recipients) notifications.push({ id: `${id}_${revision}_${uid}`, value: { id: `${id}_${revision}_${uid}`, eventId: id, recipientId: uid, revision, title: next.title, summary, createdAt: serverTimestamp(), readAt: '' } });
+      } });
+    if (notifications.length) {
+      try { await commitDeliveryBatches(notifications, async notices => {
+        const batch = writeBatch(db);
+        for (const notice of notices) { batch.set(doc(db, 'communityEventNotices', notice.id), notice.value); batch.set(doc(db, 'communityEventDeliveries', notice.id), { actorId: notificationOwnerId, eventId: id, recipientId: notice.value.recipientId, createdAt: serverTimestamp() }); }
+        await batch.commit();
+      }); } catch { throw new Error('El cambio se ha guardado, pero no se han podido entregar todos los avisos. El organizador puede usar «Recuperar avisos» para completar la entrega.'); }
+    }
   }
-  async function login() { setError(''); await signInWithGoogle(); }
+  async function login() { if (!serviceOpen) throw new Error('El acceso está disponible cuando el servicio esté abierto.'); setError(''); await signInWithGoogle(); }
+  async function loginAdmin() { setError(''); const user = await signInWithGoogle(); const token = await user.getIdTokenResult(true); if (token.claims.admin !== true) { await logout(); throw new Error('Esta cuenta no tiene el permiso de administración.'); } }
   async function signOut() { await logout(); localStorage.removeItem('cantera-demo-active'); setFirebaseUser(null); setProfile(null); setLegacyUser(null); setMode('cloud'); }
   async function beginDemo(name: string) {
     if (!demoEnabled) throw new Error('El modo de prueba no está disponible en producción.');
@@ -341,7 +658,7 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
           return { ...data, follows: data.follows.filter(item => item.id !== followId) };
         }
         actor();
-        if (!data.profiles.some(item => item.id === id && item.adultConfirmed && item.acceptedTermsVersion === TERMS_VERSION)) throw new Error('Este perfil ya no está disponible.');
+        if (!data.profiles.some(item => item.id === id && item.adultConfirmed && item.acceptedTermsVersion === TERMS_VERSION && item.city.trim() && item.country.trim())) throw new Error('Este perfil ya no está disponible.');
         return { ...data, follows: [...data.follows, { id: followId, followerId: user.id, followingId: id, createdAt: stamp() }] };
       });
     } else await runTransaction(db, async transaction => {
@@ -353,7 +670,7 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
       actor();
       const target = await transaction.get(doc(db, 'communityPublicProfiles', id));
       if (!target.exists() || !normalizePublicProfile(target.data(), target.id)) throw new Error('Este perfil ya no está disponible.');
-      transaction.set(relation, { followerId: user.id, followingId: id, createdAt: stamp() });
+      transaction.set(relation, { followerId: user.id, followingId: id, createdAt: serverTimestamp() });
     });
   }
   async function saveProfile(input: Omit<CommunityProfile, 'id' | 'verification' | 'createdAt'>) {
@@ -367,37 +684,79 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
     const updated = { ...profile, ...cleaned };
     if (mode === 'demo') mutateDemo(data => ({ ...data, profile: updated }));
     else {
-      const batch = writeBatch(db); batch.set(doc(db, 'communityProfiles', profile.id), updated);
-      batch.set(doc(db, 'communityPublicProfiles', profile.id), normalizePublicProfile(updated)!); await batch.commit();
+      const target = doc(db, 'communityProfiles', profile.id); const stored = await getDoc(target);
+      const createdAt = stored.exists() ? stored.data().createdAt : serverTimestamp();
+      const acceptedTermsAt = stored.exists() && stored.data().acceptedTermsVersion === input.acceptedTermsVersion ? stored.data().acceptedTermsAt : serverTimestamp();
+      const batch = writeBatch(db); batch.set(target, { ...updated, createdAt, acceptedTermsAt });
+      batch.set(doc(db, 'communityPublicProfiles', profile.id), { ...normalizePublicProfile(updated)!, createdAt, searchTokens: profileSearchTokens(updated) }); await batch.commit();
     }
   }
   async function createEvent(input: EventInput) {
     const user = actor(); const cleaned = validateEvent(input); const id = newId();
-    const event: PlayEvent = { ...cleaned, startAtMs: Date.parse(cleaned.startAt), id, ownerId: user.id, ownerName: user.name, status: 'open', participants: {}, fixtures: [], createdAt: stamp() };
+    const event: PlayEvent = { ...cleaned, startAtMs: Date.parse(cleaned.startAt), id, ownerId: user.id, ownerName: user.name, status: 'open', participants: {}, participantIds: [], rsvps: {}, waitlist: {}, waitlistOrder: [], revision: 0, history: [], updatedAt: stamp(), fixtures: [], createdAt: stamp() };
     if (mode === 'demo') mutateDemo(data => ({ ...data, events: [event, ...data.events] }));
-    else await setDoc(doc(db, 'communityEvents', id), event);
+    else await setDoc(doc(db, 'communityEvents', id), { ...event, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
     return id;
   }
-  async function joinEvent(id: string, name: string) { await mutateEvent(id, (event, user) => ({ ...event, participants: joinParticipants(event, user.id, name) })); }
+  async function createEventSeries(inputs: EventInput[]) {
+    const user = actor(); if (inputs.length < 2 || inputs.length > 12) throw new Error('La serie admite entre 2 y 12 encuentros.');
+    const records = inputs.map(input => { const cleaned = validateEvent(input); const id = newId(); return { ...cleaned, id, ownerId: user.id, ownerName: user.name, startAtMs: Date.parse(cleaned.startAt), status: 'open' as const, participants: {}, participantIds: [], fixtures: [], waitlist: {}, waitlistOrder: [], rsvps: {}, revision: 0, history: [], createdAt: stamp(), updatedAt: stamp() }; });
+    if (mode === 'demo') mutateDemo(data => ({ ...data, events: [...records, ...data.events] }));
+    else { const batch = writeBatch(db); for (const record of records) batch.set(doc(db, 'communityEvents', record.id), { ...record, createdAt: serverTimestamp(), updatedAt: serverTimestamp() }); await batch.commit(); }
+    return records.map(event => event.id);
+  }
+  function releasePlace(event: PlayEvent, uid: string): PlayEvent {
+    const participants = { ...event.participants }; delete participants[uid];
+    const waitlist = { ...(event.waitlist || {}) }; const order = [...(event.waitlistOrder || [])];
+    if (event.status === 'open' && !event.fixtures.length && Date.parse(event.startAt) > Date.now() && Object.keys(participants).length < event.capacity && order.length) { const promoted = order.shift()!; if (waitlist[promoted]) participants[promoted] = waitlist[promoted].name; delete waitlist[promoted]; }
+    return { ...event, participants, waitlist, waitlistOrder: order };
+  }
+  async function joinEvent(id: string, name: string) { await mutateEvent(id, (event, user) => { if ((event.waitlistOrder || []).length) throw new Error('Hay una lista de espera. Solicita tu turno.'); return { ...event, participants: joinParticipants(event, user.id, name), rsvps: { ...(event.rsvps || {}), [user.id]: 'yes' } }; }); }
   async function leaveEvent(id: string) { await mutateEvent(id, (event, user) => {
     if (event.fixtures.length || Date.parse(event.startAt) <= Date.now()) throw new Error('El calendario ya está cerrado. Contacta con el organizador.');
-    const participants = { ...event.participants }; delete participants[user.id]; return { ...event, participants };
-  }); }
-  async function addGuest(id: string, name: string) { await mutateEvent(id, event => ({ ...event, participants: joinParticipants(event, `guest-${newId()}`, name) }), true); }
-  async function setEventStatus(id: string, status: PlayEvent['status']) {
-    if (!['open', 'closed', 'cancelled'].includes(status)) throw new Error('Estado inválido.');
-    await mutateEvent(id, event => { if (status === 'open' && event.fixtures.length) throw new Error('No puedes reabrir un calendario ya generado.'); return { ...event, status }; }, true);
+    return { ...releasePlace(event, user.id), rsvps: { ...(event.rsvps || {}), [user.id]: 'no' } };
+  }, false, '', true); }
+  async function addGuest(id: string, name: string) { await mutateEvent(id, event => { if ((event.waitlistOrder || []).length) throw new Error('Hay participantes esperando una plaza.'); return { ...event, participants: joinParticipants(event, `guest-${newId()}`, name) }; }, true, 'El organizador ha añadido un invitado.'); }
+  async function removeGuest(id: string, guestId: string) { await mutateEvent(id, event => { if (!guestId.startsWith('guest-') || !event.participants[guestId]) throw new Error('Invitado no encontrado.'); if (event.fixtures.length || Date.parse(event.startAt) <= Date.now()) throw new Error('No se pueden cambiar invitados después de cerrar el calendario.'); return releasePlace(event, guestId); }, true, 'El organizador ha retirado un invitado.'); }
+  async function promoteWaitingPlayers(id: string) {
+    for (let attempt = 0; attempt < 64; attempt++) {
+      const source = mode === 'demo' ? normalizeDemoData(readDemo()).events.find(event => event.id === id) : await getDoc(doc(db, 'communityEvents', id)).then(snapshot => snapshot.exists() ? normalizeEvent(snapshot.data(), id) : null);
+      if (!source || source.status !== 'open' || source.fixtures.length || Date.parse(source.startAt) <= Date.now() || Object.keys(source.participants).length >= source.capacity || !(source.waitlistOrder || []).length) return;
+      const uid = source.waitlistOrder![0];
+      await mutateEvent(id, event => { const first = event.waitlistOrder?.[0]; if (!first || Object.keys(event.participants).length >= event.capacity || event.status !== 'open') throw new Error('La lista de espera ha cambiado. Actualiza el encuentro.'); const waitlist = { ...(event.waitlist || {}) }; const name = waitlist[first].name; delete waitlist[first]; return { ...event, participants: { ...event.participants, [first]: name }, waitlist, waitlistOrder: event.waitlistOrder!.slice(1) }; }, true, 'Has conseguido una plaza al ampliar la convocatoria.', false, [uid]);
+    }
   }
-  async function generateFixtures(id: string) { await mutateEvent(id, event => ({ ...event, fixtures: makeFixtures(event), status: 'closed' }), true); }
-  async function saveScore(id: string, fixture: string, home: number, away: number) { await mutateEvent(id, event => ({ ...event, fixtures: recordScore(event, fixture, home, away) }), true); }
+  async function updateEvent(id: string, input: EventInput, changeReason: string) { await mutateEvent(id, event => ({ ...event, ...validateEventEdit(event, input, changeReason), startAtMs: Date.parse(input.startAt) }), true, changeReason); try { await promoteWaitingPlayers(id); } catch { throw new Error('El cambio se ha guardado, pero queda una promoción pendiente. Vuelve a guardar el aforo para reintentarlo.'); } }
+  async function setEventStatus(id: string, status: PlayEvent['status'], reason?: string) {
+    if (!['open', 'closed', 'cancelled', 'completed'].includes(status)) throw new Error('Estado inválido.');
+    await mutateEvent(id, event => { if (status === 'open' && (event.fixtures.length || Date.parse(event.startAt) <= Date.now())) throw new Error('No puedes reabrir un calendario ya generado o celebrado.'); if (status === 'completed') { if (Date.parse(event.startAt) > Date.now()) throw new Error('El encuentro todavía no ha comenzado.'); if (event.status === 'cancelled') throw new Error('Un encuentro cancelado no puede marcarse celebrado.'); if (event.type === 'match' && !event.result) throw new Error('Registra primero el resultado del partido.'); if (event.type === 'tournament' && (!event.fixtures.length || event.fixtures.some(f => f.awayId && f.homeScore === null) || event.tournamentFormat === 'knockout' && event.fixtures.filter(f => f.round === Math.max(...event.fixtures.map(f => f.round))).length !== 1)) throw new Error('Completa los resultados del torneo.'); } return { ...event, status }; }, true, reason || (status === 'cancelled' ? 'El organizador ha cancelado el encuentro.' : `El organizador ha cambiado el estado a ${status}.`)); if (status === 'open') { try { await promoteWaitingPlayers(id); } catch { throw new Error('Se han abierto las inscripciones, pero queda una promoción pendiente. Vuelve a abrirlas para reintentarlo.'); } }
+  }
+  async function setRsvp(id: string, response: Rsvp) { if (!['yes', 'no', 'maybe'].includes(response)) throw new Error('Respuesta inválida.'); await mutateEvent(id, (event, user) => {
+    if (!event.participants[user.id]) throw new Error('Primero inscríbete en el encuentro.');
+    if (Date.parse(event.startAt) <= Date.now() || event.status === 'cancelled' || event.status === 'completed') throw new Error('La convocatoria ha terminado.');
+    if (response === 'no' && event.fixtures.length) throw new Error('El calendario ya está cerrado. Contacta con el organizador.');
+    return { ...(response === 'no' ? releasePlace(event, user.id) : event), rsvps: { ...(event.rsvps || {}), [user.id]: response } };
+  }, false, '', response === 'no'); }
+  async function joinWaitlist(id: string, name: string) { await mutateEvent(id, (event, user) => {
+    if (event.status !== 'open' || event.fixtures.length || Date.parse(event.startAt) <= Date.now()) throw new Error('Las inscripciones están cerradas.');
+    if (event.participants[user.id] || event.waitlist?.[user.id]) throw new Error('Ya estás inscrito o en espera.');
+    if (Object.keys(event.participants).length < event.capacity && !(event.waitlistOrder || []).length) throw new Error('Quedan plazas. Inscríbete directamente.');
+    if ((event.waitlistOrder || []).length >= 64) throw new Error('La lista de espera está completa.');
+    return { ...event, waitlist: { ...(event.waitlist || {}), [user.id]: { name: requireText(name, 'Nombre', 100), joinedAt: stamp() } }, waitlistOrder: [...(event.waitlistOrder || []), user.id] };
+  }); }
+  async function leaveWaitlist(id: string) { await mutateEvent(id, (event, user) => { const waitlist = { ...(event.waitlist || {}) }; delete waitlist[user.id]; return { ...event, waitlist, waitlistOrder: (event.waitlistOrder || []).filter(uid => uid !== user.id) }; }, false, '', true); }
+  async function saveMatchResult(id: string, result: MatchResult) { await mutateEvent(id, event => { if (event.type !== 'match' || event.status === 'cancelled' || Date.parse(event.startAt) > Date.now()) throw new Error('Sólo se pueden registrar resultados de partidos celebrados.'); return { ...event, result: validateMatchResult(result), status: 'completed' }; }, true, 'El organizador ha registrado el resultado del partido.'); }
+  async function scheduleFixture(id: string, fixtureId: string, schedule: FixtureSchedule) { await mutateEvent(id, event => { const cleaned = validateFixtureSchedule(schedule); const fixture = event.fixtures.find(f => f.id === fixtureId); if (!fixture || !fixture.awayId || fixture.homeScore !== null || event.status === 'cancelled' || event.status === 'completed') throw new Error('No se puede programar este cruce.'); return { ...event, fixtures: event.fixtures.map(f => f.id === fixtureId ? { ...f, ...cleaned } : f) }; }, true, 'El organizador ha actualizado la fecha, hora o campo de un cruce.'); }
+  async function generateFixtures(id: string) { await mutateEvent(id, event => { if (event.type !== 'tournament') throw new Error('Los cruces son para torneos.'); return { ...event, fixtures: makeFixtures(event), status: 'closed' }; }, true, 'El organizador ha publicado los cruces del torneo.'); }
+  async function saveScore(id: string, fixture: string, home: number, away: number) { await mutateEvent(id, event => ({ ...event, fixtures: recordScore(event, fixture, home, away) }), true, 'El organizador ha registrado un resultado del torneo.'); }
 
   async function createPost(input: PostInput, progress?: (n: number) => void) {
     const user = actor(); const id = newId();
     if (!['reel', 'photo', 'achievement'].includes(input.kind)) throw new Error('Tipo de publicación inválido.');
-    if (input.kind !== 'achievement' && mode !== 'demo' && import.meta.env.VITE_ENABLE_MEDIA_UPLOADS !== 'true') throw new Error('Las fotos y los reels se habilitarán cuando el patrocinio permita activar el almacenamiento. Puedes compartir un logro escrito.');
+    if (input.kind !== 'achievement' && mode !== 'demo') throw new Error('Las fotos y los reels se habilitarán cuando el patrocinio permita activar el almacenamiento. Puedes compartir un logro escrito.');
     const text = requireText(input.text, 'Texto', 2000);
     const title = input.kind === 'achievement' ? requireText(input.title, 'Logro', 100) : input.title.trim().slice(0, 100);
-    if (input.eventId && !events.some(e => e.id === input.eventId)) throw new Error('Evento asociado no encontrado.');
+    if (input.eventId && !availableEvents.some(e => e.id === input.eventId)) throw new Error('Evento asociado no encontrado.');
     let mediaUrl = '', mediaPath = '';
     try {
       if (input.kind !== 'achievement') {
@@ -417,7 +776,7 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
       }
       const post: CommunityPost = { id, authorId: user.id, authorName: user.name, kind: input.kind, text, title, mediaUrl, mediaPath, createdAt: stamp(), eventId: input.eventId };
       if (mode === 'demo') mutateDemo(data => ({ ...data, posts: [post, ...data.posts] }));
-      else await setDoc(doc(db, 'communityPosts', id), post);
+      else await setDoc(doc(db, 'communityPosts', id), { ...post, createdAt: serverTimestamp() });
     } catch (err) {
       if (mediaPath) { try { if (mode === 'demo') await deleteLocalMedia(id); else await deleteObject(ref(storage, mediaPath)); } catch { /* cleanup can be retried by admin */ } }
       throw err;
@@ -425,7 +784,7 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
     return id;
   }
   async function deletePost(id: string) {
-    const user = actor(); const post = availablePosts.find(p => p.id === id);
+    const user = sessionActor(); const cloudSnapshot = mode === 'cloud' ? await getDoc(doc(db, 'communityPosts', id)) : null; const post = cloudSnapshot?.exists() ? normalizePost(cloudSnapshot.data(), id) : availablePosts.find(p => p.id === id);
     if (!post || post.authorId !== user.id && !isAdmin) throw new Error('No tienes permiso para borrar esta publicación.');
     if (mode === 'demo') {
       mutateDemo(data => { const l = { ...data.likes }, c = { ...data.comments }; delete l[id]; delete c[id];
@@ -440,20 +799,20 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
     }
   }
   async function toggleLike(id: string) {
-    const user = actor(); if (!availablePosts.some(p => p.id === id)) throw new Error('Publicación no encontrada.');
-    if (mode === 'demo') mutateDemo(data => { const current = data.likes[id] || []; return { ...data, likes: { ...data.likes, [id]: current.includes(user.id) ? current.filter(i => i !== user.id) : [...current, user.id] } }; });
+    const user = sessionActor();
+    if (mode === 'demo') mutateDemo(data => { const current = data.likes[id] || []; if (!current.includes(user.id)) actor(); return { ...data, likes: { ...data.likes, [id]: current.includes(user.id) ? current.filter(i => i !== user.id) : [...current, user.id] } }; });
     else await runTransaction(db, async tx => { const like = doc(db, 'communityLikes', `${id}_${user.id}`); const snap = await tx.get(like);
-      if (snap.exists()) tx.delete(like); else tx.set(like, { userId: user.id, postId: id, createdAt: stamp() }); });
+      if (snap.exists()) tx.delete(like); else { actor(); tx.set(like, { userId: user.id, postId: id, createdAt: serverTimestamp() }); } });
   }
   async function addComment(id: string, value: string) {
     const user = actor(); if (!availablePosts.some(p => p.id === id)) throw new Error('Publicación no encontrada.');
     const comment = { id: newId(), authorId: user.id, authorName: user.name, text: requireText(value, 'Comentario', 1000), createdAt: stamp() };
     if (mode === 'demo') mutateDemo(data => ({ ...data, comments: { ...data.comments, [id]: [...(data.comments[id] || []), comment] } }));
-    else await setDoc(doc(db, 'communityComments', comment.id), { ...comment, postId: id });
+    else await setDoc(doc(db, 'communityComments', comment.id), { ...comment, postId: id, createdAt: serverTimestamp() });
   }
   async function reportPost(postId: string, reason: string) {
-    const user = actor(); const report: ContentReport = { id: newId(), reporterId: user.id, postId, reason: requireText(reason, 'Motivo', 1000), status: 'open', createdAt: stamp() };
-    if (mode === 'demo') mutateDemo(data => ({ ...data, reports: [...data.reports, report] })); else await setDoc(doc(db, 'communityReports', report.id), report);
+    const user = sessionActor(); const report: ContentReport = { id: newId(), reporterId: user.id, postId, reason: requireText(reason, 'Motivo', 1000), status: 'open', createdAt: stamp() };
+    if (mode === 'demo') mutateDemo(data => ({ ...data, reports: [...data.reports, report] })); else await setDoc(doc(db, 'communityReports', report.id), { ...report, createdAt: serverTimestamp() });
   }
   function hidePost(id: string) { const next = [...new Set([...hiddenPostIds, id])]; setHidden(next); localStorage.setItem(`cantera-hidden-${profile?.id || 'visitor'}`, JSON.stringify(next)); }
   async function requestVerification(organization: string, evidence: string) {
@@ -463,32 +822,32 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
     const request: VerificationRequest = { id: user.id, userId: user.id, name: user.name, organization: requireText(organization, 'Entidad', 100),
       evidence: requireText(evidence, 'Información para el administrador', 2000), status: 'pending', createdAt: stamp(), reviewedAt: '' };
     if (mode === 'demo') mutateDemo(data => ({ ...data, verifications: [...data.verifications.filter(v => v.id !== user.id), request] }));
-    else await setDoc(doc(db, 'communityVerifications', user.id), request);
+    else await setDoc(doc(db, 'communityVerifications', user.id), { ...request, createdAt: serverTimestamp() });
   }
   async function reviewVerification(id: string, approve: boolean) {
-    actor(); if (!isAdmin || mode !== 'cloud') throw new Error('Esta acción requiere la cuenta administradora.');
+    sessionActor(); if (!isAdmin || mode !== 'cloud') throw new Error('Esta acción requiere la cuenta administradora.');
     await runTransaction(db, async tx => { const r = doc(db, 'communityVerifications', id); const snapshot = await tx.get(r);
       if (!snapshot.exists() || snapshot.data().status !== 'pending') throw new Error('Solicitud no pendiente.');
       const target = approve ? await tx.get(doc(db, 'communityProfiles', id)) : null;
       const targetProfile = target?.exists() ? normalizeProfile(target.data(), target.id) : null;
       if (approve && !targetProfile) throw new Error('Perfil no disponible.');
-      tx.update(r, { status: approve ? 'approved' : 'rejected', reviewedAt: stamp() });
+      tx.update(r, { status: approve ? 'approved' : 'rejected', reviewedAt: serverTimestamp() });
       if (approve && targetProfile) {
         tx.update(doc(db, 'communityProfiles', id), { verification: 'verified' });
-        tx.set(doc(db, 'communityPublicProfiles', id), { ...normalizePublicProfile(targetProfile)!, verification: 'verified' });
+        tx.set(doc(db, 'communityPublicProfiles', id), { ...normalizePublicProfile(targetProfile)!, createdAt: target!.data().createdAt, searchTokens: profileSearchTokens(targetProfile), verification: 'verified' });
       } });
   }
   async function resolveReport(id: string, removePost: boolean) {
-    actor(); if (!isAdmin || mode !== 'cloud') throw new Error('Esta acción requiere la cuenta administradora.');
+    sessionActor(); if (!isAdmin || mode !== 'cloud') throw new Error('Esta acción requiere la cuenta administradora.');
     const report = reports.find(r => r.id === id); if (!report) throw new Error('Denuncia no encontrada.');
-    if (removePost) await deletePost(report.postId);
+    if (removePost) { if (report.commentId) await deleteComment(report.postId, report.commentId); else await deletePost(report.postId); }
     await updateDoc(doc(db, 'communityReports', id), { status: 'resolved' });
   }
-  const value: CommunityAPI = { profile, mode, loading, error, isAdmin, demoEnabled, mediaUploadsEnabled: mode === 'demo' || import.meta.env.VITE_ENABLE_MEDIA_UPLOADS === 'true', events, posts: availablePosts, likes, comments, verificationRequests, reports, hiddenPostIds,
+  const value: CommunityAPI = { profile, mode, loading, error, isAdmin, demoEnabled, accountModeration, mediaUploadsEnabled: mode === 'demo', runtimeConfig: mode === 'demo' ? { serviceStatus: 'open', mediaUploadsEnabled: true, contactEmail: '', updatedAt: '' } : { ...runtimeConfig, serviceStatus: serviceOpen ? 'open' : runtimeConfig.serviceStatus === 'paused' ? 'paused' : 'setup' }, adminRightsRequests, adminQueueHasMore, adminQueueLoading, loadMoreAdminQueue, suspendAccount, reviewRightsRequest, updateRuntimeStatus, ownEvents, ownEventsHasMore: false, ownEventsLoading: loading, loadMoreOwnEvents, ...pages, loadMoreEvents, loadMorePosts, fixtureData, fixtureStates, watchFixtureData, eventHistories, watchEventHistory, eventNotices, rightsRequests, blockedIds, toggleBlock, markNoticeRead, requestRights, retryEventNotices, postInteractionStates, watchPostInteractions, loadMoreComments, deleteComment, reportComment, searchPeople, events: availableEvents, posts: availablePosts, likes, comments, verificationRequests, reports, hiddenPostIds,
     profiles: peoplePage.mode === mode ? peoplePage.profiles : [], publicProfiles: publicCaches[mode], publicProfileStates: profileStates[mode], followingIds,
     peopleLoading: peoplePage.mode === mode && peoplePage.loading, peopleError: peoplePage.mode === mode ? peoplePage.error : '', peopleHasMore: peoplePage.mode !== mode || peoplePage.hasMore,
     loadMorePeople, watchPublicProfile, toggleFollow, watchPost, linkedPostStates: linkedStates[mode],
-    login, signOut, beginDemo, saveProfile, createEvent, joinEvent, leaveEvent, addGuest, setEventStatus, generateFixtures, saveScore,
+    login, loginAdmin, signOut, beginDemo, saveProfile, createEvent, createEventSeries, updateEvent, removeGuest, setRsvp, joinWaitlist, leaveWaitlist, saveMatchResult, scheduleFixture, joinEvent, leaveEvent, addGuest, setEventStatus, generateFixtures, saveScore,
     createPost, deletePost, toggleLike, addComment, reportPost, hidePost, requestVerification, reviewVerification, resolveReport };
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }

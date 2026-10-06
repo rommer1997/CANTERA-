@@ -1,4 +1,4 @@
-import type { EventInput, Fixture, PlayEvent, Standing } from './types';
+import type { EventInput, Fixture, FixtureSchedule, MatchResult, PlayEvent, Standing } from './types';
 
 export function requireText(value: string, label: string, max = 200): string {
   const text = value.trim();
@@ -19,6 +19,31 @@ export function validateEvent(input: EventInput, now = Date.now()): EventInput {
     country: requireText(input.country, 'País', 100), venue: requireText(input.venue, 'Lugar', 200), description: input.description.trim() };
 }
 
+export function validateEventEdit(event: PlayEvent, input: EventInput, reason: string, now = Date.now()): EventInput {
+  if (event.status === 'completed') throw new Error('Un encuentro celebrado no se puede reprogramar.');
+  requireText(reason, 'Motivo del cambio', 500);
+  const cleaned = validateEvent(input, now);
+  if (cleaned.capacity < Object.keys(event.participants).length) throw new Error('El aforo no puede ser menor que el número de inscripciones.');
+  if (Object.keys(event.participants).length && (cleaned.type !== event.type || cleaned.entry !== event.entry)) throw new Error('Con participantes inscritos no puedes cambiar el tipo de encuentro ni de inscripción.');
+  if (event.fixtures.length && (cleaned.type !== event.type || cleaned.entry !== event.entry || cleaned.format !== event.format || cleaned.tournamentFormat !== event.tournamentFormat)) throw new Error('Los cruces generados fijan el formato de la competición.');
+  if (cleaned.teamId !== event.teamId) throw new Error('No puedes cambiar el equipo organizador de un encuentro publicado.');
+  return cleaned;
+}
+
+export function validateFixtureSchedule(input: FixtureSchedule, now = Date.now()): FixtureSchedule {
+  const ms = Date.parse(input.startAt);
+  if (!Number.isFinite(ms) || ms <= now) throw new Error('El horario del cruce debe ser futuro.');
+  try { new Intl.DateTimeFormat('es', { timeZone: input.timeZone }).format(); } catch { throw new Error('Zona horaria inválida.'); }
+  return { startAt: new Date(ms).toISOString(), timeZone: input.timeZone, venue: requireText(input.venue, 'Lugar del cruce', 200) };
+}
+
+export function validateMatchResult(input: MatchResult): MatchResult {
+  const homeName = requireText(input.homeName, 'Equipo local', 100), awayName = requireText(input.awayName, 'Equipo visitante', 100);
+  if (homeName.normalize('NFKC').toLocaleLowerCase('es') === awayName.normalize('NFKC').toLocaleLowerCase('es')) throw new Error('Indica dos equipos diferentes.');
+  if (![input.homeScore, input.awayScore].every(value => Number.isInteger(value) && value >= 0 && value <= 99)) throw new Error('Introduce goles enteros entre 0 y 99.');
+  return { ...input, homeName, awayName };
+}
+
 export function joinParticipants(event: PlayEvent, id: string, name: string, now = Date.now()): Record<string, string> {
   if (event.status !== 'open' || event.fixtures.length || Date.parse(event.startAt) <= now) throw new Error('Las inscripciones están cerradas.');
   if (event.participants[id]) throw new Error('Ya estás inscrito.');
@@ -28,7 +53,7 @@ export function joinParticipants(event: PlayEvent, id: string, name: string, now
 
 export function makeFixtures(event: PlayEvent): Fixture[] {
   const ids = Object.keys(event.participants);
-  if (event.status === 'cancelled') throw new Error('El evento está cancelado.');
+  if (event.status === 'cancelled' || event.status === 'completed') throw new Error('No puedes generar cruces en un encuentro cancelado o celebrado.');
   if (event.fixtures.length) throw new Error('Ya se ha generado el calendario.');
   if (ids.length < 2 || ids.length > 32) throw new Error('El calendario admite entre 2 y 32 participantes.');
   if (event.tournamentFormat === 'knockout') {
@@ -97,16 +122,74 @@ function zonedParts(ms: number, timeZone: string): string {
   return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}`;
 }
 
-export function zonedDateTimeToIso(local: string, timeZone: string): string {
+export function isoToZonedDateTime(iso: string, timeZone: string): string {
+  const ms = Date.parse(iso);
+  if (!Number.isFinite(ms)) throw new Error('Fecha inválida.');
+  try { return zonedParts(ms, timeZone); } catch { throw new Error('Zona horaria inválida.'); }
+}
+
+export type EventRecurrence = 'weekly' | 'biweekly' | 'monthly';
+export function expandEventSeries(input: EventInput, frequency: EventRecurrence, count: number, now = Date.now()): EventInput[] {
+  if (!['weekly', 'biweekly', 'monthly'].includes(frequency)) throw new Error('Frecuencia de repetición inválida.');
+  if (!Number.isInteger(count) || count < 2 || count > 12) throw new Error('Una serie debe tener entre 2 y 12 encuentros.');
+  const original = validateEvent(input, now);
+  const local = isoToZonedDateTime(original.startAt, original.timeZone);
+  const [year, month, day] = local.slice(0, 10).split('-').map(Number);
+  const minuteRemainder = Date.parse(original.startAt) % 60_000;
+  return Array.from({ length: count }, (_, index) => {
+    if (!index) return { ...original };
+    let date: Date;
+    if (frequency === 'monthly') {
+      const target = new Date(Date.UTC(year, month - 1 + index, 1));
+      const lastDay = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate();
+      date = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth(), Math.min(day, lastDay)));
+    } else date = new Date(Date.UTC(year, month - 1, day + index * (frequency === 'weekly' ? 7 : 14)));
+    const nextLocal = `${date.toISOString().slice(0, 10)}${local.slice(10)}`;
+    let startAt: string;
+    try { startAt = new Date(Date.parse(zonedDateTimeToIso(nextLocal, original.timeZone)) + minuteRemainder).toISOString(); }
+    catch (error) { throw new Error(`El encuentro ${index + 1} no tiene una hora válida (${nextLocal.replace('T', ' ')}). ${error instanceof Error ? error.message : 'Elige otra hora.'}`); }
+    return validateEvent({ ...original, startAt, ...(original.startAtMs === undefined ? {} : { startAtMs: Date.parse(startAt) }) }, now);
+  });
+}
+
+export function buildEventCalendar(event: PlayEvent, invitation: string, fixtureId?: string, now = Date.now()): string {
+  const stamp = (date: number) => new Date(date).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+  const escape = (value: string) => value.replace(/\\/g, '\\\\').replace(/\r\n|\r|\n/g, '\\n').replace(/,/g, '\\,').replace(/;/g, '\\;');
+  const scheduled = event.fixtures.filter(fixture => fixture.startAt && fixture.awayId);
+  const fixture = fixtureId ? scheduled.find(item => item.id === fixtureId) : undefined;
+  if (fixtureId && !fixture) throw new Error('Este cruce todavía no tiene un horario asignado.');
+  const appointments = fixture ? [fixture] : scheduled.length ? scheduled : [null];
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Cantera//Encuentros//ES', 'CALSCALE:GREGORIAN', ...appointments.flatMap(item => {
+    const start = Date.parse(item?.startAt || event.startAt);
+    const summary = item ? `${event.title}: ${event.participants[item.homeId]} – ${event.participants[item.awayId]}` : event.title;
+    return ['BEGIN:VEVENT', `UID:${event.id}${item ? `-${item.id}` : ''}@cantera`, `DTSTAMP:${stamp(now)}`, `SEQUENCE:${event.revision || 0}`, `DTSTART:${stamp(start)}`, `DTEND:${stamp(start + 90 * 60_000)}`, `SUMMARY:${escape(summary)}`, `LOCATION:${escape(`${item?.venue || event.venue}, ${event.city}, ${event.country}`)}`, `DESCRIPTION:${escape(`${event.description}\n${invitation}\nZona horaria: ${item?.timeZone || event.timeZone}. Duración orientativa: 90 minutos. Confirmar con la organización.`)}`, `STATUS:${event.status === 'cancelled' ? 'CANCELLED' : 'CONFIRMED'}`, 'END:VEVENT'];
+  }), 'END:VCALENDAR'];
+  const encoder = new TextEncoder();
+  const fold = (line: string) => {
+    let output = '', size = 0;
+    for (const char of line) {
+      const bytes = encoder.encode(char).length;
+      if (size + bytes > 73) { output += '\r\n '; size = 1; }
+      output += char; size += bytes;
+    }
+    return output;
+  };
+  return `${lines.map(fold).join('\r\n')}\r\n`;
+}
+
+export function zonedDateTimeOptions(local: string, timeZone: string): string[] {
   if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(local)) throw new Error('Fecha y hora inválidas.');
   const target = Date.parse(`${local}:00Z`);
   if (!Number.isFinite(target) || new Date(target).toISOString().slice(0, 16) !== local) throw new Error('Fecha inválida.');
-  // Probe both sides of DST changes; choose the first occurrence for an ambiguous time.
   const candidates = [-36, -12, 0, 12, 36].map(hours => {
     const probe = target + hours * 3600000;
     const offset = Date.parse(`${zonedParts(probe, timeZone)}:00Z`) - probe;
     return target - offset;
   }).filter(ms => zonedParts(ms, timeZone) === local).sort((a, b) => a - b);
   if (!candidates.length) throw new Error('Esa hora no existe por el cambio horario. Elige otra hora.');
-  return new Date(candidates[0]).toISOString();
+  return [...new Set(candidates)].map(ms => new Date(ms).toISOString());
+}
+export function zonedDateTimeToIso(local: string, timeZone: string, occurrence: 'first' | 'second' = 'first'): string {
+  const candidates = zonedDateTimeOptions(local, timeZone);
+  return candidates[occurrence === 'second' && candidates.length > 1 ? 1 : 0];
 }

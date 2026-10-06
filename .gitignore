@@ -11,3 +11,6 @@ output/pdf/*.qa.json
 firebase-debug.log
 .env*
 !.env.example
+output/private/
+__pycache__/
+*.pyc

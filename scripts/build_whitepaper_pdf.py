@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Typeset the approved Markdown whitepaper with the Cantera visual identity.
+"""Typeset the versioned Markdown whitepaper with the Cantera visual identity.
 
 Run with the bundled Python runtime. Pass --expected-sha256 to freeze a final
 source version, then --publish to make an identical public download copy.
@@ -401,12 +401,12 @@ def build(source: Path, output: Path, publish: bool, expected_sha: str | None) -
     story: list[Flowable] = [Cover(version, date, status_match.group(1).strip()), NextPageTemplate('Body'), PageBreak(),
                              Spacer(1, 18), Paragraph('CONTENIDO', style['eyebrow']),
                              Paragraph('Guía de lectura', style['index_title']),
-                             Paragraph('El alcance y la hoja de ruta describen la intención del proyecto. La sección 16 identifica las pruebas realizadas y los pasos pendientes para publicar un servicio real.', style['note']),
+                             Paragraph('El alcance y la hoja de ruta describen la intención del proyecto. La sección 12 identifica las pruebas realizadas y los pasos pendientes para publicar un servicio real.', style['note']),
                              Spacer(1, 13), contents,
                              PageBreak()]
     story.extend(body)
     story.extend([CondPageBreak(560), SectionHeading('Origen y referencias', style['h2'], 'source-notes', 'Origen y referencias'),
-                  Paragraph('Esta edición se ha generado a partir de la fuente editable del proyecto. Se conserva el contenido aprobado y se añaden únicamente portada, índice, enlaces y datos de identificación del archivo.', style['body']),
+                  Paragraph('Esta edición se ha generado a partir de la fuente editable y versionada del proyecto. Se añaden portada, índice, enlaces y datos de identificación del archivo. Este documento no acredita la aprobación de apertura del servicio.', style['body']),
                   Paragraph(f'<b>Fuente:</b> {html.escape(source.name)}<br/><b>Versión de contenido:</b> {version}<br/><b>Fecha de edición:</b> {html.escape(date)}', style['body']),
                   Paragraph('Huella SHA-256 de la fuente', style['h3']),
                   Paragraph(f'<font name="CanteraMono" size="8.0">{source_sha}</font>', style['body']),
