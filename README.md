@@ -4,11 +4,11 @@ Comunidad de fútbol para organizar partidos y torneos gratis, coordinar equipos
 
 ## Estado de esta revisión
 
-**Edición de trabajo del 6 de octubre de 2026: código ampliado y pruebas locales superadas; apertura real pendiente.** No se declara el producto terminado para clientes. El sitio público [cantera-tau.vercel.app](https://cantera-tau.vercel.app/) continúa correspondiendo al prototipo anterior; esta revisión no se ha desplegado allí.
+**Edición de trabajo del 7 de octubre de 2026: configuración del responsable incorporada; apertura real pendiente de acceso y comprobación de Firebase.** El estado de esta puesta en marcha está en [RELEASE_2026-10-07.md](docs/RELEASE_2026-10-07.md). No se declara el producto terminado para clientes. El sitio público [cantera-tau.vercel.app](https://cantera-tau.vercel.app/) continúa correspondiendo al prototipo anterior; esta revisión no se ha desplegado allí.
 
 La auditoría remota del 6 de octubre encontró la base `ai-studio-647af55f-499b-43f3-9268-9bf5f62701bb`, región `eur3`, con reglas `deny-all`, sin bucket de Storage y sin facturación habilitada. Google Auth todavía no incluye `cantera-tau.vercel.app` entre sus dominios autorizados. El despliegue de reglas fue rechazado por revisión automática de aprobación; su autorización específica sigue pendiente. No se modificaron esos servicios ni se habilitaron costes.
 
-La versión vigente de aceptación es **`2026-10-06`**. Faltan nombre legal, contacto atendido y país del responsable, revisión de la operación y pruebas de recuperación y derechos. No se ha fabricado una identidad jurídica, una aprobación o un patrocinador.
+La versión vigente de aceptación es **`2026-10-06`**. El propietario ha declarado Rommer, persona física, España y `Rommer@garitocastizo.com`; estos datos están configurados en local y Vercel. Queda comprobar el canal atendido y completar la revisión de la operación, recuperación y derechos. El intento de reauditoría del 7 de octubre devuelve 403 con las sesiones disponibles: el estado remoto de hoy no está verificado. No se ha fabricado una identidad jurídica, una aprobación o un patrocinador.
 
 ## Alcance implementado en código local
 
@@ -50,7 +50,7 @@ Local: `http://127.0.0.1:3000/`. HashRouter: `/#/play`, `/#/feed`, `/#/people`, 
 
 **Evidencia histórica:** la [ejecución CI 37384779319](https://github.com/rommer1997/CANTERA-/actions/runs/37384779319), sobre `54fd7e98c9469dac60e0fedd53594e778f7b9751`, superó TypeScript, build y 49 casos: 14 de dominio/normalización, 19 emulados y 16 de limpieza. La revisión social `c4880af6bdc107fa3f56ced9d106e82b07943bff` documentó después 58 casos locales: 19 TS, 23 emulados y 16 de limpieza. Ambos registros pertenecen a entregas anteriores; **58 no es el total de esta ampliación**.
 
-En la copia de trabajo actual se han registrado TypeScript y 121 casos superados: 65 TS, 40 de seguridad emulada y 16 de limpieza con dobles. El QA local comprobó móvil 390×844 y 320×740 sin overflow, creación/visor y el recorrido equipo→aprobación→evento→espera/aviso. TypeScript y la compilación final cerrada pasan; los resultados no acreditan nube real. Firebase sigue en un bloque de 737,61 kB sin comprimir: el rendimiento en dispositivos y redes reales continúa pendiente de medición. La matriz completa está en [PLAN_CANTERA.md](PLAN_CANTERA.md). Un control pendiente no se marca superado por heredar una prueba histórica. La instalación mantiene la política estricta de scripts revisados en `pnpm-workspace.yaml`.
+La entrega del 6 de octubre `b9a7522e0470bf52f4e5242543faf8558f3e9d86` superó [Cantera CI #22](https://github.com/rommer1997/CANTERA-/actions/runs/37534230311): 156 casos, con 100 TS, 40 de reglas emuladas y 16 de limpieza. La ampliación del 7 de octubre añade 21 pruebas offline de preparación Auth/limpieza manual y 3 de reglas; sus 121 pruebas TS, TypeScript y compilación cerrada pasan en local. Los emuladores se ejecutan en CI porque no hay JVM local; comprobar esa ejecución sobre el commit de entrega antes de desplegar. Los recorridos móviles de entregas anteriores son evidencia histórica, no pruebas de cuentas cloud reales. Firebase sigue en un bloque de 737,61 kB sin comprimir: el rendimiento en dispositivos y redes reales continúa pendiente de medición. La matriz completa está en [PLAN_CANTERA.md](PLAN_CANTERA.md). Un control pendiente no se marca superado por heredar una prueba histórica. La instalación mantiene la política estricta de scripts revisados en `pnpm-workspace.yaml`.
 
 ## Demostración separada
 
@@ -70,7 +70,7 @@ Perfil → Probar en este dispositivo permite ensayar sin crear cuentas externas
 
 `scripts/export-account.cjs` prepara una exportación revisable por UID: sólo lectura cloud y salida privada local cuando se solicita explícitamente. Filtra datos ajenos y credenciales; no descarga los archivos multimedia ni borra registros. Requiere procedimiento del operador y comprobación real antes de cerrar la puerta de derechos.
 
-`cleanupCommunityPost` en `functions/` dispone de pruebas offline y está pendiente de despliegue financiado e invocación real. Trata nuevos borrados y reintentos, con límites sobre documentos y archivos propios; no acredita limpieza histórica, baja completa, retirada de copias o supresión de medios nunca publicados.
+`cleanupCommunityPost` en `functions/` dispone de pruebas offline y está pendiente de despliegue financiado e invocación real. Para el núcleo sin funciones cloud, las reglas preparadas ocultan a terceros las interacciones de una publicación retirada y `scripts/cleanup-deleted-posts.cjs` permite limpiar físicamente likes/comentarios de IDs concretos: dry-run por defecto, lotes limitados y comprobación transaccional de que el padre siga ausente. No descarga ni borra medios y no sustituye la supresión de una cuenta. Consulta [ACCOUNT_RIGHTS.md](docs/ACCOUNT_RIGHTS.md).
 
 ## Viabilidad y pendientes
 

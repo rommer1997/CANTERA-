@@ -315,6 +315,81 @@ describe('Publicaciones e interacciones', { concurrency: false }, () => {
     await assertSucceeds(deleteDoc(doc(db('alice'), 'communityPosts/post')));
     await assertFails(setDoc(doc(bob, 'communityComments/after-delete'), { ...comment, id: 'after-delete' }));
   });
+
+  test('consultas, contadores y primera transacción de like conservan acceso con padre visible', async () => {
+    await seed('communityPosts/post', post());
+    for (let index = 0; index < 35; index++) await seed(`communityComments/c-${index}`, {
+      id: `c-${index}`, authorId: 'bob', authorName: 'bob', text: 'Comentario de prueba', postId: 'post', createdAt: stamp(),
+    });
+    await seed('communityLikes/post_bob', { userId: 'bob', postId: 'post', createdAt: stamp() });
+    const carol = db('carol');
+    const likes = query(collection(carol, 'communityLikes'), where('postId', '==', 'post'));
+    const comments = query(collection(carol, 'communityComments'), where('postId', '==', 'post'));
+    assert.equal((await assertSucceeds(getCountFromServer(likes))).data().count, 1);
+    assert.equal((await assertSucceeds(getCountFromServer(comments))).data().count, 35);
+    assert.equal((await assertSucceeds(getDocs(query(comments, orderBy('createdAt', 'desc'), limit(30))))).size, 30);
+    await assertSucceeds(getDocs(query(likes, orderBy('createdAt', 'desc'), limit(1))));
+    assert.equal((await assertSucceeds(getDoc(doc(carol, 'communityLikes/post_carol')))).exists(), false);
+    await assertSucceeds(runTransaction(carol, async tx => {
+      const target = doc(carol, 'communityLikes/post_carol');
+      assert.equal((await tx.get(target)).exists(), false);
+      tx.set(target, { userId: 'carol', postId: 'post', createdAt: stamp() });
+    }));
+    await assertFails(getDocs(collection(carol, 'communityComments')));
+    await assertFails(getDoc(doc(db(), 'communityLikes/post_carol')));
+  });
+
+  test('borrar padre oculta huérfanos a terceros; autores conservan consulta y retirada propias', async () => {
+    await seed('communityPosts/post', post());
+    await seed('communityLikes/post_inactive', { userId: 'inactive', postId: 'post', createdAt: stamp() });
+    await seed('communityComments/retained', { id: 'retained', authorId: 'inactive', authorName: 'inactive', text: 'Mi comentario', postId: 'post', createdAt: stamp() });
+    await assertSucceeds(deleteDoc(doc(db('alice'), 'communityPosts/post')));
+    for (const status of ['open', 'paused', 'setup']) {
+      await seed('communityConfiguration/runtime', { serviceStatus: status, mediaUploadsEnabled: false, contactEmail: '', updatedAt: stamp() });
+      for (const uid of ['carol', 'alice']) {
+        const client = db(uid);
+        await assertFails(getDoc(doc(client, 'communityLikes/post_inactive')));
+        await assertFails(getDoc(doc(client, 'communityComments/retained')));
+        for (const name of ['communityLikes', 'communityComments']) {
+          const byPost = query(collection(client, name), where('postId', '==', 'post'));
+          await assertFails(getDocs(byPost));
+          await assertFails(getCountFromServer(byPost));
+        }
+      }
+      const inactive = db('inactive');
+      await assertSucceeds(getDoc(doc(inactive, 'communityLikes/post_inactive')));
+      await assertSucceeds(getDoc(doc(inactive, 'communityComments/retained')));
+      await assertSucceeds(getDocs(query(collection(inactive, 'communityLikes'), where('userId', '==', 'inactive'))));
+      await assertSucceeds(getDocs(query(collection(inactive, 'communityComments'), where('authorId', '==', 'inactive'))));
+    }
+    await assertSucceeds(getDoc(doc(db('admin'), 'communityComments/retained')));
+    await assertFails(deleteDoc(doc(db('carol'), 'communityComments/retained')));
+    await assertFails(deleteDoc(doc(db('carol'), 'communityLikes/post_inactive')));
+    const inactive = db('inactive');
+    await assertSucceeds(runTransaction(inactive, async tx => {
+      const target = doc(inactive, 'communityLikes/post_inactive');
+      assert.equal((await tx.get(target)).exists(), true);
+      tx.delete(target);
+    }));
+    await assertSucceeds(deleteDoc(doc(db('inactive'), 'communityComments/retained')));
+  });
+
+  test('padre conservado y servicio pausado limita interacciones a sus autores y al dueño del post', async () => {
+    await seed('communityPosts/post', post());
+    await seed('communityLikes/post_bob', { userId: 'bob', postId: 'post', createdAt: stamp() });
+    await seed('communityComments/retained', { id: 'retained', authorId: 'bob', authorName: 'bob', text: 'Mi comentario', postId: 'post', createdAt: stamp() });
+    await seed('communityConfiguration/runtime', { serviceStatus: 'paused', mediaUploadsEnabled: false, contactEmail: '', updatedAt: stamp() });
+    for (const name of ['communityLikes', 'communityComments']) {
+      const byPost = client => query(collection(client, name), where('postId', '==', 'post'));
+      await assertFails(getDocs(byPost(db('carol'))));
+      await assertFails(getCountFromServer(byPost(db('carol'))));
+      await assertSucceeds(getDocs(byPost(db('alice'))));
+      await assertSucceeds(getCountFromServer(byPost(db('alice'))));
+    }
+    await assertSucceeds(getDoc(doc(db('bob'), 'communityComments/retained')));
+    await assertSucceeds(deleteDoc(doc(db('bob'), 'communityComments/retained')));
+    await assertSucceeds(deleteDoc(doc(db('bob'), 'communityLikes/post_bob')));
+  });
 });
 
 describe('Verificación privada y moderación administrativa', { concurrency: false }, () => {

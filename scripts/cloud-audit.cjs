@@ -1,4 +1,5 @@
 const fs = require('node:fs');
+const {resolve} = require('node:path');
 const auth = require('firebase-tools/lib/auth');
 const {requireAuth} = require('firebase-tools/lib/requireAuth');
 const rules = require('firebase-tools/lib/gcp/rules');
@@ -6,7 +7,7 @@ const storage = require('firebase-tools/lib/gcp/storage');
 const firebaseAuth = require('firebase-tools/lib/gcp/auth');
 (async () => {
   const project = 'gen-lang-client-0853130215';
-  const account = auth.getGlobalDefaultAccount();
+  const account = auth.getProjectDefaultAccount(resolve(__dirname, '..'));
   if (!account) throw new Error('Firebase CLI requiere una sesión del propietario.');
   const options = {project}; auth.setActiveAccount(options, account); await requireAuth(options);
   const releases = await rules.listAllReleases(project);

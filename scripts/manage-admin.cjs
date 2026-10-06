@@ -1,11 +1,12 @@
 // Run only from an owner-authorized Firebase CLI session. No client-side role switch.
 const auth = require('firebase-tools/lib/auth');
+const {resolve} = require('node:path');
 const {requireAuth} = require('firebase-tools/lib/requireAuth');
 const firebaseAuth = require('firebase-tools/lib/gcp/auth');
 (async () => {
  const args=process.argv.slice(2);const index=args.indexOf('--email');const email=index>=0?args[index+1]:'';
  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error('Uso: node scripts/manage-admin.cjs --email CORREO [--apply]');
- const project='gen-lang-client-0853130215';const options={project};const account=auth.getGlobalDefaultAccount();
+ const project='gen-lang-client-0853130215';const options={project};const account=auth.getProjectDefaultAccount(resolve(__dirname, '..'));
  if (!account) throw new Error('Accede primero al Firebase CLI con una cuenta propietaria autorizada.');
  auth.setActiveAccount(options,account);await requireAuth(options);
  const user=await firebaseAuth.findUser(project,email);

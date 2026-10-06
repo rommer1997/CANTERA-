@@ -35,3 +35,19 @@ Operación: documentar la cuenta administradora, la asistencia y la recuperació
 Después de verificar el acta, ejecutar `pnpm check:release`, compilar con modo de prueba desactivado y confirmar el estado `open` de `communityConfiguration/runtime` desde una cuenta administradora. El cambio de reglas remoto previamente bloqueado requiere la aprobación pendiente del propietario. No debe abrirse mediante un código cliente alternativo.
 
 Fotos y vídeos continúan cerrados hasta patrocinio. El núcleo de coordinación y publicaciones de texto puede abrirse sin ellos cuando el resto de controles esté completo. La carga futura necesita cuotas y un servicio autorizado que valide los archivos; no basta con cambiar una variable de Vite.
+
+## Configuración preparada el 7 de octubre
+
+La identificación y el contacto declarados por el propietario están configurados en local y Vercel. Consulta el estado de acceso y las comprobaciones pendientes en [RELEASE_2026-10-07.md](RELEASE_2026-10-07.md). Las sesiones Firebase disponibles no tienen permisos para reauditar reglas, Auth o base; esto es un bloqueo de acceso real, distinto de la aprobación de despliegue.
+
+Los scripts con Firebase CLI respetan la cuenta elegida para esta carpeta. Tras iniciar sesión con la cuenta propietaria mediante `pnpm exec firebase login:add`, seleccionar esa cuenta con `pnpm exec firebase login:use CORREO_DE_LA_CUENTA` si no es ya la cuenta activa. No entregar códigos, claves ni tokens en el chat. Comprobar permisos antes de ejecutar cualquier cambio.
+
+El dominio Auth se prepara conservando los dominios actuales:
+
+```sh
+node scripts/prepare-auth-domain.cjs --domain cantera-tau.vercel.app --dry-run
+```
+
+Sólo tras revisar el resultado y autorizar el cambio, `--apply` añade ese dominio y vuelve a consultar la lista. No habilita proveedores, no crea cuentas, no concede administración y no modifica facturación. La API no admite precondición sobre la lista; evitar cambios simultáneos desde la consola al aplicar.
+
+La limpieza física de likes/comentarios retirados tiene una alternativa manual con simulación por defecto y sin Functions. Las reglas preparadas cierran la lectura de interacciones huérfanas a terceros, manteniendo acceso y retirada propios. El procedimiento está en [ACCOUNT_RIGHTS.md](ACCOUNT_RIGHTS.md).

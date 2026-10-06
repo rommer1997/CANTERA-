@@ -23,14 +23,14 @@ Decisión D-09: facturación, Storage y funciones esperan financiación de un pa
 
 La apertura requiere además [RELEASE_REVIEW.md](RELEASE_REVIEW.md), datos legales confirmados y las comprobaciones allí enumeradas. No se creó un acta de aprobación.
 
-## 1. Información real pendiente del responsable
+## 1. Información declarada y comprobaciones pendientes del responsable
 
 | Dato | Situación | Evidencia de cierre |
 |---|---|---|
-| Nombre completo o denominación de quien presta el servicio | Pendiente de respuesta del propietario | Dato confirmado y publicado donde corresponda. |
-| Correo de soporte, privacidad y verificación | Pendiente de configuración | Buzón real atendido; recepción y respuesta comprobadas. |
-| País de establecimiento | Pendiente de respuesta | País confirmado y revisión del ámbito aplicable. |
-| Persona física o entidad; forma y datos de identificación pertinentes | Pendiente de respuesta | Datos reales, sin atribuir una asociación/fundación no constituida. |
+| Nombre completo o denominación de quien presta el servicio | Nombre declarado por el propietario: Rommer; configurado el 7 de octubre | Confirmar que identifica adecuadamente al responsable y publicar los datos pertinentes. |
+| Correo de soporte, privacidad y verificación | `Rommer@garitocastizo.com`, aportado y configurado el 7 de octubre | Buzón real atendido; recepción y respuesta pendientes de comprobar. |
+| País de establecimiento | España; ciudad declarada Madrid | País configurado y revisión del ámbito aplicable pendiente. |
+| Persona física o entidad; forma y datos de identificación pertinentes | Persona física, confirmado por el propietario | Iniciativa gratuita con orientación sin fines de lucro; no se afirma una entidad constituida. |
 | Dirección y demás información obligatoria según ámbito | Pendiente de revisión | Información necesaria confirmada por el responsable. |
 | Cuenta Firebase con privilegio administrativo | Pendiente de comprobar en nube | UID seguro, claim administrativo y recuperación verificadas. |
 | Territorios e idiomas de difusión inicial | Visión global; operación por definir | Registro de ámbitos y capacidad de atención. |

@@ -803,7 +803,8 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
       if (post.mediaPath) { const mediaId = post.mediaPath.startsWith('local:') ? post.mediaPath.slice(6) : id; await deleteLocalMedia(mediaId); mediaCache.current?.drop(mediaId); }
     } else {
       await deleteDoc(doc(db, 'communityPosts', id));
-      // The server deletion trigger also removes interactions and retries failed media cleanup.
+      // Retained interactions become unavailable to others under the prepared rules.
+      // Physical cleanup uses the owner's bounded maintenance script until the trigger is funded.
       if (post.mediaPath) {
         try { await deleteObject(ref(storage, post.mediaPath)); } catch (err) { console.error('Media cleanup deferred to the server', err); }
       }

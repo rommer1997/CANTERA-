@@ -43,4 +43,20 @@ Si una consulta, un índice, las credenciales o la escritura privada fallan, no 
 
 ## Borrado
 
+### Publicaciones retiradas sin Functions
+
+El borrado del documento de una publicación no elimina por sí mismo sus likes/comentarios. Las reglas preparadas impiden que terceros consulten esas interacciones cuando el padre ya no existe; sus autores conservan consulta y retirada propias y la administración conserva acceso para tramitar derechos. Esta protección requiere desplegar las reglas autorizadas; no se atribuye al estado remoto todavía pendiente.
+
+El operador puede revisar IDs concretos de publicaciones retiradas mediante:
+
+```sh
+node scripts/cleanup-deleted-posts.cjs --post ID --dry-run
+```
+
+Para la eliminación física, después de revisar y autorizar ese alcance, sustituir `--dry-run` por `--apply`. Requiere ADC autorizadas y dependencias Admin de `functions/`, sin desplegar Functions ni activar facturación. Cada lote verifica transaccionalmente que la publicación siga ausente; si reaparece, sus interacciones quedan protegidas. Máximo 20 IDs explícitos, 200 documentos por lote y 8 lotes globales por defecto; `--max-batches` admite hasta 32. Si se agota el presupuesto, el resumen indica desde qué posición de la lista continuar: omitir los IDs anteriores ya revisados para que los primeros vacíos no consuman repetidamente el límite. La herramienta no imprime IDs, texto, correos ni credenciales y no borra publicaciones activas ni archivos.
+
+Una simulación o una ejecución limitada no acredita que toda la limpieza esté completada. Comprobar el resumen y repetir con los IDs pendientes hasta concluir. Este mantenimiento no sustituye la supresión completa de una cuenta.
+
+### Cuenta completa
+
 Esta herramienta **no borra datos**, no cambia Auth, no concede permisos y no despliega servicios. Las solicitudes de eliminación quedan para revisión del operador. Antes de automatizarlas hay que acordar cómo transferir o cerrar equipos y encuentros organizados, tratar resultados compartidos y conservar o retirar registros de coordinación y moderación. La exportación no acredita por sí sola que una solicitud de borrado esté resuelta.

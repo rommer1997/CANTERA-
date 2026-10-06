@@ -397,8 +397,17 @@ service cloud.firestore {
       allow update: if false;
       allow delete: if owner(resource.data.authorId) || admin();
     }
+    // Removing the parent immediately hides other people's retained interactions.
+    // Authors can still retrieve and withdraw their own data during a service pause.
+    function readablePostInteraction(postId) {
+      return hasPost(postId) && (runtimeOpen()
+        || owner(get(/databases/$(database)/documents/communityPosts/$(postId)).data.authorId));
+    }
     match /communityLikes/{id} {
-      allow read: if signed();
+      // An absent document must remain readable for the first like transaction.
+      allow get: if signed() && (!exists(/databases/$(database)/documents/communityLikes/$(id))
+        || owner(resource.data.userId) || admin() || readablePostInteraction(resource.data.postId));
+      allow list: if signed() && (owner(resource.data.userId) || admin() || readablePostInteraction(resource.data.postId));
       allow create: if active() && interactionAllowed(request.resource.data.postId) && request.resource.data.keys().hasAll(['userId', 'postId', 'createdAt'])
         && request.resource.data.keys().hasOnly(['userId', 'postId', 'createdAt'])
         && request.resource.data.userId == request.auth.uid && hasPost(request.resource.data.postId)
@@ -407,7 +416,9 @@ service cloud.firestore {
       allow delete: if owner(resource.data.userId) && id == resource.data.postId + '_' + request.auth.uid;
     }
     match /communityComments/{id} {
-      allow read: if signed();
+      allow get: if signed() && (!exists(/databases/$(database)/documents/communityComments/$(id))
+        || owner(resource.data.authorId) || admin() || readablePostInteraction(resource.data.postId));
+      allow list: if signed() && (owner(resource.data.authorId) || admin() || readablePostInteraction(resource.data.postId));
       allow create: if active() && interactionAllowed(request.resource.data.postId) && request.resource.data.keys().hasAll(['id', 'authorId', 'authorName', 'text', 'createdAt', 'postId'])
         && request.resource.data.keys().hasOnly(['id', 'authorId', 'authorName', 'text', 'createdAt', 'postId'])
         && request.resource.data.id == id && request.resource.data.authorId == request.auth.uid

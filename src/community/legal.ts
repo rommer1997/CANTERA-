@@ -2,6 +2,7 @@ export const operator = {
   name: import.meta.env.VITE_OPERATOR_NAME || '',
   email: import.meta.env.VITE_CONTACT_EMAIL || '',
   country: import.meta.env.VITE_OPERATOR_COUNTRY || '',
+  kind: 'Persona física',
 };
 export const legalReady = Boolean(operator.name && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(operator.email) && operator.country);
 export const legalDocuments = {
