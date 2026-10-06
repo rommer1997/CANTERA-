@@ -32,13 +32,15 @@ Migración: convertir las fechas antiguas conservando su instante, añadir prefi
 
 Operación: documentar la cuenta administradora, la asistencia y la recuperación de datos. La exportación y supresión se tramitan mediante el procedimiento de derechos; una solicitud pendiente no equivale a una supresión realizada. Probar el procedimiento con datos de ensayo antes del lanzamiento.
 
-Después de verificar el acta, ejecutar `pnpm check:release`, compilar con modo de prueba desactivado y confirmar el estado `open` de `communityConfiguration/runtime` desde una cuenta administradora. El cambio de reglas remoto previamente bloqueado requiere la aprobación pendiente del propietario. No debe abrirse mediante un código cliente alternativo.
+Después de verificar el acta, ejecutar `pnpm check:release`, compilar con modo de prueba desactivado y confirmar el estado `open` de `communityConfiguration/runtime` desde una cuenta administradora. El propietario ya autorizó el cambio concreto de reglas e índices el 7 de octubre; su aplicación sigue pendiente de acceso a Firebase. No debe abrirse mediante un código cliente alternativo.
 
 Fotos y vídeos continúan cerrados hasta patrocinio. El núcleo de coordinación y publicaciones de texto puede abrirse sin ellos cuando el resto de controles esté completo. La carga futura necesita cuotas y un servicio autorizado que valide los archivos; no basta con cambiar una variable de Vite.
 
 ## Configuración preparada el 7 de octubre
 
 La identificación y el contacto declarados por el propietario están configurados en local y Vercel. Consulta el estado de acceso y las comprobaciones pendientes en [RELEASE_2026-10-07.md](RELEASE_2026-10-07.md). Las sesiones Firebase disponibles no tienen permisos para reauditar reglas, Auth o base; esto es un bloqueo de acceso real, distinto de la aprobación de despliegue.
+
+El destino solicitado ahora es Firebase Hosting. `pnpm build:hosting` utiliza los mismos datos de Vite y las mismas comprobaciones de apertura, y declara Firebase como alojamiento en la ficha de proveedores. Consulta [FIREBASE_HOSTING.md](FIREBASE_HOSTING.md) para publicación y prueba previa. No se ha retirado la web anterior ni se ha abierto automáticamente el registro.
 
 Los scripts con Firebase CLI respetan la cuenta elegida para esta carpeta. Tras iniciar sesión con la cuenta propietaria mediante `pnpm exec firebase login:add`, seleccionar esa cuenta con `pnpm exec firebase login:use CORREO_DE_LA_CUENTA` si no es ya la cuenta activa. No entregar códigos, claves ni tokens en el chat. Comprobar permisos antes de ejecutar cualquier cambio.
 

@@ -4,11 +4,11 @@ import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import localConfig from '../firebase-applet-config.json';
 
-// Support for both local development and Vercel environment variables
+// Public Firebase configuration is compiled by Vite, independently of Hosting.
 const getFirebaseConfig = () => {
   const env = import.meta.env;
   
-  // Try to use environment variables first (Vercel)
+  // Prefer explicit build environment variables.
   if (env.VITE_FIREBASE_API_KEY) {
     return {
       apiKey: env.VITE_FIREBASE_API_KEY,
@@ -36,7 +36,7 @@ const getFirebaseConfig = () => {
 const config = getFirebaseConfig();
 
 if (!config.apiKey || config.apiKey.includes('TODO')) {
-  console.warn("Firebase API Key is missing or invalid. Check your Environment Variables in Vercel.");
+  console.warn("Firebase API Key is missing or invalid. Check the public Firebase build configuration.");
 }
 
 const app = initializeApp(config);
