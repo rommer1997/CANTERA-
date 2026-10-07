@@ -737,6 +737,19 @@ async function connectWithCode(client, uid, code = '23456789ABCDEFGH') {
     tx.set(second, { ownerId: uid, peerId: inviter, inviteId: code, createdAt: stamp() });
   });
 }
+function writeConnectionPair(client, inviter, recipient, code) {
+  // Send a complete request directly to rules, without a client-side "already
+  // connected" check that would abort before the backend evaluates the writes.
+  const batch = writeBatch(client);
+  batch.update(doc(client, 'communityInvitations', code), { status: 'used', usedBy: recipient, usedAt: stamp() });
+  batch.set(doc(client, `communityConnections/${inviter}/members/${recipient}`), { ownerId: inviter, peerId: recipient, inviteId: code, createdAt: stamp() });
+  batch.set(doc(client, `communityConnections/${recipient}/members/${inviter}`), { ownerId: recipient, peerId: inviter, inviteId: code, createdAt: stamp() });
+  return batch.commit();
+}
+async function assertPrivateReadFails(promise, label) {
+  try { await assertFails(promise); }
+  catch (error) { throw new Error(`Lectura privada no denegada: ${label}.`, { cause: error }); }
+}
 async function admitWithCode(client, uid, code = '23456789ABCDEFGH', overrides = {}) {
   return runTransaction(client, async tx => {
     const token = doc(client, 'communityInvitations', code); const current = (await tx.get(token)).data();
@@ -794,9 +807,12 @@ describe('Códigos de un uso, conexiones y eventos privados', { concurrency: fal
     await assertFails(updateDoc(doc(bob, 'communityConnections/bob/members/alice'), { peerId: 'carol' }));
     await assertFails(connectWithCode(verifiedDb('carol'), 'carol', code));
     assert.equal((await getDoc(doc(alice, 'communityInvitations', code))).data().usedBy, 'bob');
+    await assertFails(writeConnectionPair(bob, 'alice', 'bob', code));
     await setDoc(doc(alice, 'communityInvitations/23456789ABCDEFGJ'), invitation('23456789ABCDEFGJ'));
-    await assertFails(connectWithCode(bob, 'bob', '23456789ABCDEFGJ'));
+    await assertFails(writeConnectionPair(bob, 'alice', 'bob', '23456789ABCDEFGJ'));
     assert.equal((await getDoc(doc(alice, 'communityInvitations/23456789ABCDEFGJ'))).data().status, 'active');
+    assert.equal((await getDoc(doc(bob, 'communityConnections/alice/members/bob'))).data().inviteId, code);
+    assert.equal((await getDoc(doc(bob, 'communityConnections/bob/members/alice'))).data().inviteId, code);
   });
   test('dos receptores simultáneos sólo consumen un código una vez y retirada requiere borrar ambas aristas incluso en pausa', async () => {
     const alice = verifiedDb('alice'); await setDoc(doc(alice, 'communityInvitations/23456789ABCDEFGH'), invitation());
@@ -819,13 +835,13 @@ describe('Códigos de un uso, conexiones y eventos privados', { concurrency: fal
     await seed('communityFixtures/private_r1-1', { eventId: 'private', ...fixture });
     await seed('communityEventChanges/private_1', { eventId: 'private', ownerId: 'alice', title: 'Título privado', summary: 'Contenido privado', revision: 1 });
     await seed('matches/legacy-private', { eventId: 'private', venue: 'No público' });
-    for (const client of [db(), db('carol')]) {
-      await assertFails(getDoc(doc(client, 'communityEvents/private')));
-      await assertFails(getDocs(collection(client, 'communityEvents')));
-      await assertFails(getDoc(doc(client, 'communityFixtures/private_r1-1')));
-      await assertFails(getDocs(query(collection(client, 'communityFixtures'), where('eventId', '==', 'private'))));
-      await assertFails(getDoc(doc(client, 'communityEventChanges/private_1')));
-      await assertFails(getDoc(doc(client, 'matches/legacy-private')));
+    for (const [actor, client] of [['visitante', db()], ['contacto sin inscripción', db('carol')]]) {
+      await assertPrivateReadFails(getDoc(doc(client, 'communityEvents/private')), `${actor}: communityEvents/private`);
+      await assertPrivateReadFails(getDocs(collection(client, 'communityEvents')), `${actor}: lista communityEvents sin filtro`);
+      await assertPrivateReadFails(getDoc(doc(client, 'communityFixtures/private_r1-1')), `${actor}: communityFixtures/private_r1-1`);
+      await assertPrivateReadFails(getDocs(query(collection(client, 'communityFixtures'), where('eventId', '==', 'private'))), `${actor}: lista communityFixtures del evento privado`);
+      await assertPrivateReadFails(getDoc(doc(client, 'communityEventChanges/private_1')), `${actor}: communityEventChanges/private_1`);
+      await assertPrivateReadFails(getDoc(doc(client, 'matches/legacy-private')), `${actor}: matches/legacy-private`);
       await assertSucceeds(getDocs(query(collection(client, 'communityEvents'), where('visibility', '==', 'public'), orderBy('createdAt', 'desc'))));
       await assertSucceeds(getDoc(doc(client, 'communityEvents/legacy')));
     }
