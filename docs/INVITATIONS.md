@@ -34,4 +34,4 @@ La actualización de la PWA conserva los módulos de las pestañas anteriores ha
 
 La demo usa dos almacenes de este navegador y lleva una etiqueta visible. Sus códigos no funcionan en otros dispositivos y no acreditan una transacción cloud o uso con clientes reales. No se añaden perfiles de ejemplo al backend.
 
-Después del despliegue de reglas, completar el recorrido entre dos cuentas reales y la administración antes de abrir el registro. La publicación anterior no contiene esta funcionalidad; el estado desplegado se registra en `RELEASE_2026-10-07.md`.
+Después del despliegue de reglas, completar el recorrido entre dos cuentas reales y la administración antes de abrir el registro. Las interfaces están publicadas en LaCantera; sus nuevas reglas cloud siguen pendientes de aprobación y despliegue. El estado desplegado se registra en `RELEASE_2026-10-07.md`.
