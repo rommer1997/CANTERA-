@@ -28,6 +28,8 @@ Las pruebas de dominio cubren generación, formato, normalización, caducidad, r
 
 En navegador se verificó con dos cuentas locales la conexión recíproca, copia del código, inscripción por código en un torneo privado con nombre de equipo propio y retirada del acceso al abandonar el encuentro. El diálogo se comprobó a 390×844 y 320×740; sin desbordamiento horizontal, con desplazamiento interno en la pantalla pequeña. Estas son pruebas aisladas, no cuentas reales.
 
+El lector se probó con imágenes PNG generadas para este ensayo: un QR de invitación abre la ruta interna con su código, y un QR de un dominio ajeno muestra un rechazo sin navegar. El lector a 320×740 y la cabecera a 820×1000 no desbordan horizontalmente. Las pruebas de cámara usan dobles locales (permisos tardíos, cierre, navegación, segundo plano y selección de imagen); no se ha probado aún la cámara de un teléfono físico.
+
 La actualización de la PWA conserva los módulos de las pestañas anteriores hasta actualizarse o cerrarse. Otra pestaña ofrece «Recargar app» sin recargar automáticamente sus formularios. Diez pruebas aisladas comprueban el cambio de versión, los módulos diferidos, la limpieza de cachés y que Firebase, cuentas y medios quedan fuera de esa caché estática.
 
 La demo usa dos almacenes de este navegador y lleva una etiqueta visible. Sus códigos no funcionan en otros dispositivos y no acreditan una transacción cloud o uso con clientes reales. No se añaden perfiles de ejemplo al backend.

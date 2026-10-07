@@ -195,7 +195,7 @@ export function QrScanner({ onCode, onClose }: { onCode(code: string): void; onC
   <header className="cqr-head"><div><p className="c-eyebrow">CONECTA CON TU GENTE</p><h2 id={titleId}>Escanear QR</h2></div><button type="button" className="cqr-close" aria-label="Cerrar lector QR" autoFocus onClick={close}><X size={21} /></button></header>
   <p id={descriptionId} className="cqr-description">Lee el QR de una invitación para conectar o entrar en un encuentro privado. Después podrás revisarla y decidir si la aceptas.</p>
   <div className={`cqr-preview ${status === 'camera' ? 'active' : ''}`} aria-busy={status === 'starting' || status === 'image'}>
-   <video ref={video} muted playsInline aria-label="Vista de la cámara para leer el QR" className="cqr-video" />
+   <video ref={video} muted playsInline aria-hidden={status !== 'camera'} aria-label="Vista de la cámara para leer el QR" className="cqr-video" />
    {status !== 'camera' ? <div className="cqr-placeholder"><ScanLine size={46} aria-hidden="true" /><span>{status === 'image' ? 'Leyendo imagen…' : status === 'starting' ? 'Iniciando cámara…' : 'Tu invitación empieza con un QR'}</span></div> : <div className="cqr-guide" aria-hidden="true" />}
   </div>
   <p className="cqr-status" role="status" aria-live="polite">{statusText}</p>
