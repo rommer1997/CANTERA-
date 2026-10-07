@@ -833,16 +833,22 @@ describe('Códigos de un uso, conexiones y eventos privados', { concurrency: fal
     await seed('communityEvents/private', event('private', { visibility: 'private', type: 'tournament', participants: { bob: 'bob' }, participantIds: ['bob'] }));
     await seed('communityConnections/alice/members/carol', { ownerId: 'alice', peerId: 'carol', inviteId: '23456789ABCDEFGH', createdAt: stamp() });
     await seed('communityFixtures/private_r1-1', { eventId: 'private', ...fixture });
+    await seed('communityFixtures/public_r1-1', { eventId: 'public', ...fixture });
     await seed('communityEventChanges/private_1', { eventId: 'private', ownerId: 'alice', title: 'Título privado', summary: 'Contenido privado', revision: 1 });
+    await seed('communityEventChanges/public_1', { eventId: 'public', ownerId: 'alice', title: 'Título público', summary: 'Contenido público', revision: 1 });
     await seed('matches/legacy-private', { eventId: 'private', venue: 'No público' });
     for (const [actor, client] of [['visitante', db()], ['contacto sin inscripción', db('carol')]]) {
       await assertPrivateReadFails(getDoc(doc(client, 'communityEvents/private')), `${actor}: communityEvents/private`);
       await assertPrivateReadFails(getDocs(collection(client, 'communityEvents')), `${actor}: lista communityEvents sin filtro`);
       await assertPrivateReadFails(getDoc(doc(client, 'communityFixtures/private_r1-1')), `${actor}: communityFixtures/private_r1-1`);
+      await assertPrivateReadFails(getDocs(collection(client, 'communityFixtures')), `${actor}: lista communityFixtures sin filtro`);
       await assertPrivateReadFails(getDocs(query(collection(client, 'communityFixtures'), where('eventId', '==', 'private'))), `${actor}: lista communityFixtures del evento privado`);
       await assertPrivateReadFails(getDoc(doc(client, 'communityEventChanges/private_1')), `${actor}: communityEventChanges/private_1`);
+      await assertPrivateReadFails(getDocs(collection(client, 'communityEventChanges')), `${actor}: lista communityEventChanges sin filtro`);
       await assertPrivateReadFails(getDoc(doc(client, 'matches/legacy-private')), `${actor}: matches/legacy-private`);
       await assertSucceeds(getDocs(query(collection(client, 'communityEvents'), where('visibility', '==', 'public'), orderBy('createdAt', 'desc'))));
+      await assertSucceeds(getDocs(query(collection(client, 'communityFixtures'), where('eventId', '==', 'public'))));
+      await assertSucceeds(getDocs(query(collection(client, 'communityEventChanges'), where('eventId', '==', 'public'))));
       await assertSucceeds(getDoc(doc(client, 'communityEvents/legacy')));
     }
     await assertSucceeds(getDoc(doc(db('bob'), 'communityEvents/private')));
@@ -856,15 +862,24 @@ describe('Códigos de un uso, conexiones y eventos privados', { concurrency: fal
   });
   test('canje privado crea plaza y recibo juntos sin lectura previa; un recibo aislado no autoriza entrada', async () => {
     const alice = verifiedDb('alice'); const bob = verifiedDb('bob'); const code = '23456789ABCDEFGH';
-    await setDoc(doc(alice, 'communityEvents/private'), event('private', { visibility: 'private', participantIds: [], type: 'tournament' }));
+    await setDoc(doc(alice, 'communityEvents/private'), event('private', { visibility: 'private', participantIds: [], type: 'tournament', entry: 'teams' }));
     await setDoc(doc(alice, 'communityInvitations', code), invitation(code, { kind: 'event', eventId: 'private' }));
     await assertFails(getDoc(doc(bob, 'communityEvents/private')));
     await assertFails(updateDoc(doc(bob, 'communityEvents/private'), { participants: { bob: 'bob' }, participantIds: ['bob'] }));
     await assertFails(setDoc(doc(bob, 'communityEventAdmissions/private/members/bob'), { eventId: 'private', userId: 'bob', inviteId: code, createdAt: stamp() }));
     await assertFails(admitWithCode(db('bob'), 'bob', code));
-    await assertSucceeds(admitWithCode(bob, 'bob', code));
+    await assertFails(admitWithCode(bob, 'bob', code, { capacity: 32 }));
+    await assertFails(admitWithCode(bob, 'bob', code, { capacity: 64 }));
+    await assertFails(admitWithCode(bob, 'bob', code, { visibility: 'public' }));
+    await assertFails(admitWithCode(bob, 'bob', code, { ownerId: 'bob' }));
+    await assertFails(admitWithCode(bob, 'bob', code, { 'participants.bob': { name: 'Equipo invitado' } }));
+    assert.equal((await getDoc(doc(alice, 'communityInvitations', code))).data().status, 'active');
+    assert.equal((await getDoc(doc(alice, 'communityEventAdmissions/private/members/bob'))).exists(), false);
+    const unchanged = (await getDoc(doc(alice, 'communityEvents/private'))).data();
+    assert.equal(unchanged.capacity, 4); assert.equal(unchanged.visibility, 'private'); assert.equal(unchanged.ownerId, 'alice'); assert.deepEqual(unchanged.participants, {});
+    await assertSucceeds(admitWithCode(bob, 'bob', code, { 'participants.bob': 'Equipo invitado' }));
     const accepted = (await getDoc(doc(bob, 'communityEvents/private'))).data();
-    assert.deepEqual(accepted.participants, { bob: 'bob' }); assert.deepEqual(accepted.participantIds, ['bob']); assert.equal(accepted.rsvps.bob, 'yes');
+    assert.deepEqual(accepted.participants, { bob: 'Equipo invitado' }); assert.deepEqual(accepted.participantIds, ['bob']); assert.equal(accepted.rsvps.bob, 'yes');
     await assertSucceeds(getDoc(doc(bob, 'communityEventAdmissions/private/members/bob')));
     await assertFails(getDoc(doc(verifiedDb('carol'), 'communityEventAdmissions/private/members/bob')));
     await assertFails(getDocs(collection(bob, 'communityEventAdmissions/private/members')));

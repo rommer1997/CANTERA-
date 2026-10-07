@@ -55,8 +55,8 @@ service cloud.firestore {
     function consumedInvitation(code, kind, eventId) {
       let before = get(/databases/$(database)/documents/communityInvitations/$(code)).data;
       let after = getAfter(/databases/$(database)/documents/communityInvitations/$(code)).data;
-      // All callers first establish the verified active actor. The event update
-      // establishes active() in selfParticipation and adds verified email below.
+      // Connections establish verifiedActor directly. Event admission callers
+      // prove absent -> present membership, whose event rule establishes it.
       return freshInvitationState(before) && before.kind == kind && before.eventId == eventId
         && after.status == 'used' && after.usedBy == request.auth.uid && after.usedAt == request.time;
     }
@@ -115,11 +115,14 @@ service cloud.firestore {
       allow update: if validInvitation(request.resource.data, code)
         && (owner(resource.data.ownerId) && resource.data.status == 'active'
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']) && request.resource.data.status == 'revoked'
-          || freshInvitation(resource.data)
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'usedBy', 'usedAt'])
+          || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'usedBy', 'usedAt'])
             && request.resource.data.status == 'used' && request.resource.data.usedBy == request.auth.uid && request.resource.data.usedAt == request.time
-            && (resource.data.kind == 'connection' && connectionPair(code, resource.data.ownerId)
-              || resource.data.kind == 'event' && admissionPair(code, resource.data.eventId, resource.data.ownerId)));
+            && (resource.data.kind == 'connection' && freshInvitation(resource.data) && connectionPair(code, resource.data.ownerId)
+              // A private event admission must change absent -> present for this
+              // actor. Its event rule establishes verifiedActor exactly once;
+              // this branch still validates code freshness, blocks and receipt.
+              || resource.data.kind == 'event' && freshInvitationState(resource.data)
+                && admissionPair(code, resource.data.eventId, resource.data.ownerId)));
       allow delete: if false;
     }
     match /communityConnections/{ownerUid}/members/{peerUid} {
@@ -139,7 +142,9 @@ service cloud.firestore {
       allow get: if owner(uid) || admin()
         || owner(get(/databases/$(database)/documents/communityEvents/$(eventId)).data.ownerId);
       allow list: if admin() || owner(get(/databases/$(database)/documents/communityEvents/$(eventId)).data.ownerId);
-      allow create, update: if owner(uid) && verifiedActor() && validAdmission(request.resource.data, eventId, uid)
+      // admissionPair requires a real new event membership in this same atomic
+      // operation, whose event rule enforces age/terms/runtime/email/suspension.
+      allow create, update: if owner(uid) && validAdmission(request.resource.data, eventId, uid)
         && consumedInvitation(request.resource.data.inviteId, 'event', eventId)
         && admissionPair(request.resource.data.inviteId, eventId,
           getAfter(/databases/$(database)/documents/communityInvitations/$(request.resource.data.inviteId)).data.ownerId);
@@ -336,7 +341,7 @@ service cloud.firestore {
         && (responseAfter == responseBefore || responseAfter[uid] in ['yes', 'no', 'maybe'])
         && after.diff(before).changedKeys().size() == 0 && (
           active() && !(uid in before) && uid in after && resource.data.status == 'open'
-            && (eventPublic(resource.data) || owner(resource.data.ownerId) || privateAdmission(resource.data.id) && after[uid] == actorProfile().name)
+            && (eventPublic(resource.data) || owner(resource.data.ownerId) || privateAdmission(resource.data.id))
             && resource.data.get('waitlistOrder', []).size() == 0 && added.size() == 1 && removed.size() == 0
             && text(after[uid], 1, 100) && unchangedWaitlist()
           || uid in before && !(uid in after) && removed == [uid] && (
@@ -417,6 +422,45 @@ service cloud.firestore {
         && (data.status != 'completed' || data.startAtMs <= request.time.toMillis() && resource.data.status != 'cancelled' && (data.type != 'match' || 'result' in data))
         && (!changed.hasAny(['teamId']) || data.get('teamId', '') == '' || teamManager(data.teamId) && teamRecord(data.teamId).status == 'active');
     }
+    function privateEventParticipation(id, changed) {
+      let before = resource.data;
+      let after = request.resource.data;
+      let uid = request.auth.uid;
+      let participantKeys = after.participants.keys();
+      let participantIds = after.get('participantIds', participantKeys);
+      let rsvps = after.get('rsvps', {});
+      // Only these three fields can differ: all metadata, capacity, fixture,
+      // history and waiting-list validations remain inherited unchanged from
+      // the validated event. Check every mutable invariant here once, then
+      // prove the verified recipient's atomic code + admission receipt.
+      return verifiedActor() && changed.hasOnly(['participants', 'participantIds', 'rsvps'])
+        && after.keys().hasAll(['participantIds', 'rsvps'])
+        && before.get('visibility', 'public') == 'private' && before.ownerId != uid
+        && !(uid in before.participants) && uid in after.participants
+        && before.status == 'open' && before.startAtMs > request.time.toMillis()
+        && before.fixtures.size() == 0 && before.get('fixtureIds', []).size() == 0
+        && before.get('waitlistOrder', []).size() == 0
+        && after.participants.diff(before.participants).affectedKeys().hasOnly([uid])
+        && text(after.participants[uid], 1, 100) && participantKeys.size() <= before.capacity
+        && participantIds is list && participantIds.size() == participantKeys.size()
+        && participantIds.toSet() == participantKeys.toSet()
+        && rsvps is map && rsvps.size() <= 128 && rsvps.diff(before.get('rsvps', {})).affectedKeys().hasOnly([uid])
+        && rsvps[uid] == 'yes' && privateAdmission(id);
+    }
+    function eventUpdate(id) {
+      let before = resource.data;
+      let after = request.resource.data;
+      let changed = after.diff(before).affectedKeys();
+      let privateJoin = before.get('visibility', 'public') == 'private' && before.ownerId != request.auth.uid
+        && after.participants is map && !(request.auth.uid in before.participants) && request.auth.uid in after.participants;
+      return privateJoin ? privateEventParticipation(id, changed)
+        : validEventState(after) && after.createdAt == before.createdAt && after.ownerId == before.ownerId
+          && after.ownerName == before.ownerName && after.id == before.id
+          && after.get('visibility', 'public') == before.get('visibility', 'public')
+          && (changed.hasAny(['revision']) ? organizerEventUpdate(id)
+            : changed.hasAny(['participants']) ? selfParticipation()
+              : changed.hasAny(['rsvps']) ? selfRsvp() : selfWaitlist());
+    }
     match /communityEvents/{id} {
       allow get: if eventReadable(resource.data);
       allow list: if eventListReadable(resource.data);
@@ -427,15 +471,7 @@ service cloud.firestore {
         && request.resource.data.get('waitlist', {}).size() == 0 && request.resource.data.get('rsvps', {}).size() == 0
         && request.resource.data.get('revision', 0) == 0 && request.resource.data.get('history', []).size() == 0
         && (!('teamId' in request.resource.data) || request.resource.data.teamId == '' || teamManager(request.resource.data.teamId) && teamRecord(request.resource.data.teamId).status == 'active');
-      allow update: if signed() && validEventState(request.resource.data)
-        && request.resource.data.createdAt == resource.data.createdAt && request.resource.data.ownerId == resource.data.ownerId
-        && request.resource.data.ownerName == resource.data.ownerName && request.resource.data.id == resource.data.id
-        && request.resource.data.get('visibility', 'public') == resource.data.get('visibility', 'public')
-        && (request.resource.data.diff(resource.data).affectedKeys().hasAny(['revision'])
-          ? organizerEventUpdate(id)
-          : request.resource.data.diff(resource.data).affectedKeys().hasAny(['participants'])
-            ? selfParticipation()
-            : request.resource.data.diff(resource.data).affectedKeys().hasAny(['rsvps']) ? selfRsvp() : selfWaitlist());
+      allow update: if signed() && eventUpdate(id);
       allow delete: if false;
     }
     match /communityEventChanges/{id} {
