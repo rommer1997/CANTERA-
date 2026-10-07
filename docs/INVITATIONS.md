@@ -6,7 +6,7 @@ En **Conexiones**, una cuenta completa crea un código y su QR para conectar con
 
 La persona invitada abre `/#/invite/CODIGO` o introduce el código en `/#/connect`. Necesita una cuenta con correo verificado, país, ciudad, mayoría de edad declarada y términos actuales aceptados. Se vuelve al enlace después de completar la cuenta. Aceptar una conexión crea dos contactos privados; cualquiera puede desconectar ambos. Seguir una cuenta sigue siendo una función pública independiente.
 
-Aceptar un código de evento inscribe a la persona sólo si el encuentro sigue abierto, futuro, sin calendario cerrado y con una plaza disponible. No se consume un código al fallar la inscripción. La invitación no muestra título, lugar ni participantes antes del canje. Conectar con un organizador tampoco permite ver sus eventos privados.
+Aceptar un código de evento inscribe a la persona sólo si el encuentro sigue abierto, futuro, sin calendario cerrado y con una plaza disponible. La persona elige el nombre público de su inscripción (jugador, grupo o equipo). No se consume un código al fallar la inscripción. La invitación no muestra título, lugar ni participantes antes del canje. Conectar con un organizador tampoco permite ver sus eventos privados.
 
 La privacidad se fija al crear el encuentro. Los privados se consultan por su organización, participantes y administrador; quedan fuera de búsqueda, feed, perfiles públicos y agenda pública del equipo. No pueden vincularse a una publicación pública. Los participantes acceden al mismo calendario y resultados del encuentro después de inscribirse.
 
@@ -25,6 +25,10 @@ No se activa facturación, Storage, Functions, chat o envío de SMS. Fotos y ví
 ## Verificación y límites
 
 Las pruebas de dominio cubren generación, formato, normalización, caducidad, reintentos y conexiones. Las reglas se prueban en Firestore emulado, incluyendo canje concurrente, aforo, consultas privadas, recibos y suplantación. Registrar el resultado exacto del CI antes de desplegar.
+
+En navegador se verificó con dos cuentas locales la conexión recíproca, copia del código, inscripción por código en un torneo privado con nombre de equipo propio y retirada del acceso al abandonar el encuentro. El diálogo se comprobó a 390×844 y 320×740; sin desbordamiento horizontal, con desplazamiento interno en la pantalla pequeña. Estas son pruebas aisladas, no cuentas reales.
+
+La actualización de la PWA conserva los módulos de las pestañas anteriores hasta actualizarse o cerrarse. Otra pestaña ofrece «Recargar app» sin recargar automáticamente sus formularios. Diez pruebas aisladas comprueban el cambio de versión, los módulos diferidos, la limpieza de cachés y que Firebase, cuentas y medios quedan fuera de esa caché estática.
 
 La demo usa dos almacenes de este navegador y lleva una etiqueta visible. Sus códigos no funcionan en otros dispositivos y no acreditan una transacción cloud o uso con clientes reales. No se añaden perfiles de ejemplo al backend.
 
