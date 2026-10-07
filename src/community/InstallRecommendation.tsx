@@ -69,16 +69,16 @@ export function InstallRecommendation() {
       await request.request();
       if (mounted.current) dismiss();
     } catch {
-      if (mounted.current) { setError('El navegador no pudo abrir la instalación. Puedes añadir Cantera siguiendo estos pasos.'); setGuideOpen(true); }
+      if (mounted.current) { setError('El navegador no pudo abrir la instalación. Puedes añadir LaCantera siguiendo estos pasos.'); setGuideOpen(true); }
     } finally { if (mounted.current) setInstalling(false); }
   };
 
   if (runningAsApp || dismissed) return null;
   return <>
-    <aside className="c-install-recommendation" aria-label="Instalar Cantera">
+    <aside className="c-install-recommendation" aria-label="Instalar LaCantera">
       <div className="c-install-content">
         <img className="c-install-app-icon" src={`${import.meta.env.BASE_URL}cantera-mark.svg`} width="40" height="40" alt="" />
-        <div className="c-install-copy"><strong>Instala Cantera</strong><span>Gratis · en tu pantalla de inicio</span></div>
+        <div className="c-install-copy"><strong>Instala LaCantera</strong><span>Gratis · en tu pantalla de inicio</span></div>
         <button ref={trigger} type="button" className="c-button secondary c-install-action" onClick={() => void install()} disabled={installing} aria-haspopup={installer ? undefined : 'dialog'}><Download size={16} aria-hidden="true" />{installing ? 'Abriendo…' : installer ? 'Instalar' : 'Ver cómo'}</button>
         <button type="button" className="c-install-close" aria-label="Cerrar recomendación de instalación" onClick={dismiss}><X size={18} aria-hidden="true" /></button>
       </div>
@@ -104,26 +104,26 @@ function InstallationGuide({ device, setDevice, close, dismiss, trigger, error }
   }, [trigger]);
 
   return <dialog ref={dialog} className="c-install-dialog" aria-labelledby={title} onCancel={event => { event.preventDefault(); close(); }}>
-    <header><div><img src={`${import.meta.env.BASE_URL}cantera-mark.svg`} width="48" height="48" alt="" /><h2 id={title}>Cantera, a un toque</h2></div><button type="button" className="c-install-close" aria-label="Cerrar guía de instalación" onClick={close}><X size={20} aria-hidden="true" /></button></header>
+    <header><div><img src={`${import.meta.env.BASE_URL}cantera-mark.svg`} width="48" height="48" alt="" /><h2 id={title}>LaCantera, a un toque</h2></div><button type="button" className="c-install-close" aria-label="Cerrar guía de instalación" onClick={close}><X size={20} aria-hidden="true" /></button></header>
     <p>Añádela a tu pantalla de inicio para abrir tu comunidad de fútbol como una app.</p>
-    <div className="c-install-devices" role="group" aria-label="Dispositivo para instalar Cantera">{(Object.keys(deviceNames) as InstallationDevice[]).map(value => <button type="button" key={value} aria-pressed={device === value} onClick={() => setDevice(value)}>{deviceNames[value]}</button>)}</div>
+    <div className="c-install-devices" role="group" aria-label="Dispositivo para instalar LaCantera">{(Object.keys(deviceNames) as InstallationDevice[]).map(value => <button type="button" key={value} aria-pressed={device === value} onClick={() => setDevice(value)}>{deviceNames[value]}</button>)}</div>
     {error ? <p className="c-error" role="alert">{error}</p> : null}
     {device === 'ios' ? <ol className="c-install-steps">
-      <li><strong>Abre Cantera en Safari.</strong><span>Si estás en otra app o navegador, abre esta misma dirección en Safari.</span></li>
+      <li><strong>Abre LaCantera en Safari.</strong><span>Si estás en otra app o navegador, abre esta misma dirección en Safari.</span></li>
       <li><strong>Toca Compartir <Share size={16} aria-hidden="true" />.</strong><span>Según tu versión, está en la barra o dentro del menú de página.</span></li>
       <li><strong>Elige “Añadir a pantalla de inicio”.</strong><span>Si no aparece, revisa “Editar acciones” al final de la lista.</span></li>
-      <li><strong>Confirma con “Añadir”.</strong><span>Activa “Abrir como app web” si aparece. Después abre Cantera desde su icono.</span></li>
+      <li><strong>Confirma con “Añadir”.</strong><span>Activa “Abrir como app web” si aparece. Después abre LaCantera desde su icono.</span></li>
     </ol> : device === 'android' ? <>
       <ol className="c-install-steps">
-        <li><strong>Abre Cantera en Chrome.</strong><span>Si estás dentro de otra app, abre esta misma dirección en el navegador.</span></li>
+        <li><strong>Abre LaCantera en Chrome.</strong><span>Si estás dentro de otra app, abre esta misma dirección en el navegador.</span></li>
         <li><strong>Abre el menú de los tres puntos.</strong><span>Busca “Instalar y crear acceso directo” → “Instalar”, o “Añadir a pantalla de inicio”, según tu versión.</span></li>
-        <li><strong>Confirma y abre el icono de Cantera.</strong><span>El navegador te indicará los últimos pasos.</span></li>
+        <li><strong>Confirma y abre el icono de LaCantera.</strong><span>El navegador te indicará los últimos pasos.</span></li>
       </ol>
-      <p className="c-install-tip">Si sólo ofrece “Crear acceso directo”, también puedes añadirlo. Ese atajo abrirá Cantera en el navegador.</p>
+      <p className="c-install-tip">Si sólo ofrece “Crear acceso directo”, también puedes añadirlo. Ese atajo abrirá LaCantera en el navegador.</p>
     </> : <ol className="c-install-steps">
-      <li><strong>Abre Cantera en Chrome o Edge.</strong><span>Usa un navegador que admita instalar aplicaciones web.</span></li>
-      <li><strong>Busca el icono de instalación.</strong><span>Puede estar en la barra de direcciones o en el menú del navegador, como “Instalar Cantera” o “Instalar esta página como aplicación”.</span></li>
-      <li><strong>Confirma la instalación.</strong><span>Cantera aparecerá entre tus aplicaciones. Si la opción no está disponible, puedes seguir usando la web.</span></li>
+      <li><strong>Abre LaCantera en Chrome o Edge.</strong><span>Usa un navegador que admita instalar aplicaciones web.</span></li>
+      <li><strong>Busca el icono de instalación.</strong><span>Puede estar en la barra de direcciones o en el menú del navegador, como “Instalar LaCantera” o “Instalar esta página como aplicación”.</span></li>
+      <li><strong>Confirma la instalación.</strong><span>LaCantera aparecerá entre tus aplicaciones. Si la opción no está disponible, puedes seguir usando la web.</span></li>
     </ol>}
     <a className="c-install-help" href={helpUrls[device]} target="_blank" rel="noopener noreferrer">Ayuda del navegador <ArrowUpRight size={15} aria-hidden="true" /></a>
     <footer><span>Instalación gratuita.</span><button type="button" className="c-button" onClick={dismiss}>Entendido</button></footer>

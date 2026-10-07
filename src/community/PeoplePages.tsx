@@ -149,7 +149,7 @@ export function PublicProfilePage() {
   async function share() {
     if (!person) return;
     const url = new URL(window.location.href); url.hash = `/people/${encodeURIComponent(person.id)}`;
-    try { if (navigator.share) await navigator.share({ title: `${person.name} · Cantera`, url: url.href }); else if (navigator.clipboard?.writeText) { await navigator.clipboard.writeText(url.href); setShareStatus('Enlace copiado.'); } else { setShareFallback(url.href); setShareStatus('Copia el enlace de este perfil.'); } }
+    try { if (navigator.share) await navigator.share({ title: `${person.name} · LaCantera`, url: url.href }); else if (navigator.clipboard?.writeText) { await navigator.clipboard.writeText(url.href); setShareStatus('Enlace copiado.'); } else { setShareFallback(url.href); setShareStatus('Copia el enlace de este perfil.'); } }
     catch (err) { if ((err as { name?: string }).name !== 'AbortError') { setShareFallback(url.href); setShareStatus('Copia el enlace de este perfil.'); } }
   }
   if (serviceUnavailable) return <PeopleUnavailable paused={runtimeConfig.serviceStatus === 'paused'} detail />;

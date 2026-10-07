@@ -16,7 +16,7 @@ export default function Logo({ className, size = 'md' }: LogoProps) {
 
   return (
     <div className={cn("font-bold select-none flex items-baseline", sizeClasses[size], className)}>
-      <span className="text-charcoal dark:text-white transition-colors duration-300 uppercase">CANTERA</span>
+      <span className="text-charcoal dark:text-white transition-colors duration-300">LaCantera</span>
       <span className="text-red-600 ml-0.5 md:ml-1">.</span>
     </div>
   );

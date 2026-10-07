@@ -174,8 +174,8 @@ export default function Cantera2PlayerDashboard() {
     try {
       if (navigator.share) {
         await navigator.share({
-          title: 'Cantera Player Profile',
-          text: 'Check out my football profile on Cantera!',
+          title: 'LaCantera Player Profile',
+          text: 'Check out my football profile on LaCantera!',
           url: window.location.href,
         });
       } else {
@@ -340,7 +340,7 @@ export default function Cantera2PlayerDashboard() {
               className="bg-white dark:bg-charcoal p-8 rounded-3xl border border-border-subtle max-w-sm w-full text-center"
               onClick={e => e.stopPropagation()}
             >
-              <h3 className="text-xl font-bold mb-2">My Cantera QR</h3>
+              <h3 className="text-xl font-bold mb-2">My LaCantera QR</h3>
               <p className="text-sm text-charcoal/50 dark:text-ice/50 mb-8">Scouts can scan this to view your profile instantly.</p>
               
               <div className="bg-white p-4 rounded-2xl inline-block mb-8">

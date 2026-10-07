@@ -11,9 +11,9 @@ interface LanguageContextType {
 const translations: Record<Language, Record<string, string>> = {
   es: {
     // Cantera 1
-    'c1.title': 'CANTERA',
+    'c1.title': 'LaCantera',
     'c1.subtitle': 'La Red Global de Talento Futbolístico',
-    'c1.desc': 'Cantera es la plataforma integral que conecta a jugadores emergentes con ojeadores y clubes, facilitando el descubrimiento y desarrollo profesional en un entorno seguro.',
+    'c1.desc': 'LaCantera es la plataforma integral que conecta a jugadores emergentes con ojeadores y clubes, facilitando el descubrimiento y desarrollo profesional en un entorno seguro.',
     'c1.role.player': 'El Atleta',
     'c1.role.player.desc': 'Accede a tu CV Atlético, métricas de rendimiento y ofertas en Escrow.',
     'c1.role.referee': 'El Árbitro',
@@ -117,7 +117,7 @@ const translations: Record<Language, Record<string, string>> = {
     'tier.diamond': 'DIAMANTE',
     'tier.diamond_pro': 'DIAMANTE PRO',
     'verification.title': 'Sistema de Verificación',
-    'verification.desc': 'Conoce los requisitos para alcanzar cada nivel de certificación en CANTERA.',
+    'verification.desc': 'Conoce los requisitos para alcanzar cada nivel de certificación en LaCantera.',
     'verification.gold.title': 'Nivel ORO',
     'verification.gold.req': 'Validación de identidad básica, perfil completo y al menos 1 año de experiencia registrada.',
     'verification.diamond.title': 'Nivel DIAMANTE',
@@ -332,9 +332,9 @@ const translations: Record<Language, Record<string, string>> = {
   },
   en: {
     // Cantera 1
-    'c1.title': 'CANTERA',
+    'c1.title': 'LaCantera',
     'c1.subtitle': 'The Global Football Talent Network',
-    'c1.desc': 'Cantera is the comprehensive platform connecting emerging players with scouts and clubs, facilitating discovery and professional development in a secure environment.',
+    'c1.desc': 'LaCantera is the comprehensive platform connecting emerging players with scouts and clubs, facilitating discovery and professional development in a secure environment.',
     'c1.role.player': 'The Athlete',
     'c1.role.player.desc': 'Access your Athletic CV, performance metrics, and Escrow offers.',
     'c1.role.referee': 'The Referee',
@@ -438,7 +438,7 @@ const translations: Record<Language, Record<string, string>> = {
     'tier.diamond': 'DIAMOND',
     'tier.diamond_pro': 'DIAMOND PRO',
     'verification.title': 'Verification System',
-    'verification.desc': 'Learn the requirements to reach each certification level in CANTERA.',
+    'verification.desc': 'Learn the requirements to reach each certification level in LaCantera.',
     'verification.gold.title': 'GOLD Tier',
     'verification.gold.req': 'Basic identity validation, complete profile, and at least 1 year of registered experience.',
     'verification.diamond.title': 'DIAMOND Tier',

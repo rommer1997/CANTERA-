@@ -23,7 +23,7 @@ export function readDemo(): DemoData {
     try { const parsed = JSON.parse(raw); if (parsed.version === 1 && Array.isArray(parsed.events) && Array.isArray(parsed.posts)) return parsed; } catch { /* recover an invalid local demo */ }
   }
   return { version: 1, profile: null, profiles: [], follows: [], events: [], posts: [
-    { id: 'demo-welcome', authorId: 'example-community', authorName: 'Comunidad Cantera · ejemplo', kind: 'achievement', title: 'El fútbol empieza con un encuentro',
+    { id: 'demo-welcome', authorId: 'example-community', authorName: 'Comunidad LaCantera · ejemplo', kind: 'achievement', title: 'El fútbol empieza con un encuentro',
       text: 'Este es un contenido de ejemplo. Crea tu primer partido, reúne a tu equipo y comparte lo que habéis conseguido. Tus cambios en el modo de prueba se guardan en este navegador.', mediaUrl: '', mediaPath: '', createdAt: now, eventId: '' }
   ], likes: {}, comments: {}, verifications: [], reports: [], blocked: {}, notices: [], rightsRequests: [] };
 }

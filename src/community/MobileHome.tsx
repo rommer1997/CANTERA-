@@ -29,7 +29,7 @@ export function MobileHome() {
   const locationQuery = profile?.city && profile.country ? `?${new URLSearchParams({ city: profile.city, country: profile.country })}` : '';
   return <div className="c-mobile-home">
     <section className="c-mobile-welcome" aria-labelledby="c-mobile-home-title">
-      <p>{profile ? `Hola, ${profile.name.split(' ')[0]}` : 'Bienvenido a Cantera'}</p><h1 id="c-mobile-home-title">Tu fútbol, hoy.</h1>
+      <p>{profile ? `Hola, ${profile.name.split(' ')[0]}` : 'Bienvenido a LaCantera'}</p><h1 id="c-mobile-home-title">Tu fútbol, hoy.</h1>
       <Link className="c-mobile-location" to={`/play${locationQuery}`}><MapPin size={16} aria-hidden="true" /><span>{locationQuery ? `${profile!.city}, ${profile!.country}` : 'Explorar por ciudad'}</span><ChevronRight size={15} aria-hidden="true" /></Link>
     </section>
     <div className="c-mobile-actions">

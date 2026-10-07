@@ -61,5 +61,5 @@ export function AppAvailability() {
   activationRequested.current = true;
   registration.waiting.postMessage({ type: 'ACTIVATE_UPDATE' });
  }
- return <>{offline ? <div className="c-service-status" role="status"><WifiOff size={17} /> Sin conexión. Los cambios en la comunidad requieren volver a conectarte.</div> : null}{registration || reloadAvailable ? <div className="c-service-status" role="status">Hay una nueva versión de Cantera. <button className="c-button secondary" onClick={updateApp}><RefreshCw size={16} />{reloadAvailable ? 'Recargar app' : 'Actualizar app'}</button></div> : null}<InstallRecommendation /></>;
+ return <>{offline ? <div className="c-service-status" role="status"><WifiOff size={17} /> Sin conexión. Los cambios en la comunidad requieren volver a conectarte.</div> : null}{registration || reloadAvailable ? <div className="c-service-status" role="status">Hay una nueva versión de LaCantera. <button className="c-button secondary" onClick={updateApp}><RefreshCw size={16} />{reloadAvailable ? 'Recargar app' : 'Actualizar app'}</button></div> : null}<InstallRecommendation /></>;
 }

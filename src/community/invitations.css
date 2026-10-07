@@ -10,6 +10,9 @@
 .ci-entry-input input { font-family: ui-monospace,monospace; font-size: 17px; letter-spacing: .07em; text-transform: uppercase; }
 .ci-entry > button { align-self: end; height: 46px; }
 .ci-entry > .c-error { grid-column: 1 / -1; }
+.ci-scan-entry { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 16px; padding-top: 14px; border-top: 1px solid var(--c-line); }
+.ci-scan-entry p { font-size: 12px; }
+.ci-scan-entry .c-button { min-height: 44px; }
 .ci-count { display: inline-grid; place-items: center; min-width: 26px; height: 26px; padding: 0 7px; background: var(--c-surface); border-radius: 8px; font-size: 13px; }
 .ci-empty { padding: 34px; border: 1px dashed var(--c-line); border-radius: 16px; text-align: center; margin: 18px 0; }
 .ci-empty > svg { color: var(--c-green); }

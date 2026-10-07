@@ -17,7 +17,7 @@ export function InvitationDialog({ initial, onClose }: { initial: CommunityInvit
   const remaining = invitationSecondsRemaining(invitationExpiresAt(current.createdAt), now);
   const active = current.status === 'active' && remaining > 0;
   const url = invitationLink(current.id, window.location.origin);
-  const text = `Te invito ${current.kind === 'event' ? 'a un encuentro privado' : 'a conectar'} en Cantera. Código: ${formatInvitationCode(current.id)}. Es para una persona y caduca en 10 minutos. ${url}`;
+  const text = `Te invito ${current.kind === 'event' ? 'a un encuentro privado' : 'a conectar'} en LaCantera. Código: ${formatInvitationCode(current.id)}. Es para una persona y caduca en 10 minutos. ${url}`;
   useEffect(() => {
     mounted.current = true; const element = dialog.current; element?.showModal();
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
@@ -38,13 +38,13 @@ export function InvitationDialog({ initial, onClose }: { initial: CommunityInvit
     {mode === 'demo' ? <p className="ci-demo-note">Código de prueba: sólo funciona con las cuentas de este navegador.</p> : null}
     <div className={`ci-code-card ${active ? '' : 'inactive'}`}>
       <code className="ci-code">{formatInvitationCode(current.id)}</code>
-      {active ? <div className="ci-qr"><QRCodeSVG value={url} size={168} level="M" marginSize={2} title="Escanea para abrir esta invitación en Cantera" /></div> : <div className="ci-code-ended"><Check size={32} /><span>{current.status === 'used' ? 'Invitación utilizada' : current.status === 'revoked' ? 'Código cancelado' : 'Este código ha caducado'}</span></div>}
+      {active ? <div className="ci-qr"><QRCodeSVG value={url} size={168} level="M" marginSize={2} title="Escanea para abrir esta invitación en LaCantera" /></div> : <div className="ci-code-ended"><Check size={32} /><span>{current.status === 'used' ? 'Invitación utilizada' : current.status === 'revoked' ? 'Código cancelado' : 'Este código ha caducado'}</span></div>}
       <p className="ci-expiry">{active ? <>Caduca en <strong>{formatInvitationCountdown(remaining)}</strong></> : 'Genera otro código para invitar a una nueva persona.'}</p>
     </div>
     <p className="c-small">La otra persona necesita entrar, verificar su correo y completar su perfil. {current.kind === 'event' ? 'Al aceptar se inscribirá, si queda una plaza.' : 'Al aceptar apareceréis en vuestras conexiones.'}</p>
     {active ? <div className="ci-actions">
       <button className="c-button" disabled={busy} onClick={() => void copy(formatInvitationCode(current.id), 'Código copiado.')}><Copy size={17} />Copiar código</button>
-      <button className="c-button secondary" disabled={busy} onClick={() => void work(async () => { if (navigator.share) { try { await navigator.share({ title: 'Invitación a Cantera', text, url }); } catch (err) { if ((err as { name?: string }).name !== 'AbortError') throw err; } } else await copy(url, 'Enlace copiado.'); })}><Share2 size={17} />Compartir</button>
+      <button className="c-button secondary" disabled={busy} onClick={() => void work(async () => { if (navigator.share) { try { await navigator.share({ title: 'Invitación a LaCantera', text, url }); } catch (err) { if ((err as { name?: string }).name !== 'AbortError') throw err; } } else await copy(url, 'Enlace copiado.'); })}><Share2 size={17} />Compartir</button>
       <a className="c-button secondary" href={`https://wa.me/?text=${encodeURIComponent(text)}`} target="_blank" rel="noopener noreferrer"><MessageCircle size={17} />WhatsApp</a>
       <a className="c-button secondary" href={`sms:?body=${encodeURIComponent(text)}`}><MessageCircle size={17} />SMS</a>
       <button className="ci-copy-link" disabled={busy} onClick={() => void copy(url, 'Enlace copiado.')}><Link2 size={16} />Copiar enlace</button>

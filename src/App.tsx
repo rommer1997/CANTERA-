@@ -12,7 +12,7 @@ const PeoplePages = lazy(() => import('./community/PeoplePages'));
 const ConnectionsPage = lazy(() => import('./community/ConnectionsPage'));
 
 export default function App() {
-  return <HashRouter><CommunityProvider><InvitationsProvider><TeamsProvider><Suspense fallback={<div className="c-empty" role="status">Cargando Cantera…</div>}><Routes><Route element={<CommunityLayout />}>
+  return <HashRouter><CommunityProvider><InvitationsProvider><TeamsProvider><Suspense fallback={<div className="c-empty" role="status">Cargando LaCantera…</div>}><Routes><Route element={<CommunityLayout />}>
     <Route index element={<CommunityHome />} />
     <Route path="play" element={<EventsPage />} /><Route path="play/:eventId" element={<EventsPage />} />
     <Route path="feed" element={<FeedPage />} /><Route path="profile" element={<ProfilePage />} />
