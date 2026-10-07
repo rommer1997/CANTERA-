@@ -3,6 +3,7 @@ import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { ArrowRight, ArrowUpRight, Award, CalendarDays, Camera, Check, CircleUserRound, Ban, EyeOff, Film, Flag, Heart, LoaderCircle, MapPin, MessageCircle, MoreHorizontal, Plus, Search, Share2, ShieldCheck, Trash2, Upload, UsersRound, X } from 'lucide-react';
 import { friendlyError, useCommunity, usePublicProfile } from './CommunityContext';
 import { legalReady } from './legal';
+import { isPublicEvent } from './eventPrivacy';
 import type { CommunityPost, PostComment, PostInput, PostKind } from './types';
 import './feed.css';
 
@@ -219,7 +220,7 @@ function Composer({ onPublished, openRequest }: { onPublished: (id: string) => v
         <input ref={inputRef} id={inputId} className="cf-file-input" type="file" accept={kind === 'reel' ? 'video/mp4,video/webm' : 'image/jpeg,image/png,image/webp'} onChange={event => { void chooseFile(event.target.files?.[0]); }} disabled={isLocked} />
         {preview && <div className="cf-upload-preview">{kind === 'reel' ? <video src={preview} muted controls playsInline preload="metadata" /> : <img src={preview} alt="Vista previa de la foto que vas a publicar" />}<div><span>{file?.name}</span><button type="button" className="cf-icon-button" aria-label="Quitar archivo" disabled={isLocked} onClick={() => { setFile(undefined); if (inputRef.current) inputRef.current.value = ''; }}><X size={17} /></button></div></div>}
       </div>}
-      <label className="cf-field">Partido o torneo relacionado <span className="cf-optional">(opcional)</span><select className="c-input" value={eventId} onChange={event => setEventId(event.target.value)} disabled={busy}><option value="">Sin evento relacionado</option>{events.filter(event => event.status !== 'cancelled').map(event => <option key={event.id} value={event.id}>{event.title} · {event.city}</option>)}</select></label>
+      <label className="cf-field">Partido o torneo relacionado <span className="cf-optional">(opcional)</span><select className="c-input" value={eventId} onChange={event => setEventId(event.target.value)} disabled={busy}><option value="">Sin evento relacionado</option>{events.filter(event => isPublicEvent(event) && event.status !== 'cancelled').map(event => <option key={event.id} value={event.id}>{event.title} · {event.city}</option>)}</select><small>Las publicaciones son públicas; sólo puedes vincular encuentros públicos.</small></label>
       {publishingUnavailable && <p className="c-error" role="status">El servicio aún no admite nuevas publicaciones. Puedes volver cuando se abra.</p>}
       <div className="cf-compose-footer"><p>{mode === 'demo' ? 'Prueba local · sólo en este navegador.' : 'Publicación pública.'}</p><button className="c-button" type="submit" disabled={isLocked || publishingUnavailable}>{busy ? <><LoaderCircle size={16} className="cf-spin" /> Publicando…</> : validating ? 'Comprobando…' : <>Publicar <ArrowUpRight size={16} /></>}</button></div>
       {busy && file && <div className="cf-progress"><label htmlFor={`${inputId}-progress`}>{progress < 100 ? `Subiendo archivo · ${Math.round(progress)} %` : 'Guardando publicación…'}</label><progress id={`${inputId}-progress`} value={progress} max={100} /></div>}
@@ -283,7 +284,7 @@ function FeedCard({ post, selected, onHidden }: { post: CommunityPost; selected:
   const countsReady = !!interaction && !interaction.loading && !interaction.error;
   const cardComments = (comments[post.id] ?? []).filter(item => !blockedIds.includes(item.authorId));
   const liked = !!profile && (likes[post.id] ?? []).includes(profile.id);
-  const event = events.find(event => event.id === post.eventId);
+  const event = events.find(event => event.id === post.eventId && isPublicEvent(event));
   const isOwnPost = profile?.id === post.authorId;
   const following = followingIds.includes(post.authorId);
   const commentInputId = React.useId();
@@ -381,7 +382,7 @@ export default function FeedPage() {
     (!query || searchKey([post.title, post.text, post.authorName].join(' ')).includes(query))
   ).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const selectedPostVisible = visiblePosts.some(post => post.id === selectedId);
-  const nextEvents = events.filter(event => event.status !== 'cancelled' && new Date(event.startAt).getTime() > Date.now()
+  const nextEvents = events.filter(event => isPublicEvent(event) && event.status !== 'cancelled' && new Date(event.startAt).getTime() > Date.now()
     && (event.status === 'open' || profile && (event.ownerId === profile.id || Object.hasOwn(event.participants, profile.id))))
     .sort((a, b) => a.startAt.localeCompare(b.startAt)).slice(0, 3);
 

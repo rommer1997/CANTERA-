@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, CalendarDays, ChevronRight, MapPin, Play, Plus, Trophy, Users } from 'lucide-react';
 import { useCommunity, usePublicProfile } from './CommunityContext';
+import { canReadEvent, isPublicEvent } from './eventPrivacy';
 import type { CommunityPost, PlayEvent } from './types';
 
 function AgendaRow({ event }: { event: PlayEvent }) {
@@ -21,8 +22,8 @@ function RecentPost({ post }: { post: CommunityPost }) {
 
 export function MobileHome() {
   const { profile, events, ownEvents, posts, hiddenPostIds, loading, error, blockedIds } = useCommunity();
-  const upcoming = events.filter(event => event.status !== 'cancelled' && Date.parse(event.startAt) > Date.now()).sort((a, b) => Date.parse(a.startAt) - Date.parse(b.startAt));
-  const agenda = profile ? ownEvents.filter(event => !['cancelled', 'completed'].includes(event.status) && Date.parse(event.startAt) > Date.now()).sort((a, b) => Date.parse(a.startAt) - Date.parse(b.startAt)).slice(0, 3) : [];
+  const upcoming = events.filter(event => isPublicEvent(event) && event.status !== 'cancelled' && Date.parse(event.startAt) > Date.now()).sort((a, b) => Date.parse(a.startAt) - Date.parse(b.startAt));
+  const agenda = profile ? ownEvents.filter(event => canReadEvent(event, profile.id) && !['cancelled', 'completed'].includes(event.status) && Date.parse(event.startAt) > Date.now()).sort((a, b) => Date.parse(a.startAt) - Date.parse(b.startAt)).slice(0, 3) : [];
   const open = upcoming.filter(event => event.status === 'open' && !agenda.some(item => item.id === event.id)).slice(0, 3);
   const recent = posts.filter(post => !hiddenPostIds.includes(post.id) && !blockedIds.includes(post.authorId)).sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)).slice(0, 2);
   const locationQuery = profile?.city && profile.country ? `?${new URLSearchParams({ city: profile.city, country: profile.country })}` : '';

@@ -1,7 +1,7 @@
 // Pure, explicit projections for operator account exports. Never serialize SDK
 // records wholesale: unknown fields may contain credentials or third-party data.
-export interface ExportRecord { id: string; data: Record<string, unknown>; }
-export const exportCollections = ['communityPosts', 'communityComments', 'communityLikes', 'communityFollows', 'communityBlocks', 'communityRightsRequests', 'communityEventNotices', 'communityEventPromotions', 'communityEventDeliveries', 'communityVerifications', 'communityReports', 'communityEventChanges', 'communityTeamMembers', 'communityTeamJoinRequests', 'communityTeamInvites'] as const;
+export interface ExportRecord { id: string; data: Record<string, unknown>; path?: string; }
+export const exportCollections = ['communityPosts', 'communityComments', 'communityLikes', 'communityFollows', 'communityBlocks', 'communityRightsRequests', 'communityEventNotices', 'communityEventPromotions', 'communityEventDeliveries', 'communityVerifications', 'communityReports', 'communityEventChanges', 'communityTeamMembers', 'communityTeamJoinRequests', 'communityTeamInvites', 'communityInvitations', 'communityConnections', 'communityEventAdmissions'] as const;
 export type ExportCollection = typeof exportCollections[number];
 export interface AccountExportSource {
   uid: string; projectId: string; databaseId: string; startedAt: string; completedAt: string;
@@ -36,7 +36,8 @@ function pick(data: unknown, keys: readonly string[]): Data {
   return result;
 }
 function unique(records: ExportRecord[] = []): ExportRecord[] {
-  return [...new Map(records.filter(record => record && typeof record.id === 'string' && isData(record.data)).map(record => [record.id, record])).values()].sort((a, b) => a.id.localeCompare(b.id));
+  const identity = (record: ExportRecord) => typeof record.path === 'string' && record.path ? record.path : record.id;
+  return [...new Map(records.filter(record => record && typeof record.id === 'string' && isData(record.data)).map(record => [identity(record), record])).values()].sort((a, b) => identity(a).localeCompare(identity(b)));
 }
 function projected(record: ExportRecord, fields: readonly string[]): Data { return { ...pick(record.data, fields), id: record.id }; }
 function profile(record: ExportRecord | null | undefined, uid: string, fields: readonly string[], uidKey = 'id'): Data | null {
@@ -73,14 +74,34 @@ const collectionPolicies: Record<ExportCollection, { owner: string; fields: stri
   communityTeamMembers: { owner: 'userId', fields: ['teamId', 'userId', 'name', 'role', 'joinedAt'] },
   communityTeamJoinRequests: { owner: 'userId', fields: ['teamId', 'userId', 'name', 'status', 'createdAt', 'reviewedAt'] },
   communityTeamInvites: { owner: 'createdBy', fields: ['teamId', 'createdBy', 'revoked', 'expiresAt', 'createdAt'] },
+  communityInvitations: { owner: 'ownerId', fields: ['kind', 'eventId', 'status', 'createdAt', 'usedAt'] },
+  communityConnections: { owner: 'ownerId', fields: ['ownerId', 'createdAt'] },
+  communityEventAdmissions: { owner: 'userId', fields: ['userId', 'eventId', 'createdAt'] },
 };
 export const accountQueryPolicies = Object.fromEntries(exportCollections.map(collection => [collection, collectionPolicies[collection].owner])) as Record<ExportCollection, string>;
+
+function privateRecordBelongs(record: ExportRecord, collection: ExportCollection, uid: string): boolean {
+  if (collection === 'communityInvitations') return record.data.ownerId === uid || record.data.usedBy === uid;
+  if (collection === 'communityConnections') {
+    if (record.data.ownerId !== uid) return false;
+    if (record.path === undefined) return true;
+    const path = record.path.split('/');
+    return path.length === 4 && path[0] === collection && path[1] === uid && path[2] === 'members' && path[3] === record.id && record.data.peerId === record.id;
+  }
+  if (collection === 'communityEventAdmissions') {
+    if (record.data.userId !== uid) return false;
+    if (record.path === undefined) return true;
+    const path = record.path.split('/');
+    return path.length === 4 && path[0] === collection && path[2] === 'members' && path[3] === uid && record.id === uid && record.data.eventId === path[1];
+  }
+  return false;
+}
 
 export function projectAccountEvent(record: ExportRecord, uid: string): Data | null {
   const data = record.data;
   const participating = owns(data.participants, uid), waiting = owns(data.waitlist, uid), responded = owns(data.rsvps, uid);
   if (data.ownerId !== uid && !participating && !waiting && !responded) return null;
-  const result = projected(record, ['ownerId', 'ownerName', 'title', 'type', 'format', 'level', 'city', 'country', 'timeZone', 'venue', 'startAt', 'startAtMs', 'capacity', 'entry', 'description', 'status', 'tournamentFormat', 'createdAt', 'updatedAt', 'revision', 'teamId']);
+  const result = projected(record, ['ownerId', 'ownerName', 'title', 'type', 'format', 'level', 'city', 'country', 'timeZone', 'venue', 'startAt', 'startAtMs', 'capacity', 'entry', 'description', 'status', 'tournamentFormat', 'createdAt', 'updatedAt', 'revision', 'teamId', 'visibility']);
   result.organizer = data.ownerId === uid;
   result.participants = participating ? { [uid]: scalar((data.participants as Data)[uid]) ?? null } : {};
   result.rsvps = responded ? { [uid]: scalar((data.rsvps as Data)[uid]) ?? null } : {};
@@ -117,12 +138,35 @@ export function buildAccountExport(source: AccountExportSource) {
     if (event.history) event.historySource = 'event-document-cache';
   }
   const collections = {} as Record<ExportCollection, Data[]>;
+  const ownInvitations = unique(source.collections?.communityInvitations).filter(record => privateRecordBelongs(record, 'communityInvitations', source.uid));
+  const ownConnections = unique(source.collections?.communityConnections).filter(record => privateRecordBelongs(record, 'communityConnections', source.uid));
+  const invitationReferences = new Map(ownInvitations.map((record, index) => [record.id, `invitation-${index + 1}`]));
+  const connectionReferences = new Map(ownConnections.map((record, index) => [record.data.peerId, `connection-${index + 1}`]));
   for (const name of exportCollections) {
     const policy = collectionPolicies[name];
-    collections[name] = unique(source.collections?.[name]).filter(record => record.data[policy.owner] === source.uid
+    const isPrivateCoordination = ['communityInvitations', 'communityConnections', 'communityEventAdmissions'].includes(name);
+    collections[name] = unique(source.collections?.[name]).filter(record => isPrivateCoordination ? privateRecordBelongs(record, name, source.uid) : record.data[policy.owner] === source.uid
       || name === 'communityEventPromotions' && record.data.recipientId === source.uid
       || name === 'communityEventChanges' && eventIds.has(record.data.eventId)).map((record, index) => {
       const result = projected(record, policy.fields);
+      if (isPrivateCoordination) {
+        // Random invitation IDs are live secrets; nested relationship IDs are
+        // another person's UID. Neither the original ID nor SDK path is exported.
+        delete result.id;
+        if (name === 'communityInvitations') {
+          result.exportReference = invitationReferences.get(record.id);
+          result.createdBySelf = record.data.ownerId === source.uid;
+          result.usedBySelf = record.data.usedBy === source.uid;
+          if (result.createdBySelf) result.ownerId = source.uid;
+          if (result.usedBySelf) result.usedBy = source.uid;
+          const peerId = result.createdBySelf ? record.data.usedBy : record.data.ownerId;
+          if (record.data.kind === 'connection' && connectionReferences.has(peerId)) result.connectionReference = connectionReferences.get(peerId);
+        } else {
+          result.exportReference = `${name === 'communityConnections' ? 'connection' : 'admission'}-${index + 1}`;
+          result.usedInvitation = typeof record.data.inviteId === 'string' && record.data.inviteId.length > 0;
+          if (typeof record.data.inviteId === 'string' && invitationReferences.has(record.data.inviteId)) result.invitationReference = invitationReferences.get(record.data.inviteId);
+        }
+      }
       if (name === 'communityTeamJoinRequests') result.usedInvitation = typeof record.data.inviteId === 'string' && record.data.inviteId.length > 0;
       if (name === 'communityEventPromotions' || name === 'communityEventDeliveries') {
         if (record.data.authorId === source.uid) result.authorId = source.uid;
@@ -156,7 +200,7 @@ export function buildAccountExport(source: AccountExportSource) {
   return {
     format: 'cantera-account-export', version: 1, uid: source.uid,
     source: { projectId: source.projectId, databaseId: source.databaseId, startedAt: source.startedAt, completedAt: source.completedAt },
-    scope: { ownRecordsOnly: true, otherParticipantsRemoved: true, otherTeamPrivateRecordsRemoved: true, credentialsRemoved: true, mediaBinariesIncluded: false },
+    scope: { ownRecordsOnly: true, otherParticipantsRemoved: true, otherTeamPrivateRecordsRemoved: true, credentialsRemoved: true, mediaBinariesIncluded: false, shortInvitationTokensRemoved: true, privateConnectionPeerIdsRemoved: true },
     counts, account, collections, events, fixtureRecords, teams, legacyLikes,
   };
 }

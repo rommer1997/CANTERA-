@@ -18,6 +18,124 @@ service cloud.firestore {
         && date(actorProfile().acceptedTermsAt) && text(actorProfile().city, 1, 100) && text(actorProfile().country, 1, 100);
     }
     function hasPost(id) { return text(id, 1, 128) && exists(/databases/$(database)/documents/communityPosts/$(id)); }
+    function verifiedActor() { return active() && request.auth.token.get('email_verified', false) == true; }
+    function eventPublic(data) { return data.get('visibility', 'public') == 'public'; }
+    function eventParticipant(data) {
+      return signed() && request.auth.uid in data.get('participantIds', data.participants.keys());
+    }
+    function eventReadable(data) {
+      return admin() || owner(data.ownerId) || eventParticipant(data) || runtimeOpen() && eventPublic(data);
+    }
+    function relatedEventReadable(id) {
+      return exists(/databases/$(database)/documents/communityEvents/$(id))
+        && eventReadable(get(/databases/$(database)/documents/communityEvents/$(id)).data);
+    }
+    function freshInvitation(data) {
+      return verifiedActor() && data.status == 'active' && data.ownerId != request.auth.uid
+        && data.createdAt is timestamp && data.createdAt <= request.time
+        && data.createdAt + duration.value(10, 'm') > request.time && notBlocked(data.ownerId);
+    }
+    function validInvitation(data, id) {
+      return id.matches('[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{16}')
+        && data.keys().hasAll(['id', 'ownerId', 'kind', 'eventId', 'status', 'createdAt', 'usedBy', 'usedAt'])
+        && data.keys().hasOnly(['id', 'ownerId', 'kind', 'eventId', 'status', 'createdAt', 'usedBy', 'usedAt'])
+        && data.id == id && text(data.ownerId, 1, 128) && data.kind in ['connection', 'event']
+        && data.status in ['active', 'used', 'revoked'] && data.createdAt is timestamp
+        && text(data.eventId, 0, 128) && text(data.usedBy, 0, 128)
+        && (data.usedAt == '' || data.usedAt is timestamp)
+        && (data.kind == 'connection' && data.eventId == '' || data.kind == 'event' && data.eventId != '');
+    }
+    function consumedInvitation(code, kind, eventId) {
+      let before = get(/databases/$(database)/documents/communityInvitations/$(code)).data;
+      let after = getAfter(/databases/$(database)/documents/communityInvitations/$(code)).data;
+      return freshInvitation(before) && before.kind == kind && before.eventId == eventId
+        && after.status == 'used' && after.usedBy == request.auth.uid && after.usedAt == request.time;
+    }
+    function validConnection(data, ownerUid, peerUid) {
+      return data.keys().hasAll(['ownerId', 'peerId', 'inviteId', 'createdAt'])
+        && data.keys().hasOnly(['ownerId', 'peerId', 'inviteId', 'createdAt'])
+        && data.ownerId == ownerUid && data.peerId == peerUid && ownerUid != peerUid
+        && text(ownerUid, 1, 128) && text(peerUid, 1, 128)
+        && text(data.inviteId, 16, 16) && data.createdAt == request.time;
+    }
+    function connectionPair(code, inviter) {
+      let recipient = request.auth.uid;
+      let first = getAfter(/databases/$(database)/documents/communityConnections/$(inviter)/members/$(recipient)).data;
+      let second = getAfter(/databases/$(database)/documents/communityConnections/$(recipient)/members/$(inviter)).data;
+      return !exists(/databases/$(database)/documents/communityConnections/$(inviter)/members/$(recipient))
+        && !exists(/databases/$(database)/documents/communityConnections/$(recipient)/members/$(inviter))
+        && validConnection(first, inviter, recipient) && validConnection(second, recipient, inviter)
+        && first.inviteId == code && second.inviteId == code;
+    }
+    function connectionMirror(data, ownerUid, peerUid) {
+      let mirror = getAfter(/databases/$(database)/documents/communityConnections/$(peerUid)/members/$(ownerUid)).data;
+      return validConnection(mirror, peerUid, ownerUid) && mirror.inviteId == data.inviteId;
+    }
+    function validAdmission(data, eventId, uid) {
+      return data.keys().hasAll(['eventId', 'userId', 'inviteId', 'createdAt'])
+        && data.keys().hasOnly(['eventId', 'userId', 'inviteId', 'createdAt'])
+        && data.eventId == eventId && data.userId == uid && text(data.inviteId, 16, 16)
+        && data.createdAt == request.time;
+    }
+    function admissionPair(code, eventId, inviter) {
+      let before = get(/databases/$(database)/documents/communityEvents/$(eventId)).data;
+      let after = getAfter(/databases/$(database)/documents/communityEvents/$(eventId)).data;
+      let receipt = getAfter(/databases/$(database)/documents/communityEventAdmissions/$(eventId)/members/$(request.auth.uid)).data;
+      return before.get('visibility', 'public') == 'private' && before.ownerId == inviter
+        && !(request.auth.uid in before.participants) && request.auth.uid in after.participants
+        && validAdmission(receipt, eventId, request.auth.uid) && receipt.inviteId == code;
+    }
+    function privateAdmission(eventId) {
+      let receipt = getAfter(/databases/$(database)/documents/communityEventAdmissions/$(eventId)/members/$(request.auth.uid)).data;
+      return validAdmission(receipt, eventId, request.auth.uid)
+        && consumedInvitation(receipt.inviteId, 'event', eventId)
+        && getAfter(/databases/$(database)/documents/communityInvitations/$(receipt.inviteId)).data.ownerId == resource.data.ownerId;
+    }
+    match /communityInvitations/{code} {
+      // No public lookup or listing. A recipient must know the exact random code.
+      allow get: if owner(resource.data.ownerId) || admin()
+        || freshInvitation(resource.data)
+        || verifiedActor() && resource.data.status == 'used' && owner(resource.data.usedBy);
+      allow list: if owner(resource.data.ownerId) || admin();
+      allow create: if active() && validInvitation(request.resource.data, code)
+        && request.resource.data.ownerId == request.auth.uid && request.resource.data.status == 'active'
+        && request.resource.data.createdAt == request.time && request.resource.data.usedBy == '' && request.resource.data.usedAt == ''
+        && (request.resource.data.kind == 'connection'
+          || owner(get(/databases/$(database)/documents/communityEvents/$(request.resource.data.eventId)).data.ownerId)
+            && get(/databases/$(database)/documents/communityEvents/$(request.resource.data.eventId)).data.get('visibility', 'public') == 'private');
+      allow update: if validInvitation(request.resource.data, code)
+        && (owner(resource.data.ownerId) && resource.data.status == 'active'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']) && request.resource.data.status == 'revoked'
+          || freshInvitation(resource.data)
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'usedBy', 'usedAt'])
+            && request.resource.data.status == 'used' && request.resource.data.usedBy == request.auth.uid && request.resource.data.usedAt == request.time
+            && (resource.data.kind == 'connection' && connectionPair(code, resource.data.ownerId)
+              || resource.data.kind == 'event' && admissionPair(code, resource.data.eventId, resource.data.ownerId)));
+      allow delete: if false;
+    }
+    match /communityConnections/{ownerUid}/members/{peerUid} {
+      allow get: if owner(ownerUid) || owner(peerUid) || admin();
+      allow list: if owner(ownerUid) || admin();
+      allow create: if verifiedActor() && validConnection(request.resource.data, ownerUid, peerUid)
+        && (request.auth.uid == ownerUid || request.auth.uid == peerUid)
+        && consumedInvitation(request.resource.data.inviteId, 'connection', '')
+        && getAfter(/databases/$(database)/documents/communityInvitations/$(request.resource.data.inviteId)).data.ownerId in [ownerUid, peerUid]
+        && connectionMirror(request.resource.data, ownerUid, peerUid);
+      allow update: if false;
+      // Either participant can withdraw the entire mirrored relationship while paused.
+      allow delete: if (owner(ownerUid) || owner(peerUid))
+        && !existsAfter(/databases/$(database)/documents/communityConnections/$(peerUid)/members/$(ownerUid));
+    }
+    match /communityEventAdmissions/{eventId}/members/{uid} {
+      allow get: if owner(uid) || admin()
+        || owner(get(/databases/$(database)/documents/communityEvents/$(eventId)).data.ownerId);
+      allow list: if admin() || owner(get(/databases/$(database)/documents/communityEvents/$(eventId)).data.ownerId);
+      allow create, update: if owner(uid) && verifiedActor() && validAdmission(request.resource.data, eventId, uid)
+        && consumedInvitation(request.resource.data.inviteId, 'event', eventId)
+        && admissionPair(request.resource.data.inviteId, eventId,
+          getAfter(/databases/$(database)/documents/communityInvitations/$(request.resource.data.inviteId)).data.ownerId);
+      allow delete: if owner(uid) || admin();
+    }
     function validProfile(data, uid) {
       return data.keys().hasAll(['id', 'name', 'bio', 'city', 'country', 'position', 'team', 'level',
           'adultConfirmed', 'verification', 'entityType', 'createdAt', 'acceptedTermsVersion', 'acceptedTermsAt'])
@@ -87,7 +205,7 @@ service cloud.firestore {
     }
     function validEvent(data, id) {
       return data.keys().hasAll(['id', 'ownerId', 'ownerName', 'title', 'type', 'format', 'level', 'city', 'country', 'timeZone', 'venue', 'startAt', 'startAtMs', 'capacity', 'entry', 'description', 'status', 'tournamentFormat', 'participants', 'fixtures', 'createdAt'])
-        && data.keys().hasOnly(['id', 'ownerId', 'ownerName', 'title', 'type', 'format', 'level', 'city', 'country', 'timeZone', 'venue', 'startAt', 'startAtMs', 'capacity', 'entry', 'description', 'status', 'tournamentFormat', 'participants', 'participantIds', 'fixtures', 'fixtureIds', 'createdAt', 'updatedAt', 'revision', 'history', 'rsvps', 'waitlist', 'waitlistOrder', 'result', 'teamId'])
+        && data.keys().hasOnly(['id', 'ownerId', 'ownerName', 'title', 'type', 'format', 'level', 'city', 'country', 'timeZone', 'venue', 'startAt', 'startAtMs', 'capacity', 'entry', 'description', 'status', 'tournamentFormat', 'participants', 'participantIds', 'fixtures', 'fixtureIds', 'createdAt', 'updatedAt', 'revision', 'history', 'rsvps', 'waitlist', 'waitlistOrder', 'result', 'teamId', 'visibility'])
         && data.id == id && text(data.ownerId, 1, 128) && text(data.ownerName, 1, 100)
         && text(data.title, 1, 100) && data.type in ['match', 'tournament'] && data.format in ['5', '7', '11']
         && data.level in ['amateur', 'professional'] && text(data.city, 1, 100) && text(data.country, 1, 100)
@@ -99,6 +217,7 @@ service cloud.firestore {
         && data.get('participantIds', data.participants.keys()) is list
         && data.get('participantIds', data.participants.keys()).toSet() == data.participants.keys().toSet()
         && data.get('participantIds', data.participants.keys()).size() == data.participants.size()
+        && data.get('visibility', 'public') in ['public', 'private']
         && data.fixtures is list && data.fixtures.size() <= 496 && date(data.createdAt)
         && data.get('fixtureIds', []) is list && data.get('fixtureIds', []).size() <= 496 && data.get('fixtureIds', []).size() == data.get('fixtureIds', []).toSet().size()
         && data.get('rsvps', {}) is map && data.get('rsvps', {}).size() <= 128
@@ -116,11 +235,12 @@ service cloud.firestore {
           && data.result.awayScore is int && data.result.awayScore >= 0 && data.result.awayScore <= 99);
     }
     function validEventState(data) {
-      return data.keys().hasOnly(['id', 'ownerId', 'ownerName', 'title', 'type', 'format', 'level', 'city', 'country', 'timeZone', 'venue', 'startAt', 'startAtMs', 'capacity', 'entry', 'description', 'status', 'tournamentFormat', 'participants', 'participantIds', 'fixtures', 'fixtureIds', 'createdAt', 'updatedAt', 'revision', 'history', 'rsvps', 'waitlist', 'waitlistOrder', 'result', 'teamId']) && data.capacity is int && data.capacity >= 2 && data.capacity <= 64 && (data.type != 'tournament' || data.capacity <= 32) && data.status in ['open', 'closed', 'cancelled', 'completed']
+      return data.keys().hasOnly(['id', 'ownerId', 'ownerName', 'title', 'type', 'format', 'level', 'city', 'country', 'timeZone', 'venue', 'startAt', 'startAtMs', 'capacity', 'entry', 'description', 'status', 'tournamentFormat', 'participants', 'participantIds', 'fixtures', 'fixtureIds', 'createdAt', 'updatedAt', 'revision', 'history', 'rsvps', 'waitlist', 'waitlistOrder', 'result', 'teamId', 'visibility']) && data.capacity is int && data.capacity >= 2 && data.capacity <= 64 && (data.type != 'tournament' || data.capacity <= 32) && data.status in ['open', 'closed', 'cancelled', 'completed']
         && data.participants is map && data.participants.size() <= data.capacity
         && data.get('participantIds', data.participants.keys()) is list
         && data.get('participantIds', data.participants.keys()).toSet() == data.participants.keys().toSet()
         && data.get('participantIds', data.participants.keys()).size() == data.participants.size()
+        && data.get('visibility', 'public') in ['public', 'private']
         && data.fixtures is list && data.fixtures.size() <= 496 && date(data.createdAt)
         && data.get('fixtureIds', []) is list && data.get('fixtureIds', []).size() <= 496 && data.get('fixtureIds', []).size() == data.get('fixtureIds', []).toSet().size()
         && data.get('rsvps', {}) is map && data.get('rsvps', {}).size() <= 128
@@ -154,7 +274,7 @@ service cloud.firestore {
         && data.id in event.get('fixtureIds', []) && event.type == 'tournament' && event.status in ['closed', 'completed'];
     }
     match /communityFixtures/{docId} {
-      allow read: if runtimeOpen();
+      allow read: if relatedEventReadable(resource.data.eventId);
       allow create: if active() && fixtureDocument(request.resource.data, docId) && owner(request.resource.data.ownerId)
         && request.resource.data.createdAt == request.time && request.resource.data.updatedAt == request.time;
       allow update: if active() && owner(resource.data.ownerId) && fixtureDocument(request.resource.data, docId)
@@ -197,6 +317,7 @@ service cloud.firestore {
         && (responseAfter == responseBefore || responseAfter[uid] in ['yes', 'no', 'maybe'])
         && after.diff(before).changedKeys().size() == 0 && (
           active() && !(uid in before) && uid in after && resource.data.status == 'open'
+            && (eventPublic(resource.data) || owner(resource.data.ownerId) || privateAdmission(resource.data.id) && after[uid] == actorProfile().name)
             && resource.data.get('waitlistOrder', []).size() == 0 && added.size() == 1 && removed.size() == 0
             && text(after[uid], 1, 100) && unchangedWaitlist()
           || uid in before && !(uid in after) && removed == [uid] && (
@@ -220,7 +341,7 @@ service cloud.firestore {
       let order = resource.data.get('waitlistOrder', []);
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['waitlist', 'waitlistOrder', 'participantIds'])
         && after.diff(before).affectedKeys().hasOnly([uid]) && (
-          active() && !(uid in resource.data.participants) && !(uid in before) && uid in after
+          active() && eventPublic(resource.data) && !(uid in resource.data.participants) && !(uid in before) && uid in after
             && resource.data.status == 'open' && resource.data.fixtures.size() == 0 && resource.data.get('fixtureIds', []).size() == 0 && resource.data.startAtMs > request.time.toMillis()
             && (resource.data.participants.size() == resource.data.capacity || order.size() > 0)
             && after[uid].keys().hasOnly(['name', 'joinedAt']) && text(after[uid].name, 1, 100) && after[uid].joinedAt == request.time
@@ -263,7 +384,7 @@ service cloud.firestore {
         && change.eventId == id && change.revision == revision && change.ownerId == request.auth.uid && change.createdAt == request.time
         && data.get('fixtureIds', []).hasAll(resource.data.get('fixtureIds', []))
         && data.get('history', []) == resource.data.get('history', []) && data.fixtures == resource.data.fixtures
-        && changed.hasOnly(['title', 'format', 'level', 'city', 'country', 'timeZone', 'venue', 'startAt', 'startAtMs', 'capacity', 'entry', 'description', 'type', 'tournamentFormat', 'participants', 'participantIds', 'fixtureIds', 'status', 'updatedAt', 'revision', 'waitlist', 'waitlistOrder', 'rsvps', 'result', 'teamId'])
+        && changed.hasOnly(['title', 'format', 'level', 'city', 'country', 'timeZone', 'venue', 'startAt', 'startAtMs', 'capacity', 'entry', 'description', 'type', 'tournamentFormat', 'participants', 'participantIds', 'fixtureIds', 'status', 'updatedAt', 'revision', 'waitlist', 'waitlistOrder', 'rsvps', 'result', 'teamId', 'visibility'])
         && (!changed.hasAny(['title', 'format', 'level', 'city', 'country', 'timeZone', 'venue', 'startAt', 'startAtMs', 'capacity', 'entry', 'description', 'type', 'tournamentFormat']) || validChangedMetadata(data, changed))
         && (!changed.hasAny(['rsvps']) || promotesFirst() && data.get('rsvps', {}).diff(resource.data.get('rsvps', {})).affectedKeys().hasOnly([resource.data.waitlistOrder[0]]) && !(resource.data.waitlistOrder[0] in data.get('rsvps', {})))
         && (!changed.hasAny(['participants']) || organizerParticipants())
@@ -277,8 +398,7 @@ service cloud.firestore {
         && (!changed.hasAny(['teamId']) || data.get('teamId', '') == '' || teamManager(data.teamId) && teamRecord(data.teamId).status == 'active');
     }
     match /communityEvents/{id} {
-      allow get: if runtimeOpen() || signed() && (owner(resource.data.ownerId) || request.auth.uid in resource.data.participants || request.auth.uid in resource.data.get('waitlist', {})) || admin();
-      allow list: if runtimeOpen();
+      allow get, list: if eventReadable(resource.data);
       allow create: if active() && validEvent(request.resource.data, id) && request.resource.data.createdAt == request.time
         && request.resource.data.ownerId == request.auth.uid && request.resource.data.ownerName == actorProfile().name
         && request.resource.data.startAtMs > request.time.toMillis() && request.resource.data.status == 'open'
@@ -289,6 +409,7 @@ service cloud.firestore {
       allow update: if signed() && validEventState(request.resource.data)
         && request.resource.data.createdAt == resource.data.createdAt && request.resource.data.ownerId == resource.data.ownerId
         && request.resource.data.ownerName == resource.data.ownerName && request.resource.data.id == resource.data.id
+        && request.resource.data.get('visibility', 'public') == resource.data.get('visibility', 'public')
         && (request.resource.data.diff(resource.data).affectedKeys().hasAny(['revision'])
           ? organizerEventUpdate(id)
           : request.resource.data.diff(resource.data).affectedKeys().hasAny(['participants'])
@@ -297,7 +418,7 @@ service cloud.firestore {
       allow delete: if false;
     }
     match /communityEventChanges/{id} {
-      allow read: if runtimeOpen();
+      allow read: if relatedEventReadable(resource.data.eventId);
       allow create: if active() && request.resource.data.keys().hasAll(['id', 'eventId', 'ownerId', 'revision', 'summary', 'title', 'createdAt', 'audienceIds'])
         && request.resource.data.keys().hasOnly(['id', 'eventId', 'ownerId', 'revision', 'summary', 'title', 'createdAt', 'audienceIds'])
         && request.resource.data.id == id && request.resource.data.ownerId == request.auth.uid
@@ -349,6 +470,10 @@ service cloud.firestore {
       return receipt.actorId == get(/databases/$(database)/documents/communityEvents/$(data.eventId)).data.ownerId
         && receipt.eventId == data.eventId && receipt.recipientId == data.recipientId && receipt.createdAt == request.time;
     }
+    function noticeAudienceAllowed(data) {
+      let event = get(/databases/$(database)/documents/communityEvents/$(data.eventId)).data;
+      return eventPublic(event) || data.recipientId == event.ownerId || data.recipientId in event.participants;
+    }
     match /communityEventDeliveries/{id} {
       allow get: if signed() && (!exists(/databases/$(database)/documents/communityEventDeliveries/$(id)) || owner(resource.data.actorId) || admin());
       allow list: if owner(resource.data.actorId) || admin();
@@ -368,6 +493,7 @@ service cloud.firestore {
         && request.resource.data.id == id && text(request.resource.data.recipientId, 1, 128)
         && request.resource.data.revision is int && request.resource.data.revision >= 1
         && request.resource.data.createdAt == request.time && request.resource.data.readAt == ''
+        && noticeAudienceAllowed(request.resource.data)
         && deliveryMatches(request.resource.data, id)
         && (request.resource.data.get('kind', 'change') == 'place' && placeNotice(request.resource.data, id)
           || request.resource.data.get('kind', 'change') == 'change' && active() && owner(get(/databases/$(database)/documents/communityEvents/$(request.resource.data.eventId)).data.ownerId)
@@ -382,7 +508,8 @@ service cloud.firestore {
         && data.id == id && data.authorId == request.auth.uid && data.authorName == actorProfile().name
         && data.kind == 'achievement' && text(data.text, 1, 2000) && text(data.title, 0, 100)
         && date(data.createdAt) && text(data.eventId, 0, 128)
-        && (data.eventId == '' || exists(/databases/$(database)/documents/communityEvents/$(data.eventId)))
+        && (data.eventId == '' || exists(/databases/$(database)/documents/communityEvents/$(data.eventId))
+          && eventPublic(get(/databases/$(database)/documents/communityEvents/$(data.eventId)).data))
         && (
           data.kind == 'achievement' && text(data.title, 1, 100) && data.mediaUrl == '' && data.mediaPath == ''
           || data.kind == 'photo' && data.mediaPath in [prefix + '.jpg', prefix + '.png', prefix + '.webp']

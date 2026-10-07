@@ -5,6 +5,7 @@ import { friendlyError, TERMS_VERSION, useCommunity } from './CommunityContext';
 import { hostingProvider, legalDocuments, legalReady, operator } from './legal';
 import { AppAvailability } from './AppAvailability';
 import { MobileHome } from './MobileHome';
+import { isPublicEvent } from './eventPrivacy';
 import '@fontsource-variable/manrope';
 import './community.css';
 import './mobile.css';
@@ -12,7 +13,7 @@ import './brand.css';
 
 const routeNames: Record<string, string> = {
   '/': 'Inicio', '/play': 'Juega', '/feed': 'Comunidad', '/profile': 'Tu perfil',
-  '/teams': 'Equipos y grupos', '/activity': 'Actividad', '/about': 'Misión y patrocinio', '/admin': 'Administración', '/people': 'Personas y equipos',
+  '/connect': 'Conexiones e invitaciones', '/teams': 'Equipos y grupos', '/activity': 'Actividad', '/about': 'Misión y patrocinio', '/admin': 'Administración', '/people': 'Personas y equipos',
   '/legal/terms': 'Términos de uso', '/legal/privacy': 'Privacidad', '/legal/cookies': 'Cookies y almacenamiento',
 };
 
@@ -23,7 +24,7 @@ export function CommunityLayout() {
   const previousPath = useRef(pathname);
   const [createOpen, setCreateOpen] = useState(false);
   const createDialog = useRef<HTMLDialogElement>(null);
-  const routeName = routeNames[pathname] || (pathname.startsWith('/play/') ? 'Detalle del encuentro' : pathname.startsWith('/teams/') ? 'Equipo' : pathname.startsWith('/people/') ? 'Perfil de la comunidad' : 'Cantera');
+  const routeName = routeNames[pathname] || (pathname.startsWith('/invite/') ? 'Aceptar invitación' : pathname.startsWith('/play/') ? 'Detalle del encuentro' : pathname.startsWith('/teams/') ? 'Equipo' : pathname.startsWith('/people/') ? 'Perfil de la comunidad' : 'Cantera');
   useEffect(() => {
     const changed = previousPath.current !== pathname;
     previousPath.current = pathname;
@@ -44,14 +45,14 @@ export function CommunityLayout() {
   const createLink = (destination: string) => profile ? destination : `/profile?returnTo=${encodeURIComponent(destination)}`;
   return <div className="c-app"><header className="c-header">
     <Link className="c-brand" to="/" aria-label="Cantera, inicio">cantera<span>●</span></Link>
-    <nav aria-label="Navegación principal" className="c-nav"><NavLink to="/" end>Inicio</NavLink><NavLink to="/play">Juega</NavLink><NavLink to="/feed">Comunidad</NavLink><NavLink to="/teams">Equipos</NavLink><NavLink to="/people">Gente</NavLink>{isAdmin ? <NavLink to="/admin">Administración</NavLink> : null}</nav>
+    <nav aria-label="Navegación principal" className="c-nav"><NavLink to="/" end>Inicio</NavLink><NavLink to="/play">Juega</NavLink><NavLink to="/feed">Comunidad</NavLink><NavLink to="/teams">Equipos</NavLink><NavLink to="/people">Gente</NavLink><NavLink to="/connect">Conexiones</NavLink>{isAdmin ? <NavLink to="/admin">Administración</NavLink> : null}</nav>
     <div className="c-header-tools">{profile ? <Link to="/activity" className="c-discover-link c-notice-bell" aria-label={`Actividad${eventNotices.some(n => !n.readAt) ? ", hay avisos sin leer" : ""}`}><Bell size={21} aria-hidden="true" />{eventNotices.some(n => !n.readAt) ? <span /> : null}</Link> : null}<Link to="/people" className="c-discover-link" aria-label="Buscar personas y clubes"><Search size={21} aria-hidden="true" /></Link><Link to="/profile" className="c-account" aria-label={profile ? 'Tu perfil' : 'Entrar a Cantera'}>{profile ? <><span className="c-avatar">{profile.name.slice(0, 1).toUpperCase()}</span><span className="c-account-label">{profile.name.split(' ')[0]}</span></> : <><span className="c-account-label">Únete gratis <ArrowUpRight size={17} /></span><UserRound className="c-mobile-account-icon" size={20} /></>}</Link></div>
   </header><AppAvailability />{mode === 'demo' ? <div className="c-demo" role="status"><span className="c-desktop-only">Entorno de prueba local · tus cambios se guardan sólo en este navegador.</span><span className="c-mobile-only">Prueba local · sólo en este dispositivo.</span> <Link to="/profile">Cuenta real</Link></div> : null}
     {mode === 'cloud' && runtimeConfig.serviceStatus !== 'open' ? <div className="c-service-status" role="status">{runtimeConfig.serviceStatus === 'paused' ? 'Comunidad en mantenimiento.' : 'Estamos preparando la apertura de Cantera.'} <Link to="/about">Conoce el proyecto</Link></div> : null}{error ? <div className="c-global-error" role="alert">{error} <Link to="/profile">Revisar cuenta</Link></div> : null}
     <div className="c-route-announcement" role="status" aria-live="polite" aria-atomic="true">{routeName}</div>
     <main ref={mainRef} className="c-main" tabIndex={-1}><Suspense fallback={<div className="c-app-loading" role="status">Cargando…</div>}><Outlet /></Suspense></main><footer className="c-footer"><div><Link className="c-brand" to="/">cantera<span>●</span></Link><p>El fútbol nos reúne. En cualquier lugar.</p></div>
       <nav aria-label="Información"><Link to="/about">Misión y patrocinio</Link><Link to="/legal/terms">Términos</Link><Link to="/legal/privacy">Privacidad</Link><Link to="/legal/cookies">Cookies y almacenamiento</Link></nav><span>Acceso gratuito · sin seguimiento publicitario</span></footer>
-    <details className="c-mobile-info"><summary>Sobre Cantera y privacidad</summary><nav aria-label="Información de Cantera"><Link to="/teams">Equipos y grupos</Link><Link to="/activity">Actividad</Link><Link to="/about">Misión y patrocinio</Link><Link to="/legal/terms">Términos de uso</Link><Link to="/legal/privacy">Privacidad</Link><Link to="/legal/cookies">Cookies y almacenamiento</Link>{isAdmin ? <Link to="/admin">Administración</Link> : null}</nav></details>
+    <details className="c-mobile-info"><summary>Sobre Cantera y privacidad</summary><nav aria-label="Información de Cantera"><Link to="/connect">Conexiones e invitaciones</Link><Link to="/teams">Equipos y grupos</Link><Link to="/activity">Actividad</Link><Link to="/about">Misión y patrocinio</Link><Link to="/legal/terms">Términos de uso</Link><Link to="/legal/privacy">Privacidad</Link><Link to="/legal/cookies">Cookies y almacenamiento</Link>{isAdmin ? <Link to="/admin">Administración</Link> : null}</nav></details>
     <nav className="c-bottom-nav" aria-label="Navegación móvil">
       <NavLink to="/" end><House size={22} aria-hidden="true" /><span>Inicio</span></NavLink>
       <NavLink to="/play"><CalendarDays size={22} aria-hidden="true" /><span>Juega</span></NavLink>
@@ -74,7 +75,7 @@ export function CommunityLayout() {
 export function CommunityHome() {
   const { events, profile } = useCommunity();
   if (profile) return <div className="c-signed-home"><MobileHome /></div>;
-  const upcoming = events.filter(e => e.status === 'open' && Date.parse(e.startAt) > Date.now()).sort((a, b) => Date.parse(a.startAt) - Date.parse(b.startAt)).slice(0, 3);
+  const upcoming = events.filter(e => isPublicEvent(e) && e.status === 'open' && Date.parse(e.startAt) > Date.now()).sort((a, b) => Date.parse(a.startAt) - Date.parse(b.startAt)).slice(0, 3);
   return <><MobileHome /><div className="c-desktop-home"><section className="c-hero"><div className="c-hero-copy"><p className="c-eyebrow"><span className="c-dot" /> UNA COMUNIDAD. TODO EL FÚTBOL.</p>
     <h1>Del barrio<br />al <em>mundo.</em></h1><p className="c-lead">Organiza tu próximo partido. Crea un torneo. Comparte lo que te hace sentir el fútbol.</p>
     <div className="c-actions"><Link className="c-button" to="/play">Encuentra tu partido <ArrowUpRight size={18} /></Link><Link className="c-button secondary" to={profile ? '/play?create=1' : '/profile'}>Organiza gratis</Link></div>

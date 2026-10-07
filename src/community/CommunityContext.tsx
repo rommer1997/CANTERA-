@@ -11,12 +11,17 @@ import { legalReady, operator } from './legal';
 import { normalizeFixtureRecord, fixtureFields, sameFixture } from './fixtureRecords';
 import { commitDeliveryBatches } from './deliveryBatches';
 import { TERMS_VERSION } from './policy';
+import { canReadEvent, isPublicEvent } from './eventPrivacy';
 export { TERMS_VERSION } from './policy';
 import { joinParticipants, makeFixtures, recordScore, requireText, validateEvent, validateEventEdit, validateFixtureSchedule, validateMatchResult } from './logic';
 import { normalizeCommentRecord, normalizeDemoData, normalizeEvent, normalizeFollow, normalizeHiddenPostIds, normalizeLike, normalizePost, normalizeProfile, normalizePublicProfile, normalizeReport, normalizeVerification, normalizeNotice, normalizeRightsRequest, normalizeRuntime, profileSearchTokens, searchText } from './normalization';
 import type { CommunityPost, CommunityProfile, ContentReport, EventInput, PlayEvent, PostComment, PostInput, PublicProfile, VerificationRequest, RuntimeConfig, AccountModeration, EventNotice, RightsRequest, FixtureSchedule, MatchResult, Rsvp, EventChange, Fixture, PeopleSearchField, PostInteractionState } from './types';
 
 type Mode = 'demo' | 'cloud';
+function noticeRecipientAllowed(event: Pick<PlayEvent, 'visibility' | 'ownerId' | 'participants'>, recipientId: string): boolean {
+  if (recipientId.startsWith('guest-') || recipientId.startsWith('guest_')) return false;
+  return isPublicEvent(event) || event.ownerId === recipientId || Object.hasOwn(event.participants, recipientId);
+}
 interface CommunityAPI {
   profile: CommunityProfile | null; mode: Mode; loading: boolean; error: string; isAdmin: boolean;
   demoEnabled: boolean; mediaUploadsEnabled: boolean; runtimeConfig: RuntimeConfig; accountModeration: AccountModeration | null;
@@ -126,6 +131,10 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
   const serviceOpenRef = useRef(serviceOpen); serviceOpenRef.current = serviceOpen;
   const readScope = JSON.stringify([mode, firebaseUser?.uid || '', isAdmin, runtimeConfig.serviceStatus, serviceOpen]);
   const currentReadScope = useRef(readScope); currentReadScope.current = readScope;
+  const eventViewer = mode === 'demo' ? profile?.id : firebaseUser?.uid;
+  const currentEventViewer = useRef(eventViewer); currentEventViewer.current = eventViewer;
+  const fixtureWatches = useRef(new Map<string, symbol>());
+  const historyWatches = useRef(new Map<string, symbol>());
   const ownSources = useRef<{ owner: PlayEvent[]; joined: PlayEvent[]; waiting: PlayEvent[] }>({ owner: [], joined: [], waiting: [] });
   const readFailure = useCallback((err: unknown) => { setError(friendlyError(err)); setLoading(false); }, []);
 
@@ -294,7 +303,7 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
         try {
           const data = normalizeDemoData(readDemo());
           if (!isCurrentRead() || sequence !== refreshSequence) return;
-          setProfile(data.profile); setPages({ eventsHasMore: false, postsHasMore: false, eventsLoading: false, postsLoading: false }); setOwnEvents(data.events.filter(e => e.ownerId === data.profile?.id || Object.hasOwn(e.participants, data.profile?.id || '') || Object.hasOwn(e.waitlist || {}, data.profile?.id || ''))); setBlockedIds(data.blocked[data.profile?.id || ''] || []); setEventNotices(data.notices.filter(n => n.recipientId === data.profile?.id)); setRightsRequests(data.rightsRequests.filter(r => r.userId === data.profile?.id)); setEvents(data.events); setLikes(data.likes); setComments(data.comments);
+          setProfile(data.profile); setPages({ eventsHasMore: false, postsHasMore: false, eventsLoading: false, postsLoading: false }); setOwnEvents(data.events.filter(e => canReadEvent(e, data.profile?.id) && (e.ownerId === data.profile?.id || Object.hasOwn(e.participants, data.profile?.id || '') || Object.hasOwn(e.waitlist || {}, data.profile?.id || '')))); setBlockedIds(data.blocked[data.profile?.id || ''] || []); setEventNotices(data.notices.filter(n => n.recipientId === data.profile?.id)); setRightsRequests(data.rightsRequests.filter(r => r.userId === data.profile?.id)); setEvents(data.events.filter(isPublicEvent)); setLikes(data.likes); setComments(data.comments);
           setVerifications(data.verifications.filter(v => v.userId === data.profile?.id)); setReports([]); setLoading(false);
           void publishLocalPosts(data.posts, localMedia(), setPosts, (post, mediaUrl) => setPosts(previous => previous.map(current => current.id === post.id && current.mediaPath === post.mediaPath ? { ...current, mediaUrl } : current)), () => isCurrentRead() && sequence === refreshSequence);
         } catch (err) { if (isCurrentRead() && sequence === refreshSequence) readFailure(err); }
@@ -323,12 +332,12 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
     const listen = <T,>(name: 'communityEvents' | 'communityPosts', normalize: (value: unknown, id: string) => T | null, receive: (items: T[]) => void) => {
       const kind = name === 'communityEvents' ? 'events' : 'posts';
       const count = contentPageSize[kind];
-      return onSnapshot(query(collection(db, name), orderBy('createdAt', 'desc'), limit(count)), { includeMetadataChanges: true }, snapshot => {
+      return onSnapshot(query(collection(db, name), ...(name === 'communityEvents' ? [where('visibility', '==', 'public')] : []), orderBy('createdAt', 'desc'), limit(count)), { includeMetadataChanges: true }, snapshot => {
         if (!isCurrentRead()) return;
         const paging = pageCursors.current[kind];
         if (paging.offset === 0 && !paging.busy) paging.cursor = snapshot.docs.at(-1) || null;
         paging.ready = !snapshot.metadata.fromCache;
-        receive(snapshot.docs.map(d => normalize(d.data(), d.id)).filter((item): item is T => item !== null));
+        receive(snapshot.docs.map(d => normalize(d.data(), d.id)).filter((item): item is T => item !== null && (name !== 'communityEvents' || isPublicEvent(item as PlayEvent))));
         setPages(previous => ({ ...previous, [`${kind}Loading`]: paging.busy || !paging.ready, ...(paging.offset === 0 ? { [`${kind}HasMore`]: paging.ready && snapshot.size === count } : {}) }));
       }, err => { if (isCurrentRead()) { setPages(previous => ({ ...previous, [`${kind}Loading`]: false })); failed(err); } });
     };
@@ -345,7 +354,7 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
       }, failed),
       listen('communityEvents', normalizeEvent, values => { setEvents(values); setLoading(false); }),
       listen('communityPosts', normalizePost, setPosts),
-      ...(['owner', 'joined', 'waiting'] as const).map(source => onSnapshot(query(collection(db, 'communityEvents'), source === 'owner' ? where('ownerId', '==', firebaseUser.uid) : where(source === 'joined' ? 'participantIds' : 'waitlistOrder', 'array-contains', firebaseUser.uid)), snapshot => { if (isCurrentRead()) { ownSources.current[source] = snapshot.docs.map(d => normalizeEvent(d.data(), d.id)).filter((e): e is PlayEvent => e !== null); setOwnEvents([...new Map(Object.values(ownSources.current).flat().map(e => [e.id, e])).values()]); } }, failed)),
+      ...(['owner', 'joined', 'waiting'] as const).map(source => onSnapshot(query(collection(db, 'communityEvents'), source === 'owner' ? where('ownerId', '==', firebaseUser.uid) : where(source === 'joined' ? 'participantIds' : 'waitlistOrder', 'array-contains', firebaseUser.uid), ...(source === 'waiting' ? [where('visibility', '==', 'public')] : [])), snapshot => { if (isCurrentRead()) { ownSources.current[source] = snapshot.docs.map(d => normalizeEvent(d.data(), d.id)).filter((e): e is PlayEvent => e !== null && canReadEvent(e, firebaseUser.uid)); setOwnEvents([...new Map(Object.values(ownSources.current).flat().map(e => [e.id, e])).values()]); } }, failed)),
       onSnapshot(query(collection(db, 'communityBlocks'), where('ownerId', '==', firebaseUser.uid)), snapshot => { if (isCurrentRead()) setBlockedIds(snapshot.docs.map(d => d.data().blockedId).filter((id): id is string => typeof id === 'string')); }, failed),
       onSnapshot(query(collection(db, 'communityEventNotices'), where('recipientId', '==', firebaseUser.uid), orderBy('createdAt', 'desc'), limit(100)), snapshot => { if (isCurrentRead()) setEventNotices(snapshot.docs.map(d => normalizeNotice(d.data(), d.id)).filter((n): n is EventNotice => n !== null)); }, failed),
       onSnapshot(query(collection(db, 'communityRightsRequests'), where('userId', '==', firebaseUser.uid), orderBy('createdAt', 'desc'), limit(30)), snapshot => { if (isCurrentRead()) setRightsRequests(snapshot.docs.map(d => normalizeRightsRequest(d.data(), d.id)).filter((n): n is RightsRequest => n !== null)); }, failed)
@@ -381,40 +390,109 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
       if (mode === 'demo') { setPages(previous => ({ ...previous, [`${kind}HasMore`]: false })); return; }
       if (!serviceOpen) return;
       const collectionName = kind === 'events' ? 'communityEvents' : 'communityPosts';
-      const snapshot = await getDocs(query(collection(db, collectionName), orderBy('createdAt', 'desc'), ...(paging.cursor ? [startAfter(paging.cursor)] : []), limit(contentPageSize[kind])));
+      const snapshot = await getDocs(query(collection(db, collectionName), ...(kind === 'events' ? [where('visibility', '==', 'public')] : []), orderBy('createdAt', 'desc'), ...(paging.cursor ? [startAfter(paging.cursor)] : []), limit(contentPageSize[kind])));
       if (!current() || pageCursors.current[kind] !== paging) return;
       paging.cursor = snapshot.docs.at(-1) || paging.cursor; paging.offset += snapshot.size; paging.ready = true;
-      if (kind === 'events') setOlderEvents(previous => [...new Map([...previous, ...snapshot.docs.map(d => normalizeEvent(d.data(), d.id)).filter((e): e is PlayEvent => e !== null)].map(e => [e.id, e])).values()]);
+      if (kind === 'events') setOlderEvents(previous => [...new Map([...previous, ...snapshot.docs.map(d => normalizeEvent(d.data(), d.id)).filter((e): e is PlayEvent => e !== null && isPublicEvent(e))].map(e => [e.id, e])).values()]);
       else setOlderPosts(previous => [...new Map([...previous, ...snapshot.docs.map(d => normalizePost(d.data(), d.id)).filter((p): p is CommunityPost => p !== null)].map(p => [p.id, p])).values()]);
       setPages(previous => ({ ...previous, [`${kind}HasMore`]: snapshot.size === contentPageSize[kind] }));
     } finally { paging.busy = false; if (current() && pageCursors.current[kind] === paging) setPages(previous => ({ ...previous, [`${kind}Loading`]: false })); }
   }
   const watchFixtureData = useCallback((id: string) => {
-    if (!validProfileId(id)) return () => {};
-    if (mode === 'demo') { const refresh = () => { setFixtureData(previous => ({ ...previous, [id]: normalizeDemoData(readDemo()).events.find(event => event.id === id)?.fixtures || [] })); setFixtureStates(previous => ({ ...previous, [id]: 'ready' })); }; refresh(); window.addEventListener('cantera-demo-updated', refresh); return () => window.removeEventListener('cantera-demo-updated', refresh); }
-    if (!serviceOpen) return () => {};
-    let active = true; let raw: DocumentData | null = null; let receivedFixtures = false; let records: Fixture[] = [];
-    setFixtureStates(previous => ({ ...previous, [id]: 'loading' }));
+    if (!validProfileId(id) || mode === 'cloud' && !serviceOpen) return () => {};
+    const lease = Symbol(id); fixtureWatches.current.set(id, lease);
+    let active = true, failed = false;
+    let raw: DocumentData | null = null; let receivedFixtures = false; let records: Fixture[] = [];
+    const scopeCurrent = () => currentReadScope.current === readScope && currentEventViewer.current === eventViewer && (mode === 'demo' || auth.currentUser?.uid === firebaseUser?.uid);
+    const current = () => active && !failed && scopeCurrent() && fixtureWatches.current.get(id) === lease;
+    const clear = () => {
+      setFixtureData(previous => { if (fixtureWatches.current.has(id) && fixtureWatches.current.get(id) !== lease) return previous; const next = { ...previous }; delete next[id]; return next; });
+    };
+    const fail = () => {
+      if (!current()) return;
+      failed = true; raw = null; receivedFixtures = false; records = []; clear();
+      setFixtureStates(previous => scopeCurrent() && fixtureWatches.current.get(id) === lease ? { ...previous, [id]: 'error' } : previous);
+    };
+    const receive = (event: PlayEvent | null) => {
+      if (!current()) return;
+      if (!event || !canReadEvent(event, eventViewer)) { fail(); return; }
+      setFixtureData(previous => current() ? { ...previous, [id]: event.fixtures } : previous);
+      setFixtureStates(previous => current() ? { ...previous, [id]: 'ready' } : previous);
+    };
+    const cleanup = () => {
+      active = false;
+      if (fixtureWatches.current.get(id) !== lease) return;
+      fixtureWatches.current.delete(id); clear();
+      setFixtureStates(previous => { if (fixtureWatches.current.has(id)) return previous; const next = { ...previous }; delete next[id]; return next; });
+    };
+    clear();
+    if (mode === 'demo') {
+      const refresh = () => {
+        if (!current()) return;
+        const data = normalizeDemoData(readDemo());
+        if (data.profile?.id !== eventViewer) { fail(); return; }
+        receive(data.events.find(event => event.id === id) || null);
+      };
+      refresh(); window.addEventListener('cantera-demo-updated', refresh);
+      return () => { window.removeEventListener('cantera-demo-updated', refresh); cleanup(); };
+    }
+    setFixtureStates(previous => current() ? { ...previous, [id]: 'loading' } : previous);
     const publish = () => {
-      if (!active || !raw) return;
+      if (!current() || !raw) return;
       const manifest = raw.fixtureIds;
-      if (!Array.isArray(manifest)) { const event = normalizeEvent(raw, id); setFixtureData(previous => ({ ...previous, [id]: event?.fixtures || [] })); setFixtureStates(previous => ({ ...previous, [id]: event ? 'ready' : 'error' })); return; }
+      if (!Array.isArray(manifest)) { receive(normalizeEvent(raw, id)); return; }
+      if (!canReadEvent({ ...raw, visibility: raw.visibility, ownerId: raw.ownerId, participantIds: raw.participantIds || Object.keys(raw.participants || {}) }, eventViewer)) { fail(); return; }
       if (!receivedFixtures) return;
       const byId = new Map(records.map(record => [record.id, record]));
       const fixtures = manifest.map(fixtureId => byId.get(fixtureId)).filter((fixture): fixture is Fixture => !!fixture);
-      const event = fixtures.length === manifest.length ? normalizeEvent({ ...raw, fixtures }, id) : null;
-      setFixtureData(previous => ({ ...previous, [id]: event?.fixtures || [] })); setFixtureStates(previous => ({ ...previous, [id]: event ? 'ready' : 'error' }));
+      receive(fixtures.length === manifest.length ? normalizeEvent({ ...raw, fixtures }, id) : null);
     };
-    const fail = () => { if (active) setFixtureStates(previous => ({ ...previous, [id]: 'error' })); };
-    const stops = [onSnapshot(doc(db, 'communityEvents', id), snapshot => { raw = snapshot.exists() ? snapshot.data() : null; if (!raw) fail(); else publish(); }, fail), onSnapshot(query(collection(db, 'communityFixtures'), where('eventId', '==', id)), snapshot => { records = snapshot.docs.map(record => normalizeFixtureRecord(record.data(), id)).filter((record): record is Fixture => record !== null); receivedFixtures = true; publish(); }, fail)];
-    return () => { active = false; stops.forEach(stop => stop()); };
-  }, [mode, serviceOpen]);
+    const stops = [onSnapshot(doc(db, 'communityEvents', id), snapshot => {
+      if (!current()) return;
+      raw = snapshot.exists() ? snapshot.data() : null; if (!raw) fail(); else publish();
+    }, fail), onSnapshot(query(collection(db, 'communityFixtures'), where('eventId', '==', id)), snapshot => {
+      if (!current()) return;
+      records = snapshot.docs.map(record => normalizeFixtureRecord(record.data(), id)).filter((record): record is Fixture => record !== null); receivedFixtures = true; publish();
+    }, fail)];
+    return () => { stops.forEach(stop => stop()); cleanup(); };
+  }, [mode, serviceOpen, readScope, eventViewer, firebaseUser?.uid]);
   const watchEventHistory = useCallback((id: string) => {
-    if (!validProfileId(id)) return () => {};
-    if (mode === 'demo') { const refresh = () => { const event = normalizeDemoData(readDemo()).events.find(event => event.id === id); setEventHistories(previous => ({ ...previous, [id]: event?.history || [] })); }; refresh(); window.addEventListener('cantera-demo-updated', refresh); return () => window.removeEventListener('cantera-demo-updated', refresh); }
-    if (!serviceOpen) return () => {};
-    return onSnapshot(query(collection(db, 'communityEventChanges'), where('eventId', '==', id), orderBy('revision', 'desc'), limit(50)), snapshot => { const values = snapshot.docs.map(record => { const value = record.data(); const date = value.createdAt?.toDate?.(); return Number.isSafeInteger(value.revision) && value.revision > 0 && typeof value.summary === 'string' && date instanceof Date ? { revision: value.revision, summary: value.summary, changedAt: date.toISOString() } as EventChange : null; }).filter((entry): entry is EventChange => entry !== null); setEventHistories(previous => ({ ...previous, [id]: values.reverse() })); }, readFailure);
-  }, [mode, serviceOpen, readFailure]);
+    if (!validProfileId(id) || mode === 'cloud' && !serviceOpen) return () => {};
+    const lease = Symbol(id); historyWatches.current.set(id, lease);
+    let active = true;
+    const current = () => active && currentReadScope.current === readScope && currentEventViewer.current === eventViewer && historyWatches.current.get(id) === lease && (mode === 'demo' || auth.currentUser?.uid === firebaseUser?.uid);
+    const clear = () => {
+      setEventHistories(previous => { if (historyWatches.current.has(id) && historyWatches.current.get(id) !== lease) return previous; const next = { ...previous }; delete next[id]; return next; });
+    };
+    const cleanup = () => {
+      active = false;
+      if (historyWatches.current.get(id) !== lease) return;
+      historyWatches.current.delete(id); clear();
+    };
+    const fail = (error?: unknown) => {
+      if (!current()) return;
+      cleanup();
+      if (error && (error as { code?: string }).code !== 'permission-denied') readFailure(error);
+    };
+    clear();
+    if (mode === 'demo') {
+      const refresh = () => {
+        if (!current()) return;
+        const data = normalizeDemoData(readDemo()); const event = data.events.find(event => event.id === id);
+        if (data.profile?.id !== eventViewer || !event || !canReadEvent(event, eventViewer)) { fail(); return; }
+        setEventHistories(previous => current() ? { ...previous, [id]: event.history || [] } : previous);
+      };
+      refresh(); window.addEventListener('cantera-demo-updated', refresh);
+      return () => { window.removeEventListener('cantera-demo-updated', refresh); cleanup(); };
+    }
+    const stop = onSnapshot(query(collection(db, 'communityEventChanges'), where('eventId', '==', id), orderBy('revision', 'desc'), limit(50)), snapshot => {
+      if (!current()) return;
+      const values = snapshot.docs.map(record => { const value = record.data(); const date = value.createdAt?.toDate?.(); return Number.isSafeInteger(value.revision) && value.revision > 0 && typeof value.summary === 'string' && date instanceof Date ? { revision: value.revision, summary: value.summary, changedAt: date.toISOString() } as EventChange : null; }).filter((entry): entry is EventChange => entry !== null);
+      const history = values.reverse();
+      setEventHistories(previous => current() ? { ...previous, [id]: history } : previous);
+    }, fail);
+    return () => { stop(); cleanup(); };
+  }, [mode, serviceOpen, readScope, eventViewer, firebaseUser?.uid, readFailure]);
   const loadMoreEvents = (reset = false) => loadPage('events', reset);
   const loadMorePosts = (reset = false) => loadPage('posts', reset);
   async function loadMoreOwnEvents() { /* Own subscriptions query by UID, without a global window. */ }
@@ -516,7 +594,8 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
     const user = actor();
     if (mode === 'demo') return { created: 0, inspected: 0, hasMore: false };
     const snapshot = await getDoc(doc(db, 'communityEvents', id));
-    if (!snapshot.exists() || snapshot.data().ownerId !== user.id) throw new Error('Solo el organizador puede recuperar los avisos.');
+    const event = snapshot.exists() ? normalizeEvent(snapshot.data(), id) : null;
+    if (!event || event.ownerId !== user.id) throw new Error('Solo el organizador puede recuperar los avisos.');
     const key = `${user.id}:${id}`;
     let state = deliveryCursors.current.get(key);
     if (!state) { state = { stage: 'changes', cursor: null, candidates: [], busy: false }; deliveryCursors.current.set(key, state); }
@@ -545,23 +624,31 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
         state.cursor = page.docs.at(-1) || state.cursor;
         if (page.size < 50) { state.stage = isChange ? 'promotions' : 'done'; state.cursor = null; }
       }
-      const candidates = state.candidates.slice(0, 200);
+      const inspected = state.candidates.slice(0, 200);
+      const candidates = inspected.filter(candidate => noticeRecipientAllowed(event, candidate.value.recipientId));
       const receipts = await Promise.all(candidates.map(candidate => getDoc(doc(db, 'communityEventDeliveries', candidate.id))));
       const missing = candidates.filter((_, index) => !receipts[index].exists());
+      let created = 0;
       if (missing.length) {
         await commitDeliveryBatches(missing, async candidates => {
+          const current = await getDoc(doc(db, 'communityEvents', id));
+          const latest = current.exists() ? normalizeEvent(current.data(), id) : null;
+          if (!latest || latest.ownerId !== user.id) throw new Error('El encuentro ya no está disponible para entregar avisos.');
+          const eligible = candidates.filter(candidate => noticeRecipientAllowed(latest, candidate.value.recipientId));
+          if (!eligible.length) return;
           const batch = writeBatch(db);
-          for (const notice of candidates) {
+          for (const notice of eligible) {
             batch.set(doc(db, 'communityEventNotices', notice.id), notice.value);
             batch.set(doc(db, 'communityEventDeliveries', notice.id), { actorId: user.id, eventId: id, recipientId: notice.value.recipientId, createdAt: serverTimestamp() });
           }
           await batch.commit();
+          created += eligible.length;
         });
       }
-      state.candidates.splice(0, candidates.length);
+      state.candidates.splice(0, inspected.length);
       const hasMore = state.candidates.length > 0 || state.stage !== 'done';
       if (!hasMore) deliveryCursors.current.delete(key);
-      return { created: missing.length, inspected: candidates.length, hasMore };
+      return { created, inspected: inspected.length, hasMore };
     } catch (error) {
       deliveryCursors.current.delete(key);
       throw new Error(`La recuperación no se ha completado. Los avisos entregados se conservan y puedes volver a intentarlo. ${friendlyError(error)}`);
@@ -574,7 +661,9 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
     else await setDoc(doc(db, 'communityRightsRequests', id), { ...request, createdAt: serverTimestamp() });
   }
 
-  const availableEvents = [...new Map([...olderEvents, ...events, ...ownEvents].map(event => [event.id, event])).values()].map(event => event.fixtureIds && fixtureStates[event.id] === 'ready' ? { ...event, fixtures: fixtureData[event.id] || [] } : event).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const viewer = mode === 'demo' ? profile?.id : auth.currentUser?.uid === firebaseUser?.uid ? firebaseUser?.uid : undefined;
+  const readableOwnEvents = ownEvents.filter(event => canReadEvent(event, viewer));
+  const availableEvents = [...new Map([...olderEvents, ...events, ...readableOwnEvents].map(event => [event.id, event])).values()].filter(event => canReadEvent(event, viewer)).map(event => event.fixtureIds && fixtureStates[event.id] === 'ready' ? { ...event, fixtures: fixtureData[event.id] || [] } : event).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const availablePosts = [...new Map([...olderPosts, ...Object.values(linkedPosts[mode]), ...posts].map(post => [post.id, post])).values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
   function sessionActor() {
@@ -596,6 +685,7 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
   async function mutateEvent(id: string, change: (event: PlayEvent, user: CommunityProfile) => PlayEvent, ownerOnly = false, reason = 'Se ha actualizado el encuentro.', withdrawal = false, notifyOnly?: string[]) {
     const user = withdrawal ? sessionActor() : actor();
     const apply = (event: PlayEvent) => {
+      if (!canReadEvent(event, user.id)) throw new Error('Necesitas una invitación para acceder a este encuentro privado.');
       if (ownerOnly && event.ownerId !== user.id) throw new Error('Solo el organizador puede realizar esta acción.');
       const changed = change(event, user);
       const promoted = Object.keys(changed.participants).find(uid => !event.participants[uid] && event.waitlist?.[uid]);
@@ -604,13 +694,13 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
     };
     if (mode === 'demo') {
       mutateDemo(data => { const event = data.events.find(e => e.id === id); if (!event) throw new Error('Evento no encontrado.');
-        const next = apply(event); const recipients = [...new Set([event.ownerId, ...Object.keys(event.participants), ...Object.keys(next.participants), ...Object.keys(event.waitlist || {}), ...Object.keys(next.waitlist || {})])].filter(uid => !uid.startsWith('guest-'));
-        const notices: EventNotice[] = ownerOnly ? (notifyOnly || recipients).map(uid => ({ id: `${id}_${next.revision}_${uid}`, eventId: id, recipientId: uid, revision: next.revision!, title: next.title, summary: reason, createdAt: stamp(), readAt: '' })) : [];
+        const next = apply(event); const recipients = [...new Set([event.ownerId, ...Object.keys(event.participants), ...Object.keys(next.participants), ...Object.keys(event.waitlist || {}), ...Object.keys(next.waitlist || {})])].filter(uid => noticeRecipientAllowed(next, uid));
+        const notices: EventNotice[] = ownerOnly ? (notifyOnly || recipients).filter(uid => noticeRecipientAllowed(next, uid)).map(uid => ({ id: `${id}_${next.revision}_${uid}`, eventId: id, recipientId: uid, revision: next.revision!, title: next.title, summary: reason, createdAt: stamp(), readAt: '' })) : [];
         const promoted = Object.keys(next.participants).find(uid => !event.participants[uid] && event.waitlist?.[uid]);
         if (promoted) { const deliveryId = newId(); notices.push({ id: `${id}_place_${deliveryId}`, eventId: id, recipientId: promoted, revision: Math.max(1, next.revision || 0), title: next.title, summary: 'Has conseguido una plaza al liberarse un puesto.', createdAt: stamp(), readAt: '', kind: 'place', deliveryId }); }
         return { ...data, events: data.events.map(e => e.id === id ? next : e), notices: [...notices, ...data.notices] }; }); return;
     }
-    const notifications: Array<{ id: string; value: DocumentData }> = []; let notificationOwnerId = '';
+    const notifications: Array<{ id: string; value: DocumentData }> = []; let notificationOwnerId = ''; let notificationEvent: PlayEvent | null = null;
     await runTransaction(db, async tx => { notifications.length = 0; const eventRef = doc(db, 'communityEvents', id); const snapshot = await tx.get(eventRef);
       if (!snapshot.exists()) throw new Error('Evento no encontrado.');
       const raw = snapshot.data(); const canonical = new Map<string, { fixture: Fixture; raw: DocumentData }>();
@@ -619,6 +709,7 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
       if (!current) throw new Error('El evento contiene datos no válidos y necesita revisión.');
       notificationOwnerId = current.ownerId;
       const next = apply(current);
+      notificationEvent = next;
       const waitlist = Object.fromEntries(Object.entries(next.waitlist || {}).map(([uid, item]) => [uid, { ...item, joinedAt: raw.waitlist?.[uid]?.joinedAt || serverTimestamp() }]));
       const useCanonical = Array.isArray(raw.fixtureIds) || ownerOnly && next.fixtures.length > 0;
       if (useCanonical && ownerOnly) for (const fixture of next.fixtures) { const existing = canonical.get(fixture.id); if (!existing || !sameFixture(existing.fixture, fixture)) tx.set(doc(db, 'communityFixtures', `${id}_${fixture.id}`), { ...fixtureFields(existing ? { ...next, timeZone: existing.raw.timeZone, venue: existing.raw.venue } : next, fixture), createdAt: existing?.raw.createdAt || serverTimestamp(), updatedAt: serverTimestamp() }); }
@@ -630,13 +721,21 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
         const revision = next.revision!; const summary = requireText(reason, 'Motivo del cambio', 500);
         const audienceIds = [...new Set([current.ownerId, ...Object.keys(current.participants), ...Object.keys(next.participants), ...Object.keys(current.waitlist || {}), ...Object.keys(next.waitlist || {})])];
         tx.set(doc(db, 'communityEventChanges', `${id}_${revision}`), { audienceIds, id: `${id}_${revision}`, eventId: id, ownerId: user.id, revision, summary, title: next.title, createdAt: serverTimestamp() });
-        const recipients = [...new Set([current.ownerId, ...Object.keys(current.participants), ...Object.keys(next.participants), ...Object.keys(current.waitlist || {}), ...Object.keys(next.waitlist || {})])].filter(uid => !uid.startsWith('guest-'));
-        for (const uid of notifyOnly || recipients) notifications.push({ id: `${id}_${revision}_${uid}`, value: { id: `${id}_${revision}_${uid}`, eventId: id, recipientId: uid, revision, title: next.title, summary, createdAt: serverTimestamp(), readAt: '' } });
+        const recipients = [...new Set([current.ownerId, ...Object.keys(current.participants), ...Object.keys(next.participants), ...Object.keys(current.waitlist || {}), ...Object.keys(next.waitlist || {})])].filter(uid => noticeRecipientAllowed(next, uid));
+        for (const uid of (notifyOnly || recipients).filter(uid => noticeRecipientAllowed(next, uid))) notifications.push({ id: `${id}_${revision}_${uid}`, value: { id: `${id}_${revision}_${uid}`, eventId: id, recipientId: uid, revision, title: next.title, summary, createdAt: serverTimestamp(), readAt: '' } });
       } });
     if (notifications.length) {
       try { await commitDeliveryBatches(notifications, async notices => {
+        // A private participant who just left cannot read the parent any more.
+        // Their promotion proof comes from the completed transaction; rules
+        // still verify the recipient's current membership at delivery time.
+        const current = user.id === notificationOwnerId ? await getDoc(doc(db, 'communityEvents', id)) : null;
+        const latest = current ? current.exists() ? normalizeEvent(current.data(), id) : null : notificationEvent;
+        if (!latest || latest.ownerId !== notificationOwnerId) throw new Error('El encuentro ya no está disponible para entregar avisos.');
+        const eligible = notices.filter(notice => noticeRecipientAllowed(latest, notice.value.recipientId));
+        if (!eligible.length) return;
         const batch = writeBatch(db);
-        for (const notice of notices) { batch.set(doc(db, 'communityEventNotices', notice.id), notice.value); batch.set(doc(db, 'communityEventDeliveries', notice.id), { actorId: notificationOwnerId, eventId: id, recipientId: notice.value.recipientId, createdAt: serverTimestamp() }); }
+        for (const notice of eligible) { batch.set(doc(db, 'communityEventNotices', notice.id), notice.value); batch.set(doc(db, 'communityEventDeliveries', notice.id), { actorId: notificationOwnerId, eventId: id, recipientId: notice.value.recipientId, createdAt: serverTimestamp() }); }
         await batch.commit();
       }); } catch { throw new Error('El cambio se ha guardado, pero no se han podido entregar todos los avisos. El organizador puede usar «Recuperar avisos» para completar la entrega.'); }
     }
@@ -767,7 +866,16 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
     if (input.kind !== 'achievement' && mode !== 'demo') throw new Error('Las fotos y los reels se habilitarán cuando el patrocinio permita activar el almacenamiento. Puedes compartir un logro escrito.');
     const text = requireText(input.text, 'Texto', 2000);
     const title = input.kind === 'achievement' ? requireText(input.title, 'Logro', 100) : input.title.trim().slice(0, 100);
-    if (input.eventId && !availableEvents.some(e => e.id === input.eventId)) throw new Error('Evento asociado no encontrado.');
+    if (input.eventId) {
+      if (!validProfileId(input.eventId)) throw new Error('Evento asociado inválido.');
+      let associated: PlayEvent | null = null;
+      if (mode === 'demo') associated = normalizeDemoData(readDemo()).events.find(event => event.id === input.eventId) || null;
+      else {
+        const parent = await getDoc(doc(db, 'communityEvents', input.eventId));
+        associated = parent.exists() ? normalizeEvent(parent.data(), parent.id) : null;
+      }
+      if (!associated || !isPublicEvent(associated)) throw new Error('Las publicaciones son públicas: sólo puedes asociar un encuentro público disponible.');
+    }
     let mediaUrl = '', mediaPath = '';
     try {
       if (input.kind !== 'achievement') {
@@ -855,7 +963,7 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
     if (removePost) { if (report.commentId) await deleteComment(report.postId, report.commentId); else await deletePost(report.postId); }
     await updateDoc(doc(db, 'communityReports', id), { status: 'resolved' });
   }
-  const value: CommunityAPI = { profile, mode, loading, error, isAdmin, demoEnabled, accountModeration, mediaUploadsEnabled: mode === 'demo', runtimeConfig: mode === 'demo' ? { serviceStatus: 'open', mediaUploadsEnabled: true, contactEmail: '', updatedAt: '' } : { ...runtimeConfig, serviceStatus: serviceOpen ? 'open' : runtimeConfig.serviceStatus === 'paused' ? 'paused' : 'setup' }, adminRightsRequests, adminQueueHasMore, adminQueueLoading, loadMoreAdminQueue, suspendAccount, reviewRightsRequest, updateRuntimeStatus, ownEvents, ownEventsHasMore: false, ownEventsLoading: loading, loadMoreOwnEvents, ...pages, loadMoreEvents, loadMorePosts, fixtureData, fixtureStates, watchFixtureData, eventHistories, watchEventHistory, eventNotices, rightsRequests, blockedIds, toggleBlock, markNoticeRead, requestRights, retryEventNotices, postInteractionStates, watchPostInteractions, loadMoreComments, deleteComment, reportComment, searchPeople, events: availableEvents, posts: availablePosts, likes, comments, verificationRequests, reports, hiddenPostIds,
+  const value: CommunityAPI = { profile, mode, loading, error, isAdmin, demoEnabled, accountModeration, mediaUploadsEnabled: mode === 'demo', runtimeConfig: mode === 'demo' ? { serviceStatus: 'open', mediaUploadsEnabled: true, contactEmail: '', updatedAt: '' } : { ...runtimeConfig, serviceStatus: serviceOpen ? 'open' : runtimeConfig.serviceStatus === 'paused' ? 'paused' : 'setup' }, adminRightsRequests, adminQueueHasMore, adminQueueLoading, loadMoreAdminQueue, suspendAccount, reviewRightsRequest, updateRuntimeStatus, ownEvents: readableOwnEvents, ownEventsHasMore: false, ownEventsLoading: loading, loadMoreOwnEvents, ...pages, loadMoreEvents, loadMorePosts, fixtureData, fixtureStates, watchFixtureData, eventHistories, watchEventHistory, eventNotices, rightsRequests, blockedIds, toggleBlock, markNoticeRead, requestRights, retryEventNotices, postInteractionStates, watchPostInteractions, loadMoreComments, deleteComment, reportComment, searchPeople, events: availableEvents, posts: availablePosts, likes, comments, verificationRequests, reports, hiddenPostIds,
     profiles: peoplePage.mode === mode ? peoplePage.profiles : [], publicProfiles: publicCaches[mode], publicProfileStates: profileStates[mode], followingIds,
     peopleLoading: peoplePage.mode === mode && peoplePage.loading, peopleError: peoplePage.mode === mode ? peoplePage.error : '', peopleHasMore: peoplePage.mode !== mode || peoplePage.hasMore,
     loadMorePeople, watchPublicProfile, toggleFollow, watchPost, linkedPostStates: linkedStates[mode],

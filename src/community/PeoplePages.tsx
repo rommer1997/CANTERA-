@@ -6,6 +6,7 @@ import { db } from '../firebase';
 import { friendlyError, useCommunity, usePublicProfile } from './CommunityContext';
 import { readDemo } from './local';
 import { normalizeDemoData, normalizeEvent, normalizePost } from './normalization';
+import { isPublicEvent } from './eventPrivacy';
 import type { CommunityPost, PlayEvent, PublicProfile } from './types';
 import './people.css';
 
@@ -92,11 +93,11 @@ function useProfileActivity<T extends Activity>(id: string, enabled: boolean, na
       let records: T[]; let more: boolean;
       if (mode === 'demo') {
         const data = normalizeDemoData(readDemo());
-        const all = (name === 'communityPosts' ? data.posts.filter(item => item.authorId === id) : data.events.filter(item => item.ownerId === id)).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+        const all = (name === 'communityPosts' ? data.posts.filter(item => item.authorId === id) : data.events.filter(item => item.ownerId === id && isPublicEvent(item))).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
         records = all.slice(page.offset, page.offset + activityPageSize) as T[]; page.offset += records.length; more = page.offset < all.length;
       } else {
-        const snapshot = await getDocs(query(collection(db, name), where(field, '==', id), orderBy('createdAt', 'desc'), limit(activityPageSize), ...(page.cursor ? [startAfter(page.cursor)] : [])));
-        records = snapshot.docs.map(item => normalize(item.data(), item.id)).filter((item): item is T => item !== null); page.cursor = snapshot.docs.at(-1) || page.cursor; more = snapshot.size === activityPageSize;
+        const snapshot = await getDocs(query(collection(db, name), where(field, '==', id), ...(name === 'communityEvents' ? [where('visibility', '==', 'public')] : []), orderBy('createdAt', 'desc'), limit(activityPageSize), ...(page.cursor ? [startAfter(page.cursor)] : [])));
+        records = snapshot.docs.map(item => normalize(item.data(), item.id)).filter((item): item is T => item !== null && (name !== 'communityEvents' || isPublicEvent(item as PlayEvent))); page.cursor = snapshot.docs.at(-1) || page.cursor; more = snapshot.size === activityPageSize;
       }
       if (page.active) setState(previous => ({ records: [...new Map([...previous.records, ...records].map(item => [item.id, item])).values()], loading: false, error: '', more }));
     } catch (err) { if (page.active) setState(previous => ({ ...previous, loading: false, error: friendlyError(err) })); }

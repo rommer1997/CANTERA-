@@ -49,6 +49,7 @@ export interface PlayEvent {
   ownerId: string;
   ownerName: string;
   title: string;
+  visibility?: 'public' | 'private';
   type: 'match' | 'tournament';
   format: '5' | '7' | '11';
   level: Level;

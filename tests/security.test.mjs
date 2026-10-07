@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { assertFails, assertSucceeds, initializeTestEnvironment } from '@firebase/rules-unit-testing';
 import { initializeApp, deleteApp } from 'firebase/app';
-import { collection, serverTimestamp, Timestamp, connectFirestoreEmulator, deleteDoc, doc, getDoc, getDocs, getFirestore, limit, orderBy, query, runTransaction, setDoc, updateDoc, where, getCountFromServer, writeBatch } from 'firebase/firestore';
+import { arrayUnion, collection, serverTimestamp, Timestamp, connectFirestoreEmulator, deleteDoc, doc, getDoc, getDocs, getFirestore, limit, orderBy, query, runTransaction, setDoc, updateDoc, where, getCountFromServer, writeBatch } from 'firebase/firestore';
 import { makeFixtures } from '../src/community/logic.ts';
 import { fixtureFields } from '../src/community/fixtureRecords.ts';
 import { commitDeliveryBatches } from '../src/community/deliveryBatches.ts';
@@ -36,6 +36,7 @@ const fixture = { id: 'r1-1', round: 1, homeId: 'alice', awayId: 'bob', homeScor
 let env;
 const context = uid => uid ? env.authenticatedContext(uid, uid === 'admin' ? { admin: true } : {}) : env.unauthenticatedContext();
 const db = uid => context(uid).firestore();
+const verifiedDb = uid => env.authenticatedContext(uid, { email_verified: true }).firestore();
 const media = uid => context(uid).storage();
 async function seed(path, value) { await env.withSecurityRulesDisabled(ctx => setDoc(doc(ctx.firestore(), path), value)); }
 
@@ -719,5 +720,199 @@ describe('Cruces canónicos con validación individual', { concurrency: false },
     await assertFails(canonicalUpdate(db('alice'), 'schedule', fixture.id, { homeScore: 2, awayScore: 2 }));
     await assertSucceeds(canonicalUpdate(db('alice'), 'schedule', fixture.id, { homeScore: 2, awayScore: 1 }));
     await assertFails(canonicalUpdate(db('alice'), 'schedule', fixture.id, { kickoffAt: Timestamp.fromMillis(Date.now() + 172800000), venue: 'Campo distinto' }));
+  });
+});
+
+const invitation = (id = '23456789ABCDEFGH', overrides = {}) => ({ id, ownerId: 'alice', kind: 'connection', eventId: '', status: 'active', createdAt: stamp(), usedBy: '', usedAt: '', ...overrides });
+async function connectWithCode(client, uid, code = '23456789ABCDEFGH') {
+  return runTransaction(client, async tx => {
+    const token = doc(client, 'communityInvitations', code); const current = (await tx.get(token)).data();
+    const inviter = current.ownerId;
+    const first = doc(client, `communityConnections/${inviter}/members/${uid}`);
+    const second = doc(client, `communityConnections/${uid}/members/${inviter}`);
+    const [left, right] = await Promise.all([tx.get(first), tx.get(second)]);
+    if (left.exists() || right.exists()) throw new Error('La conexión ya existe.');
+    tx.update(token, { status: 'used', usedBy: uid, usedAt: stamp() });
+    tx.set(first, { ownerId: inviter, peerId: uid, inviteId: code, createdAt: stamp() });
+    tx.set(second, { ownerId: uid, peerId: inviter, inviteId: code, createdAt: stamp() });
+  });
+}
+async function admitWithCode(client, uid, code = '23456789ABCDEFGH', overrides = {}) {
+  return runTransaction(client, async tx => {
+    const token = doc(client, 'communityInvitations', code); const current = (await tx.get(token)).data();
+    // A valid code reveals no private event details before the atomic admission.
+    const target = doc(client, 'communityEvents', current.eventId);
+    tx.update(token, { status: 'used', usedBy: uid, usedAt: stamp() });
+    tx.set(doc(client, `communityEventAdmissions/${current.eventId}/members/${uid}`), { eventId: current.eventId, userId: uid, inviteId: code, createdAt: stamp() });
+    tx.update(target, { [`participants.${uid}`]: uid, participantIds: arrayUnion(uid), [`rsvps.${uid}`]: 'yes', ...overrides });
+  });
+}
+describe('Códigos de un uso, conexiones y eventos privados', { concurrency: false }, () => {
+  test('alta de código sólo usa entropía/formato admitidos y hora de servidor; propietario puede revocar tras caducar', async () => {
+    const alice = verifiedDb('alice');
+    await assertSucceeds(setDoc(doc(alice, 'communityInvitations/23456789ABCDEFGH'), invitation()));
+    await assertFails(setDoc(doc(alice, 'communityInvitations/short'), invitation('short')));
+    await assertFails(setDoc(doc(alice, 'communityInvitations/IIIIIIIIIIIIIIII'), invitation('IIIIIIIIIIIIIIII')));
+    await assertFails(setDoc(doc(alice, 'communityInvitations/23456789ABCDEFGJ'), invitation('23456789ABCDEFGJ', { expiresAt: Timestamp.fromMillis(Date.now() + 600000) })));
+    await assertFails(setDoc(doc(alice, 'communityInvitations/23456789ABCDEFGK'), invitation('23456789ABCDEFGK', { createdAt: Timestamp.fromMillis(Date.now() + 60000) })));
+    await assertFails(setDoc(doc(verifiedDb('bob'), 'communityInvitations/23456789ABCDEFGL'), invitation('23456789ABCDEFGL')));
+    await seed('communityInvitations/23456789ABCDEFGM', invitation('23456789ABCDEFGM', { createdAt: Timestamp.fromMillis(Date.now() - 601000) }));
+    await assertSucceeds(updateDoc(doc(alice, 'communityInvitations/23456789ABCDEFGM'), { status: 'revoked' }));
+    await assertFails(updateDoc(doc(alice, 'communityInvitations/23456789ABCDEFGH'), { createdAt: stamp() }));
+    await assertFails(updateDoc(doc(alice, 'communityInvitations/23456789ABCDEFGH'), { ownerId: 'bob' }));
+  });
+  test('conocer el código requiere correo verificado, consentimiento y plazo; nunca permite enumerar invitaciones ajenas', async () => {
+    const alice = verifiedDb('alice'); await setDoc(doc(alice, 'communityInvitations/23456789ABCDEFGH'), invitation());
+    await assertFails(getDoc(doc(db(), 'communityInvitations/23456789ABCDEFGH')));
+    await assertFails(getDoc(doc(db('bob'), 'communityInvitations/23456789ABCDEFGH')));
+    for (const uid of ['inactive', 'minor']) await assertFails(getDoc(doc(verifiedDb(uid), 'communityInvitations/23456789ABCDEFGH')));
+    await assertSucceeds(getDoc(doc(verifiedDb('bob'), 'communityInvitations/23456789ABCDEFGH')));
+    await assertFails(getDocs(collection(verifiedDb('bob'), 'communityInvitations')));
+    await assertFails(getDocs(query(collection(verifiedDb('bob'), 'communityInvitations'), where('status', '==', 'active'))));
+    await assertSucceeds(getDocs(query(collection(alice, 'communityInvitations'), where('ownerId', '==', 'alice'), orderBy('createdAt', 'desc'))));
+    await seed('communityInvitations/23456789ABCDEFGJ', invitation('23456789ABCDEFGJ', { createdAt: Timestamp.fromMillis(Date.now() - 601000) }));
+    await assertFails(getDoc(doc(verifiedDb('bob'), 'communityInvitations/23456789ABCDEFGJ')));
+    await assertSucceeds(getDoc(doc(alice, 'communityInvitations/23456789ABCDEFGJ')));
+    await updateDoc(doc(alice, 'communityInvitations/23456789ABCDEFGH'), { status: 'revoked' });
+    await assertFails(getDoc(doc(verifiedDb('bob'), 'communityInvitations/23456789ABCDEFGH')));
+    await assertFails(connectWithCode(verifiedDb('bob'), 'bob'));
+  });
+  test('conexión necesita dos aristas y consumo atómico; no admite suplantación, autocanje ni replay', async () => {
+    const alice = verifiedDb('alice'); const bob = verifiedDb('bob'); const code = '23456789ABCDEFGH';
+    await setDoc(doc(alice, 'communityInvitations', code), invitation(code));
+    await assertFails(updateDoc(doc(bob, 'communityInvitations', code), { status: 'used', usedBy: 'bob', usedAt: stamp() }));
+    const edge = { ownerId: 'bob', peerId: 'alice', inviteId: code, createdAt: stamp() };
+    await assertFails(setDoc(doc(bob, 'communityConnections/bob/members/alice'), edge));
+    const partial = writeBatch(bob); partial.update(doc(bob, 'communityInvitations', code), { status: 'used', usedBy: 'bob', usedAt: stamp() }); partial.set(doc(bob, 'communityConnections/bob/members/alice'), edge);
+    await assertFails(partial.commit());
+    await assertFails(connectWithCode(alice, 'alice', code));
+    await assertSucceeds(connectWithCode(bob, 'bob', code));
+    await assertSucceeds(getDoc(doc(bob, 'communityConnections/alice/members/bob')));
+    await assertSucceeds(getDocs(collection(bob, 'communityConnections/bob/members')));
+    await assertFails(getDocs(collection(bob, 'communityConnections/alice/members')));
+    await assertFails(getDoc(doc(verifiedDb('carol'), 'communityConnections/alice/members/bob')));
+    await assertFails(updateDoc(doc(bob, 'communityConnections/bob/members/alice'), { peerId: 'carol' }));
+    await assertFails(connectWithCode(verifiedDb('carol'), 'carol', code));
+    assert.equal((await getDoc(doc(alice, 'communityInvitations', code))).data().usedBy, 'bob');
+    await setDoc(doc(alice, 'communityInvitations/23456789ABCDEFGJ'), invitation('23456789ABCDEFGJ'));
+    await assertFails(connectWithCode(bob, 'bob', '23456789ABCDEFGJ'));
+    assert.equal((await getDoc(doc(alice, 'communityInvitations/23456789ABCDEFGJ'))).data().status, 'active');
+  });
+  test('dos receptores simultáneos sólo consumen un código una vez y retirada requiere borrar ambas aristas incluso en pausa', async () => {
+    const alice = verifiedDb('alice'); await setDoc(doc(alice, 'communityInvitations/23456789ABCDEFGH'), invitation());
+    const results = await Promise.allSettled([connectWithCode(verifiedDb('bob'), 'bob'), connectWithCode(verifiedDb('carol'), 'carol')]);
+    assert.equal(results.filter(result => result.status === 'fulfilled').length, 1);
+    const winner = (await getDoc(doc(alice, 'communityInvitations/23456789ABCDEFGH'))).data().usedBy;
+    assert.equal((await getDocs(collection(alice, 'communityConnections/alice/members'))).size, 1);
+    const client = verifiedDb(winner);
+    await assertFails(deleteDoc(doc(client, `communityConnections/${winner}/members/alice`)));
+    await seed('communityConfiguration/runtime', { serviceStatus: 'paused', mediaUploadsEnabled: false, contactEmail: '', updatedAt: stamp() });
+    const batch = writeBatch(client); batch.delete(doc(client, `communityConnections/${winner}/members/alice`)); batch.delete(doc(client, `communityConnections/alice/members/${winner}`));
+    await assertSucceeds(batch.commit());
+    assert.equal((await getDoc(doc(client, `communityConnections/${winner}/members/alice`))).exists(), false);
+  });
+  test('privado oculta detalle, lista, cruces, historial y acceso por amistad; público legado sigue accesible', async () => {
+    await seed('communityEvents/public', event('public', { visibility: 'public', participantIds: [] }));
+    await seed('communityEvents/legacy', event('legacy'));
+    await seed('communityEvents/private', event('private', { visibility: 'private', type: 'tournament', participants: { bob: 'bob' }, participantIds: ['bob'] }));
+    await seed('communityConnections/alice/members/carol', { ownerId: 'alice', peerId: 'carol', inviteId: '23456789ABCDEFGH', createdAt: stamp() });
+    await seed('communityFixtures/private_r1-1', { eventId: 'private', ...fixture });
+    await seed('communityEventChanges/private_1', { eventId: 'private', ownerId: 'alice', title: 'Título privado', summary: 'Contenido privado', revision: 1 });
+    await seed('matches/legacy-private', { eventId: 'private', venue: 'No público' });
+    for (const client of [db(), db('carol')]) {
+      await assertFails(getDoc(doc(client, 'communityEvents/private')));
+      await assertFails(getDocs(collection(client, 'communityEvents')));
+      await assertFails(getDoc(doc(client, 'communityFixtures/private_r1-1')));
+      await assertFails(getDocs(query(collection(client, 'communityFixtures'), where('eventId', '==', 'private'))));
+      await assertFails(getDoc(doc(client, 'communityEventChanges/private_1')));
+      await assertFails(getDoc(doc(client, 'matches/legacy-private')));
+      await assertSucceeds(getDocs(query(collection(client, 'communityEvents'), where('visibility', '==', 'public'), orderBy('createdAt', 'desc'))));
+      await assertSucceeds(getDoc(doc(client, 'communityEvents/legacy')));
+    }
+    await assertSucceeds(getDoc(doc(db('bob'), 'communityEvents/private')));
+    await assertSucceeds(getDocs(query(collection(db('bob'), 'communityEvents'), where('participantIds', 'array-contains', 'bob'), orderBy('createdAt', 'desc'))));
+    await assertSucceeds(getDocs(query(collection(db('alice'), 'communityEvents'), where('ownerId', '==', 'alice'), orderBy('createdAt', 'desc'))));
+    await assertSucceeds(getDocs(query(collection(db('bob'), 'communityFixtures'), where('eventId', '==', 'private'))));
+    await assertSucceeds(getDoc(doc(db('bob'), 'communityEventChanges/private_1')));
+    await assertFails(ownerUpdate(doc(db('alice'), 'communityEvents/public'), { visibility: 'private' }));
+    await assertFails(setDoc(doc(db('alice'), 'communityPosts/private-link'), post('private-link', { eventId: 'private' })));
+    await assertSucceeds(setDoc(doc(db('alice'), 'communityPosts/public-link'), post('public-link', { eventId: 'public' })));
+  });
+  test('canje privado crea plaza y recibo juntos sin lectura previa; un recibo aislado no autoriza entrada', async () => {
+    const alice = verifiedDb('alice'); const bob = verifiedDb('bob'); const code = '23456789ABCDEFGH';
+    await setDoc(doc(alice, 'communityEvents/private'), event('private', { visibility: 'private', participantIds: [], type: 'tournament' }));
+    await setDoc(doc(alice, 'communityInvitations', code), invitation(code, { kind: 'event', eventId: 'private' }));
+    await assertFails(getDoc(doc(bob, 'communityEvents/private')));
+    await assertFails(updateDoc(doc(bob, 'communityEvents/private'), { participants: { bob: 'bob' }, participantIds: ['bob'] }));
+    await assertFails(setDoc(doc(bob, 'communityEventAdmissions/private/members/bob'), { eventId: 'private', userId: 'bob', inviteId: code, createdAt: stamp() }));
+    await assertFails(admitWithCode(db('bob'), 'bob', code));
+    await assertSucceeds(admitWithCode(bob, 'bob', code));
+    const accepted = (await getDoc(doc(bob, 'communityEvents/private'))).data();
+    assert.deepEqual(accepted.participants, { bob: 'bob' }); assert.deepEqual(accepted.participantIds, ['bob']); assert.equal(accepted.rsvps.bob, 'yes');
+    await assertSucceeds(getDoc(doc(bob, 'communityEventAdmissions/private/members/bob')));
+    await assertFails(getDoc(doc(verifiedDb('carol'), 'communityEventAdmissions/private/members/bob')));
+    await assertFails(getDocs(collection(bob, 'communityEventAdmissions/private/members')));
+    await assertSucceeds(getDocs(collection(alice, 'communityEventAdmissions/private/members')));
+    await assertFails(admitWithCode(verifiedDb('carol'), 'carol', code));
+    await assertSucceeds(updateDoc(doc(bob, 'communityEvents/private'), { participants: {}, participantIds: [], rsvps: { bob: 'no' } }));
+    await assertFails(getDoc(doc(bob, 'communityEvents/private')));
+    await assertFails(updateDoc(doc(bob, 'communityEvents/private'), { participants: { bob: 'bob' }, participantIds: ['bob'], rsvps: { bob: 'yes' } }));
+    await assertSucceeds(deleteDoc(doc(bob, 'communityEventAdmissions/private/members/bob')));
+  });
+  test('plaza llena, evento cerrado, capacidad concurrente y destinatario bloqueado dejan el código sin consumir', async () => {
+    const alice = verifiedDb('alice'); const bob = verifiedDb('bob');
+    await seed('communityEvents/full', event('full', { visibility: 'private', capacity: 2, participants: { alice: 'alice', carol: 'carol' }, participantIds: ['alice', 'carol'] }));
+    await setDoc(doc(alice, 'communityInvitations/23456789ABCDEFGH'), invitation('23456789ABCDEFGH', { kind: 'event', eventId: 'full' }));
+    await assertFails(admitWithCode(bob, 'bob'));
+    assert.equal((await getDoc(doc(alice, 'communityInvitations/23456789ABCDEFGH'))).data().status, 'active');
+    await seed('communityEvents/closed', event('closed', { visibility: 'private', status: 'closed', participantIds: [] }));
+    await setDoc(doc(alice, 'communityInvitations/23456789ABCDEFGJ'), invitation('23456789ABCDEFGJ', { kind: 'event', eventId: 'closed' }));
+    await assertFails(admitWithCode(bob, 'bob', '23456789ABCDEFGJ'));
+    assert.equal((await getDoc(doc(alice, 'communityInvitations/23456789ABCDEFGJ'))).data().status, 'active');
+    await seed('communityEvents/race-private', event('race-private', { visibility: 'private', capacity: 2, participants: { alice: 'alice' }, participantIds: ['alice'] }));
+    for (const code of ['23456789ABCDEFGK', '23456789ABCDEFGL']) await setDoc(doc(alice, 'communityInvitations', code), invitation(code, { kind: 'event', eventId: 'race-private' }));
+    const results = await Promise.allSettled([admitWithCode(bob, 'bob', '23456789ABCDEFGK'), admitWithCode(verifiedDb('carol'), 'carol', '23456789ABCDEFGL')]);
+    assert.equal(results.filter(result => result.status === 'fulfilled').length, 1);
+    assert.equal((await getDoc(doc(alice, 'communityEvents/race-private'))).data().participantIds.length, 2);
+    const tokens = await Promise.all(['23456789ABCDEFGK', '23456789ABCDEFGL'].map(code => getDoc(doc(alice, 'communityInvitations', code))));
+    assert.equal(tokens.filter(token => token.data().status === 'active').length, 1);
+    await setDoc(doc(alice, 'communityInvitations/23456789ABCDEFGM'), invitation('23456789ABCDEFGM'));
+    await setDoc(doc(bob, 'communityBlocks/bob_alice'), { ownerId: 'bob', blockedId: 'alice', createdAt: stamp() });
+    await assertFails(connectWithCode(bob, 'bob', '23456789ABCDEFGM'));
+    assert.equal((await getDoc(doc(alice, 'communityInvitations/23456789ABCDEFGM'))).data().status, 'active');
+  });
+  test('código de evento no se fabrica para otro dueño o un evento público, y expiración/suspensión bloquean el canje', async () => {
+    const alice = verifiedDb('alice'); const bob = verifiedDb('bob');
+    await seed('communityEvents/public-invite', event('public-invite', { visibility: 'public', participantIds: [] }));
+    await seed('communityEvents/private-invite', event('private-invite', { visibility: 'private', participantIds: [] }));
+    await assertFails(setDoc(doc(alice, 'communityInvitations/23456789ABCDEFGH'), invitation('23456789ABCDEFGH', { kind: 'event', eventId: 'public-invite' })));
+    await assertFails(setDoc(doc(bob, 'communityInvitations/23456789ABCDEFGH'), invitation('23456789ABCDEFGH', { ownerId: 'bob', kind: 'event', eventId: 'private-invite' })));
+    await assertFails(setDoc(doc(alice, 'communityInvitations/23456789ABCDEFGH'), invitation('23456789ABCDEFGH', { kind: 'event', eventId: 'missing' })));
+    await seed('communityInvitations/23456789ABCDEFGH', invitation('23456789ABCDEFGH', { kind: 'event', eventId: 'private-invite', createdAt: Timestamp.fromMillis(Date.now() - 601000) }));
+    const expired = writeBatch(bob);
+    expired.update(doc(bob, 'communityInvitations/23456789ABCDEFGH'), { status: 'used', usedBy: 'bob', usedAt: stamp() });
+    expired.set(doc(bob, 'communityEventAdmissions/private-invite/members/bob'), { eventId: 'private-invite', userId: 'bob', inviteId: '23456789ABCDEFGH', createdAt: stamp() });
+    expired.update(doc(bob, 'communityEvents/private-invite'), { 'participants.bob': 'bob', participantIds: arrayUnion('bob'), 'rsvps.bob': 'yes' });
+    await assertFails(expired.commit());
+    assert.equal((await getDoc(doc(alice, 'communityInvitations/23456789ABCDEFGH'))).data().status, 'active');
+    await setDoc(doc(alice, 'communityInvitations/23456789ABCDEFGJ'), invitation('23456789ABCDEFGJ', { kind: 'event', eventId: 'private-invite' }));
+    await seed('communityAccountModeration/bob', { status: 'suspended', reason: 'Prueba', updatedAt: stamp() });
+    await assertFails(getDoc(doc(bob, 'communityInvitations/23456789ABCDEFGJ')));
+    await assertFails(admitWithCode(bob, 'bob', '23456789ABCDEFGJ'));
+    await assertSucceeds(updateDoc(doc(alice, 'communityEvents/private-invite'), { 'participants.alice': 'alice', participantIds: arrayUnion('alice'), 'rsvps.alice': 'yes' }));
+  });
+  test('avisos privados sólo se entregan a participantes actuales; una entrega previa sigue accesible a su destinatario', async () => {
+    const alice = verifiedDb('alice'); const bob = verifiedDb('bob');
+    await seed('communityEvents/secret-notice', event('secret-notice', { visibility: 'private', participantIds: [], revision: 1 }));
+    await seed('communityEventChanges/secret-notice_1', { id: 'secret-notice_1', eventId: 'secret-notice', ownerId: 'alice', title: 'Reunión privada', summary: 'Cambio de campo', revision: 1, audienceIds: ['alice', 'bob'], createdAt: Timestamp.fromMillis(Date.now() - 1000) });
+    const notice = { id: 'secret-notice_1_bob', eventId: 'secret-notice', recipientId: 'bob', revision: 1, title: 'Reunión privada', summary: 'Cambio de campo', createdAt: stamp(), readAt: '' };
+    const batch = writeBatch(alice);
+    batch.set(doc(alice, 'communityEventNotices/secret-notice_1_bob'), notice);
+    batch.set(doc(alice, 'communityEventDeliveries/secret-notice_1_bob'), { actorId: 'alice', eventId: 'secret-notice', recipientId: 'bob', createdAt: stamp() });
+    await assertFails(batch.commit());
+    await seed('communityEventNotices/secret-notice_1_bob', notice);
+    await assertSucceeds(getDoc(doc(bob, 'communityEventNotices/secret-notice_1_bob')));
+    await assertSucceeds(getDocs(query(collection(bob, 'communityEventNotices'), where('recipientId', '==', 'bob'), orderBy('createdAt', 'desc'))));
+    await assertFails(getDoc(doc(verifiedDb('carol'), 'communityEventNotices/secret-notice_1_bob')));
   });
 });

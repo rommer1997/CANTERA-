@@ -1,4 +1,5 @@
 import type { EventInput, Fixture, FixtureSchedule, MatchResult, PlayEvent, Standing } from './types';
+import { eventVisibility } from './eventPrivacy.ts';
 
 export function requireText(value: string, label: string, max = 200): string {
   const text = value.trim();
@@ -9,13 +10,14 @@ export function requireText(value: string, label: string, max = 200): string {
 export function validateEvent(input: EventInput, now = Date.now()): EventInput {
   if (!['match', 'tournament'].includes(input.type) || !['5', '7', '11'].includes(input.format) ||
     !['amateur', 'professional'].includes(input.level) || !['players', 'teams'].includes(input.entry) ||
-    !['league', 'knockout'].includes(input.tournamentFormat)) throw new Error('Formato de evento inválido.');
+    !['league', 'knockout'].includes(input.tournamentFormat) ||
+    input.visibility !== undefined && !['public', 'private'].includes(input.visibility)) throw new Error('Formato de evento inválido.');
   if (!Number.isInteger(input.capacity) || input.capacity < 2 || input.capacity > 64) throw new Error('El aforo debe estar entre 2 y 64.');
   if (input.type === 'tournament' && input.capacity > 32) throw new Error('Los torneos admiten hasta 32 participantes para generar el calendario.');
   if (!Number.isFinite(Date.parse(input.startAt)) || Date.parse(input.startAt) <= now) throw new Error('La fecha debe ser futura.');
   try { new Intl.DateTimeFormat('es', { timeZone: input.timeZone }).format(); } catch { throw new Error('Zona horaria inválida.'); }
   if (input.description.length > 2000) throw new Error('La descripción admite hasta 2000 caracteres.');
-  return { ...input, title: requireText(input.title, 'Título', 100), city: requireText(input.city, 'Ciudad', 100),
+  return { ...input, visibility: eventVisibility(input), title: requireText(input.title, 'Título', 100), city: requireText(input.city, 'Ciudad', 100),
     country: requireText(input.country, 'País', 100), venue: requireText(input.venue, 'Lugar', 200), description: input.description.trim() };
 }
 
@@ -23,6 +25,7 @@ export function validateEventEdit(event: PlayEvent, input: EventInput, reason: s
   if (event.status === 'completed') throw new Error('Un encuentro celebrado no se puede reprogramar.');
   requireText(reason, 'Motivo del cambio', 500);
   const cleaned = validateEvent(input, now);
+  if (cleaned.visibility !== eventVisibility(event)) throw new Error('La privacidad del encuentro no se puede cambiar después de crearlo.');
   if (cleaned.capacity < Object.keys(event.participants).length) throw new Error('El aforo no puede ser menor que el número de inscripciones.');
   if (Object.keys(event.participants).length && (cleaned.type !== event.type || cleaned.entry !== event.entry)) throw new Error('Con participantes inscritos no puedes cambiar el tipo de encuentro ni de inscripción.');
   if (event.fixtures.length && (cleaned.type !== event.type || cleaned.entry !== event.entry || cleaned.format !== event.format || cleaned.tournamentFormat !== event.tournamentFormat)) throw new Error('Los cruces generados fijan el formato de la competición.');

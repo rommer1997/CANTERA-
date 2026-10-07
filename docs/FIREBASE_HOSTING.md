@@ -4,9 +4,9 @@ La migración preparada sirve el frontend de Vite con Firebase Hosting estático
 
 ## Destino y estado
 
-El proyecto existente es `gen-lang-client-0853130215`. Los comandos de publicación especifican ese proyecto y la configuración no fija un `site` o `target` inventado. Con el sitio predeterminado, la URL esperable es `https://gen-lang-client-0853130215.web.app/`; debe confirmarse mediante el inventario del proyecto y la respuesta de despliegue. La consulta a Hosting del 7 de octubre devolvió 403, por lo que todavía no se ha confirmado el sitio ni publicado esta versión allí.
+El proyecto existente es `gen-lang-client-0853130215`. El propietario eligió **[lacantera.web.app](https://lacantera.web.app/)**; el sitio `lacantera` se creó en ese proyecto y la web está publicada allí desde el 7 de octubre. `.firebaserc` asigna el target `cantera` exclusivamente a `lacantera`, y `firebase.json` utiliza ese target. Los comandos especifican el proyecto y el target; el sitio predeterminado del proyecto queda fuera del despliegue.
 
-Un nombre corto, como `cantera.web.app`, requiere un identificador de sitio disponible y su creación dentro del proyecto. No se ha reservado ese nombre ni creado otro proyecto. Firebase asigna los subdominios de sus sitios; consulta la [gestión de varios sitios](https://firebase.google.com/docs/hosting/multisites).
+El acceso inicial devolvía 403; se recuperó con la sesión del propietario. `lacantera.web.app` ya está autorizado en Firebase Auth y Google está habilitado. El registro sigue en preparación: publicar el alojamiento no completa la prueba entre cuentas ni la revisión del lanzamiento. No se ha creado otro proyecto. Firebase asigna subdominios `SITE_ID.web.app`; consulta la [gestión de varios sitios](https://firebase.google.com/docs/hosting/multisites).
 
 ## Preparación y publicación
 
@@ -34,7 +34,7 @@ pnpm run hosting:preview
 pnpm run hosting:deploy
 ```
 
-Los scripts especifican el proyecto anterior. `hosting:deploy` utiliza `--only hosting` y el paso `hosting.predeploy` ejecuta `pnpm run build:hosting` para impedir una publicación con un `dist` de otra compilación. El canal de revisión no añade dominios automáticamente a Firebase Auth. Una revisión publicada sí puede consumir las cuotas de Hosting; su URL y fecha de expiración las devuelve Firebase. No modifica las reglas, los índices, las cuentas, los administradores ni los datos de la aplicación.
+Los scripts especifican el proyecto anterior y el target `cantera`. `hosting:deploy` utiliza `--only hosting:cantera` y el paso `hosting.predeploy` ejecuta `pnpm run build:hosting` para impedir una publicación con un `dist` de otra compilación. `hosting:preview` utiliza `--only cantera`; el CLI lo resuelve al mismo target y no añade dominios automáticamente a Firebase Auth. Una revisión publicada sí puede consumir las cuotas de Hosting; su URL y fecha de expiración las devuelve Firebase. Estos comandos no modifican reglas, índices, cuentas, administradores ni datos de la aplicación.
 
 No utilices `firebase init` sobre esta configuración ni `firebase deploy` sin `--only`: pueden sustituir configuración o incluir servicios adicionales. Las reglas e índices del backend se aplican mediante un despliegue separado y limitado a la base autorizada.
 
@@ -45,6 +45,8 @@ Cantera usa navegación con `#/...`; el fragmento de la URL lo procesa el navega
 El HTML, `sw.js`, el manifest y los archivos sin hash requieren revalidación. Sólo los archivos de `/assets/` con el hash de ocho caracteres generado por Vite reciben un año de caché inmutable. La PWA conserva su mecanismo de actualización del shell: un service worker nuevo espera la activación que ofrece la interfaz. Estas cabeceras no almacenan respuestas de Firebase, perfiles, cuentas o contenido privado. La [configuración oficial de Hosting](https://firebase.google.com/docs/hosting/full-config) describe el orden de las cabeceras y las reglas de reescritura.
 
 Después de publicar, comprueba la URL exacta devuelta por Firebase: HTML y manifest, cabeceras de caché, enlaces compartidos con `#/`, instalación en móvil y aviso de nueva versión. Confirma el dominio real en Firebase Auth y prueba registro, aceptación legal, inicio de sesión y acceso con dos cuentas reales antes de abrir el servicio. Una publicación correcta del frontend no acredita esos flujos del backend.
+
+Comprobación realizada sobre la web publicada: HTML, manifest, service worker y asset versionado devuelven 200 con sus tipos y cabeceras esperados; un asset retirado devuelve 404. La navegación `#/` y los datos del responsable se verificaron en navegador, y la consola no mostró avisos o errores. La instalación y actualización en teléfonos físicos y los recorridos con cuentas reales siguen pendientes.
 
 Cambiar de dominio crea un origen distinto para el navegador. Las sesiones y datos locales de prueba no se trasladan; una PWA instalada desde Vercel sigue abriendo el dominio anterior y hay que instalarla desde la nueva URL. Los datos que ya existan en el mismo proyecto de Firebase no se migran por publicar otro frontend. Actualiza los enlaces públicos una vez comprobado el sitio nuevo y retira el despliegue anterior cuando el cambio esté validado.
 

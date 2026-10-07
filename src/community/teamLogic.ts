@@ -15,6 +15,6 @@ export function assertInvite(invite: TeamInvite | null, team: CommunityTeam | nu
 }
 export function safeReturnTo(value: string | null) {
   if (!value || !value.startsWith('/') || value.startsWith('//') || /[\\\u0000-\u001f]/.test(value)) return '';
-  if (!/^\/(play(?:\/[^?/#]+)?|teams(?:\/(?:join\/)?[^?/#]+)?|feed|people(?:\/[^?/#]+)?)(?:\?[^#]*)?$/.test(value)) return '';
+  if (!/^\/(play(?:\/[^?/#]+)?|teams(?:\/(?:join\/)?[^?/#]+)?|feed|connect|invite\/[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{16}|people(?:\/[^?/#]+)?)(?:\?[^#]*)?$/.test(value)) return '';
   return value;
 }

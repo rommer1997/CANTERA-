@@ -79,7 +79,7 @@ function writePrivateJson(root, requested, payload) {
 
 async function collectAccountSource({ db, auth, uid, projectId, databaseId, FieldPath, policies }) {
   const startedAt = new Date().toISOString();
-  const record = document => ({ id: document.id, data: document.data() });
+  const record = document => ({ id: document.id, data: document.data(), ...(typeof document.ref?.path === 'string' ? { path: document.ref.path } : {}) });
   const readAll = async (query, rangeField) => {
     const ordered = rangeField ? query.orderBy(rangeField).orderBy(FieldPath.documentId()) : query.orderBy(FieldPath.documentId());
     const rows = []; let cursor;
@@ -99,13 +99,26 @@ async function collectAccountSource({ db, auth, uid, projectId, databaseId, Fiel
   const [identity, direct] = await Promise.all([getAuth(), db.getAll(...directNames.map(name => db.collection(name).doc(uid)))]);
   const collections = {};
   // Bounded concurrency without truncating any collection to a UI page window.
-  const names = Object.keys(policies);
+  const names = Object.keys(policies).filter(name => !['communityConnections', 'communityEventAdmissions'].includes(name));
   for (let index = 0; index < names.length; index += 4) await Promise.all(names.slice(index, index + 4).map(async name => {
     collections[name] = await readAll(db.collection(name).where(policies[name], '==', uid));
   }));
   // Incoming promotion proofs belong to their recipient as well. Other
   // recipients' inboxes remain private; they are never queried by event ID.
   collections.communityEventPromotions = [...(collections.communityEventPromotions || []), ...await readAll(db.collection('communityEventPromotions').where('recipientId', '==', uid))];
+  // Invitations consumed by the requester are personal records even when
+  // another person created the code. Do not read all invitations or accounts.
+  collections.communityInvitations = [...(collections.communityInvitations || []), ...await readAll(db.collection('communityInvitations').where('usedBy', '==', uid))];
+  collections.communityConnections = await readAll(db.collection('communityConnections').doc(uid).collection('members').where('ownerId', '==', uid));
+  // A group named "members" may also contain contacts or future team records.
+  // The equality query is personal; this exact path gate admits only receipts
+  // under communityEventAdmissions. A missing index is an error, never a scan.
+  collections.communityEventAdmissions = (await readAll(db.collectionGroup('members').where('userId', '==', uid))).filter(row => {
+    if (typeof row.path !== 'string') return false;
+    const parts = row.path.split('/');
+    return parts.length === 4 && parts[0] === 'communityEventAdmissions' && parts[2] === 'members'
+      && parts[3] === uid && row.id === uid && row.data.userId === uid && row.data.eventId === parts[1];
+  });
   const eventCollection = db.collection('communityEvents');
   const events = [];
   const eventQueries = [

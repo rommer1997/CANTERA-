@@ -107,6 +107,57 @@ test('equipos incluyen metadatos vinculados, sólo membresía/solicitud propia e
   assert.ok(!JSON.stringify(result).includes('SECRET'));
 });
 
+test('invitaciones y contactos privados exportan datos propios con referencias, sin códigos ni UID ajenos', () => {
+  const incomingCode = 'DME2M8Z4PFA6GF89', outgoingCode = '6666777788889999', activeCode = '2222333344445555', admissionCode = 'ABCDEFGHJKLMNPQR';
+  const connection = (peerId: string, inviteId: string) => ({ ...row(peerId, { ownerId: uid, peerId, inviteId, createdAt: timestamp, email: 'SECRET_EMAIL' }), path: `communityConnections/${uid}/members/${peerId}` });
+  const result = buildAccountExport(source({ collections: {
+    communityInvitations: [
+      row(incomingCode, { id: incomingCode, ownerId: 'SECRET_CONTACT_A', kind: 'connection', eventId: '', status: 'used', usedBy: uid, createdAt: timestamp, usedAt: timestamp }),
+      row(outgoingCode, { id: outgoingCode, ownerId: uid, kind: 'connection', eventId: '', status: 'used', usedBy: 'SECRET_CONTACT_B', createdAt: timestamp, usedAt: timestamp }),
+      row(activeCode, { id: activeCode, ownerId: uid, kind: 'connection', eventId: '', status: 'active', usedBy: '', usedAt: '', createdAt: timestamp, secretToken: 'SECRET_TOKEN' }),
+      row(admissionCode, { id: admissionCode, ownerId: 'SECRET_PRIVATE_ORGANIZER', kind: 'event', eventId: 'private-event-a', status: 'used', usedBy: uid, createdAt: timestamp, usedAt: timestamp }),
+      row('SECRET_UNRELATED_CODE', { ownerId: 'other', usedBy: 'other', kind: 'connection' }),
+    ],
+    communityConnections: [connection('SECRET_CONTACT_A', incomingCode), connection('SECRET_CONTACT_B', outgoingCode), row('SECRET_MIRROR', { ownerId: 'other', peerId: uid, inviteId: outgoingCode }), { ...connection('SECRET_WRONG_PATH', outgoingCode), path: `communityConnections/other/members/${uid}` }],
+    communityEventAdmissions: [
+      { ...row(uid, { userId: uid, eventId: 'private-event-a', inviteId: admissionCode, createdAt: timestamp, organizerId: 'SECRET_ORGANIZER' }), path: `communityEventAdmissions/private-event-a/members/${uid}` },
+      { ...row(uid, { userId: uid, eventId: 'private-event-b', inviteId: 'SECRET_HISTORIC_CODE', createdAt: timestamp }), path: `communityEventAdmissions/private-event-b/members/${uid}` },
+      { ...row(uid, { userId: uid, eventId: 'SECRET_WRONG_PARENT', inviteId: outgoingCode, createdAt: timestamp }), path: `communityTeams/SECRET_WRONG_PARENT/members/${uid}` },
+      { ...row('other', { userId: 'other', eventId: 'private-event-a', inviteId: 'SECRET_OTHER_CODE' }), path: 'communityEventAdmissions/private-event-a/members/other' },
+    ],
+  } }));
+  assert.equal(result.counts.communityInvitations, 4);
+  assert.equal(result.counts.communityConnections, 2);
+  // Both receipts use the same UID document ID but belong to distinct parents.
+  assert.equal(result.counts.communityEventAdmissions, 2);
+  const ownActive = result.collections.communityInvitations.find(record => record.status === 'active')!;
+  assert.equal(ownActive.ownerId, uid); assert.equal(ownActive.createdBySelf, true); assert.equal(ownActive.usedBySelf, false);
+  const outgoing = result.collections.communityInvitations.find(record => record.createdBySelf && record.status === 'used')!;
+  assert.equal(outgoing.ownerId, uid); assert.ok(!Object.hasOwn(outgoing, 'usedBy'));
+  assert.match(outgoing.connectionReference as string, /^connection-\d+$/);
+  const incoming = result.collections.communityInvitations.find(record => !record.createdBySelf && record.kind === 'connection')!;
+  assert.equal(incoming.usedBy, uid); assert.ok(!Object.hasOwn(incoming, 'ownerId'));
+  assert.match(incoming.connectionReference as string, /^connection-\d+$/);
+  for (const connection of result.collections.communityConnections) {
+    assert.equal(connection.ownerId, uid); assert.equal(connection.usedInvitation, true);
+    assert.match(connection.exportReference as string, /^connection-\d+$/);
+    assert.match(connection.invitationReference as string, /^invitation-\d+$/);
+    for (const field of ['id', 'path', 'peerId', 'inviteId']) assert.ok(!Object.hasOwn(connection, field));
+  }
+  const admitted = result.collections.communityEventAdmissions.find(record => record.eventId === 'private-event-a')!;
+  assert.equal(admitted.userId, uid); assert.equal(admitted.usedInvitation, true);
+  assert.match(admitted.invitationReference as string, /^invitation-\d+$/);
+  for (const receipt of result.collections.communityEventAdmissions) {
+    assert.match(receipt.exportReference as string, /^admission-\d+$/);
+    for (const field of ['id', 'path', 'inviteId']) assert.ok(!Object.hasOwn(receipt, field));
+  }
+  const json = JSON.stringify(result);
+  assert.ok(!json.includes('SECRET'));
+  for (const token of [incomingCode, outgoingCode, activeCode, admissionCode]) assert.ok(!json.includes(token));
+  assert.equal(result.scope.shortInvitationTokensRemoved, true);
+  assert.equal(result.scope.privateConnectionPeerIdsRemoved, true);
+});
+
 test('UID y perfiles cruzados fallan antes de producir la exportación', () => {
   for (const invalid of ['', 'x/y', ' x ', '__proto__', '..', 'x\u0000y', 'a'.repeat(129)]) assert.throws(() => assertExportUid(invalid), /UID inválido/);
   assert.throws(() => buildAccountExport(source({ privateProfile: row(uid, { id: 'other', name: 'Otro' }) })), /no corresponde/);
@@ -121,6 +172,7 @@ class FakeFieldPath {
 }
 test('lecturas por UID paginan toda la colección y recuperan mapas antiguos con UID que contiene puntos', async () => {
   const reads: string[] = [];
+  const filters: { collection: string; conditions: { field: string | FakeFieldPath; op: string; value: string }[] }[] = [];
   const data: Record<string, ExportRecord[]> = {
     communityPosts: [...Array.from({ length: 405 }, (_, index) => row(`post-${String(index).padStart(4, '0')}`, { authorId: uid, text: `Propio ${index}` })), row('other', { authorId: 'other', text: 'SECRET_OTHER' })],
     communityEvents: [row('owner', { ownerId: uid, fixtureIds: ['r1-1'], fixtures: [{ id: 'r1-1', homeScore: 0, awayScore: 0 }] }), row('joined', { ownerId: 'other', participantIds: [uid], participants: { [uid]: 'Yo' } }), row('wait', { ownerId: 'other', waitlistOrder: [uid], waitlist: { [uid]: { name: 'Yo' } } }), row('legacy', { ownerId: 'other', participants: { [uid]: 'Yo' } }), row('legacy-wait', { ownerId: 'other', waitlist: { [uid]: { name: 'Yo' } } }), row('former', { ownerId: 'other', rsvps: { [uid]: 'no' } }), row('wrong', { ownerId: 'other', participants: { self: { with: { dot: 'SECRET_WRONG_PATH' } } } })],
@@ -130,30 +182,42 @@ test('lecturas por UID paginan toda la colección y recuperan mapas antiguos con
     communityEventDeliveries: [row('owner_2_SECRET_DESTINATION', { actorId: uid, eventId: 'owner', recipientId: 'SECRET_DESTINATION', createdAt: timestamp }), row('other_delivery', { actorId: 'other', eventId: 'joined', recipientId: uid, createdAt: timestamp })],
     communityTeamMembers: [row('my-member', { userId: uid, teamId: 'team' })],
     communityTeams: [row('owned-team', { ownerId: uid }), row('team', { ownerId: 'other', name: 'Público' })],
+    communityInvitations: [row('2222333344445555', { ownerId: uid, kind: 'connection', status: 'active', createdAt: timestamp }), row('6666777788889999', { ownerId: 'SECRET_OWNER', usedBy: uid, kind: 'event', eventId: 'joined', status: 'used', createdAt: timestamp, usedAt: timestamp }), row('SECRET_UNRELATED_CODE', { ownerId: 'other', usedBy: 'other', kind: 'connection' })],
+    [`communityConnections/${uid}/members`]: Array.from({ length: 205 }, (_, index) => row(`SECRET_CONTACT_${String(index).padStart(3, '0')}`, { ownerId: uid, peerId: `SECRET_CONTACT_${String(index).padStart(3, '0')}`, inviteId: '2222333344445555', createdAt: timestamp })),
+    '**/members': [
+      ...Array.from({ length: 205 }, (_, index) => ({ ...row(uid, { userId: uid, eventId: `admission-${String(index).padStart(3, '0')}`, inviteId: '6666777788889999', createdAt: timestamp }), path: `communityEventAdmissions/admission-${String(index).padStart(3, '0')}/members/${uid}` })),
+      { ...row(uid, { userId: uid, eventId: 'SECRET_TEAM', inviteId: 'SECRET_TEAM_TOKEN' }), path: `communityTeams/SECRET_TEAM/members/${uid}` },
+      { ...row(uid, { ownerId: uid, userId: uid, eventId: 'SECRET_CONTACT', inviteId: 'SECRET_CONTACT_TOKEN' }), path: `communityConnections/SECRET_CONTACT/members/${uid}` },
+      { ...row(uid, { userId: uid, eventId: 'SECRET_WRONG_EVENT' }), path: `communityEventAdmissions/different-event/members/${uid}` },
+      { ...row(uid, { userId: uid, eventId: 'SECRET_DEEP_EVENT' }), path: `other/parent/communityEventAdmissions/SECRET_DEEP_EVENT/members/${uid}` },
+      { ...row('other', { userId: 'other', eventId: 'SECRET_OTHER_EVENT' }), path: 'communityEventAdmissions/SECRET_OTHER_EVENT/members/other' },
+    ],
     [`users/${uid}/likes`]: [row('legacy-like', { timestamp })],
   };
   const direct = new Map([['communityProfiles/' + uid, row(uid, { id: uid, acceptedTermsVersion: '' })]]);
   const ref = (collection: string, id: string) => ({ id, path: `${collection}/${id}`, collection: (name: string) => query(`${collection}/${id}/${name}`) });
-  const snapshot = (record: ExportRecord | undefined, id: string) => ({ id, exists: !!record, data: () => record?.data });
+  const snapshot = (record: ExportRecord | undefined, id: string) => ({ id, exists: !!record, data: () => record?.data, ...(record?.path ? { ref: { path: record.path } } : {}) });
   function query(collection: string, constraints: { field: string | FakeFieldPath; op: string; value: string }[] = [], after = '', maximum = Infinity): any {
     return {
       doc: (id: string) => ref(collection, id),
       where: (field: string | FakeFieldPath, op: string, value: string) => query(collection, [...constraints, { field, op, value }], after, maximum),
       orderBy: () => query(collection, constraints, after, maximum),
-      startAfter: (document: { id: string }) => query(collection, constraints, document.id, maximum),
+      startAfter: (document: { id: string; ref?: { path: string } }) => query(collection, constraints, collection.startsWith('**/') ? document.ref!.path : document.id, maximum),
       limit: (count: number) => query(collection, constraints, after, count),
       get: async () => {
         reads.push(collection);
+        filters.push({ collection, conditions: constraints });
+        const identity = (record: ExportRecord) => collection.startsWith('**/') ? record.path! : record.id;
         const records = (data[collection] || []).filter(record => constraints.every(condition => {
           const parts = typeof condition.field === 'string' ? [condition.field] : condition.field.segments;
           const value = parts.reduce<any>((value, segment) => value?.[segment], record.data);
           return condition.op === '==' ? value === condition.value : condition.op === 'array-contains' ? Array.isArray(value) && value.includes(condition.value) : typeof value === 'string' && value >= condition.value;
-        })).sort((a, b) => a.id.localeCompare(b.id)).filter(record => !after || record.id > after).slice(0, maximum);
-        return { docs: records.map(record => snapshot(record, record.id)), size: records.length };
+        })).sort((a, b) => identity(a).localeCompare(identity(b))).filter(record => !after || identity(record) > after).slice(0, maximum);
+        return { docs: records.map(record => snapshot({ ...record, path: record.path || `${collection}/${record.id}` }, record.id)), size: records.length };
       },
     };
   }
-  const db = { collection: query, getAll: async (...references: { id: string; path: string }[]) => references.map(reference => snapshot(direct.get(reference.path) || data[reference.path.split('/')[0]]?.find(record => record.id === reference.id), reference.id)) };
+  const db = { collection: query, collectionGroup: (name: string) => query(`**/${name}`), getAll: async (...references: { id: string; path: string }[]) => references.map(reference => snapshot(direct.get(reference.path) || data[reference.path.split('/')[0]]?.find(record => record.id === reference.id), reference.id)) };
   const collected = await cli.collectAccountSource({ db, auth: { getUser: async (requested: string) => ({ uid: requested }) }, uid, projectId: 'demo-cantera', databaseId: 'test', FieldPath: FakeFieldPath, policies: accountQueryPolicies });
   const result = buildAccountExport(collected);
   assert.equal(result.counts.communityPosts, 405);
@@ -166,7 +230,40 @@ test('lecturas por UID paginan toda la colección y recuperan mapas antiguos con
   assert.equal(result.collections.communityEventChanges[0].id, 'joined_2');
   assert.equal(result.collections.communityEventPromotions.length, 2);
   assert.equal(result.collections.communityEventDeliveries.length, 1);
+  assert.equal(result.counts.communityInvitations, 2);
+  assert.equal(result.counts.communityConnections, 205);
+  assert.equal(result.counts.communityEventAdmissions, 205);
+  assert.equal(reads.filter(collection => collection === `communityConnections/${uid}/members`).length, 2);
+  assert.equal(reads.filter(collection => collection === '**/members').length, 2);
+  assert.equal(reads.filter(collection => collection === 'communityInvitations').length, 2);
+  for (const query of filters.filter(entry => entry.collection === '**/members')) assert.deepEqual(query.conditions, [{ field: 'userId', op: '==', value: uid }]);
+  for (const query of filters.filter(entry => entry.collection === `communityConnections/${uid}/members`)) assert.deepEqual(query.conditions, [{ field: 'ownerId', op: '==', value: uid }]);
+  assert.ok(!reads.includes('communityConnections')); assert.ok(!reads.includes('communityEventAdmissions'));
+  assert.ok(!JSON.stringify(result).includes('2222333344445555'));
+  assert.ok(!JSON.stringify(result).includes('6666777788889999'));
   assert.ok(!JSON.stringify(result).includes('SECRET'));
+});
+
+test('índice de recibos ausente aborta sin consultar miembros o cuentas sin filtro', async () => {
+  const reads: { scope: string; field: string; value: string }[] = [];
+  const indexFailure = Object.assign(new Error('SDK index link contains SECRET_UID'), { code: 9 });
+  function query(scope: string, field = '', value = ''): any {
+    return {
+      doc: (id: string) => ({ id, collection: (name: string) => query(`${scope}/${id}/${name}`) }),
+      where: (nextField: string, op: string, nextValue: string) => { assert.equal(op, '=='); return query(scope, nextField, nextValue); },
+      orderBy: () => query(scope, field, value), limit: () => query(scope, field, value),
+      get: async () => {
+        reads.push({ scope, field, value });
+        assert.ok(field); assert.equal(value, uid);
+        if (scope === '**/members') { assert.equal(field, 'userId'); throw indexFailure; }
+        return { docs: [], size: 0 };
+      },
+    };
+  }
+  const db = { collection: query, collectionGroup: (name: string) => { assert.equal(name, 'members'); return query('**/members'); }, getAll: async () => Array.from({ length: 4 }, () => ({ exists: false })) };
+  await assert.rejects(() => cli.collectAccountSource({ db, auth: { getUser: async () => null }, uid, projectId: 'demo-cantera', databaseId: 'test', FieldPath: FakeFieldPath, policies: accountQueryPolicies }), error => error === indexFailure);
+  assert.equal(reads.filter(read => read.scope === '**/members').length, 1);
+  assert.ok(!reads.some(read => ['members', 'communityEventAdmissions', 'communityConnections', 'users'].includes(read.scope)));
 });
 
 test('CLI tiene simulación por defecto y exige UID/salida para aplicar', () => {

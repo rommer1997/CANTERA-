@@ -6,6 +6,7 @@ import { normalizeTeam, normalizeTeamMember, normalizeTeamInvite, normalizeTeamR
 import { assertInvite, isTeamManager, memberId, validTeamInput } from './teamLogic';
 import { readDemo } from './local';
 import { normalizeEvent } from './normalization';
+import { isPublicEvent } from './eventPrivacy';
 import { keyedSubscriptions } from './keyedSubscriptions';
 import type { PlayEvent } from './types';
 import type { CommunityTeam, TeamInput, TeamInvite, TeamJoinRequest, TeamMember } from './teamTypes';
@@ -140,15 +141,15 @@ export function useTeamEvents(teamId: string) {
     setState(previous => ({ key, events: reset || previous.key !== key ? [] : previous.events, status: 'loading', loading: true, error: '', hasMore: reset ? false : previous.hasMore, invalidCount: reset ? 0 : previous.invalidCount, fromCache: reset ? false : previous.fromCache }));
     try {
       if (mode === 'demo') {
-        const all = readDemo().events.filter(event => event && event.teamId === teamId);
+        const all = readDemo().events.filter(event => event && event.teamId === teamId && isPublicEvent(event));
         const events = all.map(event => normalizeEvent(event, event.id)).filter((event): event is PlayEvent => event !== null).sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id));
         if (!active()) return;
         more.current = false;
         setState({ key, events, status: 'ready', loading: false, error: '', hasMore: false, invalidCount: all.length - events.length, fromCache: false });
       } else {
-        const snapshot = await getDocs(query(collection(db, 'communityEvents'), where('teamId', '==', teamId), orderBy('createdAt', 'desc'), ...(cursor.current ? [startAfter(cursor.current)] : []), limit(20)));
+        const snapshot = await getDocs(query(collection(db, 'communityEvents'), where('teamId', '==', teamId), where('visibility', '==', 'public'), orderBy('createdAt', 'desc'), ...(cursor.current ? [startAfter(cursor.current)] : []), limit(20)));
         if (!active()) return;
-        const events = snapshot.docs.map(document => normalizeEvent(document.data(), document.id)).filter((event): event is PlayEvent => event !== null && event.teamId === teamId);
+        const events = snapshot.docs.map(document => normalizeEvent(document.data(), document.id)).filter((event): event is PlayEvent => event !== null && event.teamId === teamId && isPublicEvent(event));
         cursor.current = snapshot.docs.at(-1) || cursor.current; more.current = snapshot.size === 20;
         setState(previous => ({ key, events: [...new Map([...(reset ? [] : previous.events), ...events].map(event => [event.id, event])).values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id)), status: 'ready', loading: false, error: '', hasMore: more.current, invalidCount: (reset ? 0 : previous.invalidCount) + snapshot.size - events.length, fromCache: (reset ? false : previous.fromCache) || snapshot.metadata.fromCache }));
       }

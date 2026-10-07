@@ -4,13 +4,13 @@ Comunidad de fútbol para organizar partidos y torneos gratis, coordinar equipos
 
 ## Estado de esta revisión
 
-**Edición de trabajo del 7 de octubre de 2026: configuración del responsable incorporada; apertura real pendiente de acceso y comprobación de Firebase.** El estado de esta puesta en marcha está en [RELEASE_2026-10-07.md](docs/RELEASE_2026-10-07.md). No se declara el producto terminado para clientes. El sitio público [cantera-tau.vercel.app](https://cantera-tau.vercel.app/) continúa correspondiendo al prototipo anterior; esta revisión no se ha desplegado allí.
+**Edición del 7 de octubre de 2026: web publicada en [lacantera.web.app](https://lacantera.web.app/), con registro todavía en preparación.** Las reglas e índices de la base nombrada están aplicados y el dominio tiene acceso autorizado en Google Auth. El estado de esta puesta en marcha está en [RELEASE_2026-10-07.md](docs/RELEASE_2026-10-07.md). No se declara el producto terminado para clientes. El sitio anterior de Vercel no se ha retirado ni actualizado a producción.
 
-La auditoría remota del 6 de octubre encontró la base `ai-studio-647af55f-499b-43f3-9268-9bf5f62701bb`, región `eur3`, con reglas `deny-all`, sin bucket de Storage, sin facturación habilitada y sin `cantera-tau.vercel.app` en Auth. Son datos históricos; la consulta actual devuelve 403. El propietario ha autorizado el despliegue concreto de reglas e índices de esa base y el dominio Auth el 7 de octubre. Su aplicación sigue pendiente de acceso; no se modificaron esos servicios ni se habilitaron costes.
+El acceso se recuperó mediante el inicio de sesión del propietario el 7 de octubre. La base `ai-studio-647af55f-499b-43f3-9268-9bf5f62701bb`, región `eur3`, estaba vacía y protegida con `deny-all`. Tras la autorización concreta del propietario se aplicaron las reglas revisadas y las 18 definiciones de índices; el contenido remoto de reglas coincide con el archivo local. Se añadieron `lacantera.web.app` y el dominio anterior autorizado `cantera-tau.vercel.app` a Auth conservando sus dominios previos. Google está habilitado. La facturación sigue desactivada.
 
-El destino solicitado es ahora Firebase Hosting (`.web.app`). La configuración y los comandos están preparados en [FIREBASE_HOSTING.md](docs/FIREBASE_HOSTING.md); no se ha confirmado el sitio ni publicado allí, porque la consulta a Hosting también devuelve 403.
+El sitio `lacantera` está creado en el proyecto existente. La configuración y los comandos de [FIREBASE_HOSTING.md](docs/FIREBASE_HOSTING.md) apuntan únicamente a ese sitio mediante el target `cantera`.
 
-La versión vigente de aceptación es **`2026-10-06`**. El propietario ha declarado Rommer, persona física, España y `Rommer@garitocastizo.com`; estos datos están configurados en local y Vercel. Queda comprobar el canal atendido y completar la revisión de la operación, recuperación y derechos. El intento de reauditoría del 7 de octubre devuelve 403 con las sesiones disponibles: el estado remoto de hoy no está verificado. No se ha fabricado una identidad jurídica, una aprobación o un patrocinador.
+La versión vigente de aceptación es **`2026-10-06`**. El propietario ha declarado Rommer, persona física, España y `Rommer@garitocastizo.com`; estos datos están incorporados en la web publicada. Queda identificar la cuenta administradora, probar el recorrido entre dos cuentas reales, comprobar el canal atendido y completar la revisión de operación, recuperación y derechos. No se ha fabricado una identidad jurídica, una aprobación o un patrocinador.
 
 ## Alcance implementado en código local
 
@@ -18,8 +18,9 @@ La versión vigente de aceptación es **`2026-10-06`**. El propietario ha declar
 |---|---|---|
 | Cuenta | Acceso Google, restauración de sesión, perfil propio y aceptación versionada | Integración sin prueba final con cuentas reales. El alta real comienza vacía, sin jugador de ejemplo compartido. |
 | Perfiles | Proyección deportiva pública separada de edad/aceptación privadas; seguimiento, fichas y actividad paginadas | Búsqueda por prefijos de nombre/ciudad/país en servidor. No es búsqueda semántica ni un censo completo de usuarios. |
+| Conexiones e invitaciones | Contactos recíprocos por aceptación; códigos y QR de una persona, diez minutos, cancelables; enlace para entrar a partidos/torneos privados | Implementados en esta revisión; [controles y comprobaciones](docs/INVITATIONS.md). No implica chat o envío automático de SMS. |
 | Equipos | Ficha pública; plantilla privada; propietario, responsables y miembros; invitaciones y solicitudes con aprobación | La invitación no incorpora automáticamente. Transferir propiedad, retirar miembros, salir y archivar tienen reglas propias. |
-| Encuentros | Fútbol 5/7/11, país/ciudad/zona, aforo, inscripción y retirada, invitados del organizador, respuestas RSVP | Partidos de 2–64 plazas; torneos de 2–32. No reserva campos ni procesa pagos. |
+| Encuentros | Fútbol 5/7/11, país/ciudad/zona, aforo, inscripción y retirada, invitados del organizador, respuestas RSVP y privacidad fijada al crear | Partidos de 2–64 plazas; torneos de 2–32. No reserva campos ni procesa pagos. |
 | Espera y avisos | Orden de espera, retirada y promoción al liberar/ampliar plazas; avisos internos al ascendido | Condicionado al estado y calendario del evento. No correo/push ni confirmación de lectura universal. |
 | Edición | Motivo, revisión, historial consultable y ledger de cambios; avisos a participantes | No certifica resultados oficiales ni sustituye resolución de disputas. |
 | Recurrencia | Crear 2–12 eventos semanales, quincenales o mensuales respetando zona y cambio horario | Cada ocurrencia es un evento independiente; no edición conjunta de una temporada. |
