@@ -18,8 +18,8 @@ export default function TeamsPage() {
   return inviteId ? <InvitationPage key={`${mode}:${inviteId}:${profile?.id || "guest"}`} inviteId={inviteId} /> : teamId ? <TeamPage key={`${teamId}:${mode}:${profile?.id || 'guest'}`} id={teamId} /> : <TeamDirectory key={`${mode}:${profile?.id || 'guest'}`} />;
 }
 function TeamDirectory() {
-  const api = useTeams(); const { profile, mode, runtimeConfig } = useCommunity(); const navigate = useNavigate(); const [params, setParams] = useSearchParams();
-  const discoveryAvailable = mode === 'demo' || runtimeConfig.serviceStatus === 'open';
+  const api = useTeams(); const { profile, mode, runtimeConfig, serviceAvailable } = useCommunity(); const navigate = useNavigate(); const [params, setParams] = useSearchParams();
+  const discoveryAvailable = serviceAvailable;
   const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [city, setCity] = useState(''); const [country, setCountry] = useState('');
   const active = useRef(true);
   useEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
@@ -35,10 +35,10 @@ function TeamDirectory() {
   </section>;
 }
 function TeamPage({ id }: { id: string }) {
-  const api = useTeams(); const { profile, mode, runtimeConfig } = useCommunity(); const detail = useTeamDetail(id); const agenda = useTeamEvents(id); const { team, role } = detail; const [busy, setBusy] = useState(''); const [error, setError] = useState(''); const [success, setSuccess] = useState(''); const [edit, setEdit] = useState(false); const [inviteLink, setInviteLink] = useState('');
+  const api = useTeams(); const { profile, mode, runtimeConfig, serviceAvailable } = useCommunity(); const detail = useTeamDetail(id); const agenda = useTeamEvents(id); const { team, role } = detail; const [busy, setBusy] = useState(''); const [error, setError] = useState(''); const [success, setSuccess] = useState(''); const [edit, setEdit] = useState(false); const [inviteLink, setInviteLink] = useState('');
   const run = async (name: string, fn: () => Promise<void>, message = '') => { setBusy(name); setError(''); setSuccess(''); try { await fn(); if (message) setSuccess(message); } catch (err) { setError(friendlyError(err)); } finally { setBusy(''); } };
   if (detail.loading) return <div className="c-empty" role="status">Cargando equipo…</div>;
-  if (!team) return <div className="c-empty"><h1>Equipo no disponible</h1><p>{detail.error || (mode === 'cloud' && runtimeConfig.serviceStatus !== 'open' ? 'La consulta pública de equipos estará disponible cuando se abra el servicio.' : 'El enlace no corresponde a un equipo disponible.')}</p><Link to="/teams">Ver equipos</Link></div>;
+  if (!team) return <div className="c-empty"><h1>Equipo no disponible</h1><p>{detail.error || (mode === 'cloud' && !serviceAvailable ? 'La consulta pública de equipos estará disponible cuando se abra el servicio.' : 'El enlace no corresponde a un equipo disponible.')}</p><Link to="/teams">Ver equipos</Link></div>;
   const pending = detail.requests.filter(r => r.status === 'pending'); const myRequest = detail.requests.find(r => r.userId === profile?.id); const manager = isTeamManager(role);
   return <section className="c-section team-page"><Link className="team-back" to="/teams">← Equipos</Link><header className="team-profile-head"><span className="team-monogram">{team.name.slice(0, 2).toUpperCase()}</span><div><p className="c-eyebrow">{team.level === 'professional' ? 'PROFESIONAL' : 'AMATEUR'}{team.status === 'archived' ? ' · ARCHIVADO' : ''}</p><h1>{team.name}</h1><p>{team.city}, {team.country}</p></div></header><p className="c-prewrap">{team.description}</p>
     {error || detail.error ? <p className="c-error" role="alert">{error || detail.error}</p> : null}{success ? <p className="c-success" role="status">{success}</p> : null}

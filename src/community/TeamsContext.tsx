@@ -39,7 +39,7 @@ export function TeamsProvider({ children }: { children: React.ReactNode }) {
   const [ownKey, setOwnKey] = useState(membershipKey);
   const [loading, setLoading] = useState(false); const [error, setError] = useState(''); const [hasMore, setMore] = useState(true);
   const cursor = useRef<QueryDocumentSnapshot<DocumentData> | null>(null); const busy = useRef(false); const epoch = useRef(0);
-  const available = mode === 'demo' || community.runtimeConfig.serviceStatus === 'open';
+  const available = community.serviceAvailable;
   const publicScope = `${mode}:${available}`; const currentPublicScope = useRef(publicScope); currentPublicScope.current = publicScope;
   const mutationScope = `${membershipKey}:${available}`; const currentMutationScope = useRef(mutationScope); currentMutationScope.current = mutationScope;
   const actor = (participating = true) => {
@@ -120,9 +120,9 @@ interface TeamEventsState {
 // community window. Only public event metadata is needed here; fixture details
 // are loaded by the encounter page when the person follows its direct link.
 export function useTeamEvents(teamId: string) {
-  const { mode, runtimeConfig } = useCommunity();
+  const { mode, serviceAvailable } = useCommunity();
   const validId = !!teamId && teamId.length <= 128 && !/[\/\\\u0000-\u001f\u007f]/.test(teamId) && !['.', '..', '__proto__', 'constructor', 'prototype'].includes(teamId);
-  const available = mode === 'demo' || runtimeConfig.serviceStatus === 'open';
+  const available = serviceAvailable;
   const key = JSON.stringify([mode, available, teamId]);
   const currentKey = useRef(key); currentKey.current = key;
   const [state, setState] = useState<TeamEventsState>({ key, events: [], status: 'loading', loading: true, error: '', hasMore: false, invalidCount: 0, fromCache: false });
@@ -174,18 +174,18 @@ export function useTeamEvents(teamId: string) {
 }
 
 export function useTeamDetail(id: string) {
-  const { mode, profile, runtimeConfig } = useCommunity(); const { myRoles } = useTeams();
+  const { mode, profile, serviceAvailable } = useCommunity(); const { myRoles } = useTeams();
   const [team, setTeam] = useState<CommunityTeam | null>(null); const [members, setMembers] = useState<TeamMember[]>([]); const [requests, setRequests] = useState<TeamJoinRequest[]>([]); const [invites, setInvites] = useState<TeamInvite[]>([]); const [loading, setLoading] = useState(true); const [error, setError] = useState('');
   const role = myRoles[id];
   useEffect(() => { let active = true; setTeam(null); setMembers([]); setRequests([]); setInvites([]); setLoading(Boolean(id)); setError(''); if (!id) return;
     const failed = (err: unknown) => { if (active) { setError(friendlyError(err)); setLoading(false); } };
     if (mode === 'demo') { const refresh = () => { const data = read(); setTeam(data.teams.find(t => t.id === id) || null); setMembers(role ? data.members.filter(m => m.teamId === id) : []); setRequests(data.requests.filter(r => r.teamId === id && (isTeamManager(role) || r.userId === profile?.id))); setInvites(isTeamManager(role) ? data.invites.filter(i => i.teamId === id) : []); setLoading(false); }; refresh(); window.addEventListener('storage', refresh); window.addEventListener('cantera-teams-updated', refresh); return () => { active = false; window.removeEventListener('storage', refresh); window.removeEventListener('cantera-teams-updated', refresh); }; }
-    if (runtimeConfig.serviceStatus !== 'open' && !role) { setLoading(false); return; }
+    if (!serviceAvailable && !role) { setLoading(false); return; }
     const stops = [onSnapshot(doc(db, 'communityTeams', id), snap => { if (active) { setTeam(snap.exists() ? teamRecord(snap.data(), snap.id) : null); setLoading(false); } }, failed)];
     if (role) stops.push(onSnapshot(query(collection(db, 'communityTeamMembers'), where('teamId', '==', id)), snap => { if (active) setMembers(snap.docs.map(d => memberRecord(d.data(), d.id)).filter((item): item is TeamMember => item !== null)); }, failed));
     if (profile) stops.push(onSnapshot(query(collection(db, 'communityTeamJoinRequests'), where('teamId', '==', id), ...(isTeamManager(role) ? [] : [where('userId', '==', profile.id)])), snap => { if (active) setRequests(snap.docs.map(d => requestRecord(d.data(), d.id)).filter((item): item is TeamJoinRequest => item !== null)); }, failed));
     if (isTeamManager(role)) stops.push(onSnapshot(query(collection(db, 'communityTeamInvites'), where('teamId', '==', id)), snap => { if (active) setInvites(snap.docs.map(d => inviteRecord(d.data(), d.id)).filter((item): item is TeamInvite => item !== null)); }, failed));
     return () => { active = false; stops.forEach(stop => stop()); };
-  }, [id, mode, profile?.id, role, runtimeConfig.serviceStatus]);
+  }, [id, mode, profile?.id, role, serviceAvailable]);
   return { team, members, requests, invites, loading, error, role };
 }

@@ -55,8 +55,8 @@ function BlockedAccountRow({ id }: { id: string }) {
   return <li><Link to={`/people/${encodeURIComponent(id)}`}>{person?.name || 'Cuenta bloqueada'}</Link><BlockButton id={id} name={person?.name || 'esta cuenta'} /></li>;
 }
 export function PeoplePage() {
-  const { mode, runtimeConfig, profiles, publicProfiles, peopleLoading, peopleError, peopleHasMore, searchPeople, blockedIds } = useCommunity();
-  const serviceUnavailable = mode === 'cloud' && runtimeConfig.serviceStatus !== 'open';
+  const { mode, runtimeConfig, serviceAvailable, profiles, publicProfiles, peopleLoading, peopleError, peopleHasMore, searchPeople, blockedIds } = useCommunity();
+  const serviceUnavailable = mode === 'cloud' && !serviceAvailable;
   const [search, setSearch] = useState(''); const [field, setField] = useState<'name' | 'city' | 'country'>('name');
   const [applied, setApplied] = useState({ value: '', field: 'name' as 'name' | 'city' | 'country' });
   const [entity, setEntity] = useState('all');
@@ -82,8 +82,8 @@ export function PeoplePage() {
 type Activity = CommunityPost | PlayEvent;
 const activityPageSize = 20;
 function useProfileActivity<T extends Activity>(id: string, enabled: boolean, name: 'communityPosts' | 'communityEvents', field: 'authorId' | 'ownerId', normalize: (value: unknown, id?: string) => T | null) {
-  const { mode, runtimeConfig } = useCommunity();
-  const serviceUnavailable = mode === 'cloud' && runtimeConfig.serviceStatus !== 'open';
+  const { mode, runtimeConfig, serviceAvailable } = useCommunity();
+  const serviceUnavailable = mode === 'cloud' && !serviceAvailable;
   const [state, setState] = useState<{ records: T[]; loading: boolean; error: string; more: boolean }>({ records: [], loading: false, error: '', more: true });
   const paging = useRef<{ cursor: QueryDocumentSnapshot<DocumentData> | null; offset: number; busy: boolean; active: boolean }>({ cursor: null, offset: 0, busy: false, active: true });
   const load = useCallback(async () => {
@@ -136,8 +136,8 @@ function ActivityFooter({ activity, noun }: { activity: { loading: boolean; erro
 }
 export function PublicProfilePage() {
   const { profileId = '' } = useParams();
-  const person = usePublicProfile(profileId); const { mode, runtimeConfig, publicProfileStates, posts, followingIds, toggleFollow, blockedIds } = useCommunity();
-  const serviceUnavailable = mode === 'cloud' && runtimeConfig.serviceStatus !== 'open';
+  const person = usePublicProfile(profileId); const { mode, runtimeConfig, serviceAvailable, publicProfileStates, posts, followingIds, toggleFollow, blockedIds } = useCommunity();
+  const serviceUnavailable = mode === 'cloud' && !serviceAvailable;
   const state = !profileId || profileId.length > 128 || ['__proto__', 'constructor', 'prototype', '.', '..'].includes(profileId) || /[\/\\\u0000-\u001f\u007f]/.test(profileId) ? 'missing' : publicProfileStates[profileId];
   const blocked = blockedIds.includes(profileId);
   const publications = useProfileActivity(profileId, !!person && !blocked, 'communityPosts', 'authorId', normalizePost);

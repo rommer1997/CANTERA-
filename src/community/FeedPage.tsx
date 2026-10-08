@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { ArrowRight, ArrowUpRight, Award, CalendarDays, Camera, Check, CircleUserRound, Ban, EyeOff, Film, Flag, Heart, LoaderCircle, MapPin, MessageCircle, MoreHorizontal, Plus, Search, Share2, ShieldCheck, Trash2, Upload, UsersRound, X } from 'lucide-react';
 import { friendlyError, useCommunity, usePublicProfile } from './CommunityContext';
-import { legalReady } from './legal';
 import { isPublicEvent } from './eventPrivacy';
 import type { CommunityPost, PostComment, PostInput, PostKind } from './types';
 import './feed.css';
@@ -99,7 +98,7 @@ function Modal({ title, children, onClose, returnFocusRef }: { title: string; ch
 }
 
 function Composer({ onPublished, openRequest }: { onPublished: (id: string) => void; openRequest: ComposerRequest }) {
-  const { profile, events, createPost, mode, mediaUploadsEnabled, runtimeConfig } = useCommunity();
+  const { profile, events, createPost, mode, mediaUploadsEnabled, runtimeConfig, serviceAvailable } = useCommunity();
   const [expanded, setExpanded] = useState(false);
   const [kind, setKind] = useState<PostKind>('achievement');
   const [text, setText] = useState('');
@@ -119,7 +118,7 @@ function Composer({ onPublished, openRequest }: { onPublished: (id: string) => v
   const fileSequence = useRef(0);
   const inputId = React.useId();
   const isLocked = busy || validating;
-  const publishingUnavailable = mode === 'cloud' && runtimeConfig.serviceStatus !== 'open';
+  const publishingUnavailable = mode === 'cloud' && !serviceAvailable;
 
   useEffect(() => {
     if (!file) { setPreview(''); return; }
@@ -350,8 +349,8 @@ function FeedCard({ post, selected, onHidden }: { post: CommunityPost; selected:
 }
 
 export default function FeedPage() {
-  const { profile, posts, events, loading, hiddenPostIds, mode, runtimeConfig, mediaUploadsEnabled, followingIds, watchPost, linkedPostStates, blockedIds, postsLoading, postsHasMore, loadMorePosts } = useCommunity();
-  const communityUnavailable = mode === 'cloud' && (runtimeConfig.serviceStatus !== 'open' || import.meta.env.VITE_SERVICE_OPEN !== 'true' || !legalReady);
+  const { profile, posts, events, loading, hiddenPostIds, mode, runtimeConfig, serviceAvailable, mediaUploadsEnabled, followingIds, watchPost, linkedPostStates, blockedIds, postsLoading, postsHasMore, loadMorePosts } = useCommunity();
+  const communityUnavailable = mode === 'cloud' && !serviceAvailable;
   const communityPaused = runtimeConfig.serviceStatus === 'paused';
   const [filter, setFilter] = useState<FeedFilter>('all');
   const [source, setSource] = useState<FeedSource>('community');

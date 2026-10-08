@@ -1,4 +1,5 @@
 import type { DemoData } from './local';
+import { validPilotUserIds } from './pilotAccess.ts';
 import type { CommunityPost, CommunityProfile, ContentReport, Fixture, FollowRecord, PlayEvent, EventNotice, RightsRequest, RuntimeConfig, PostComment, PublicProfile, VerificationRequest } from './types';
 
 type Data = Record<string, unknown>;
@@ -204,8 +205,9 @@ export function normalizeReport(value: unknown, documentId?: string): ContentRep
 
 export function normalizeRuntime(value: unknown): RuntimeConfig {
   const data = dates(value);
-  return object(data) && enumValue(data.serviceStatus, ['setup', 'open', 'paused'] as const) && typeof data.mediaUploadsEnabled === 'boolean' && text(data.contactEmail, 0, 200) && date(data.updatedAt)
-    ? { serviceStatus: data.serviceStatus, mediaUploadsEnabled: data.mediaUploadsEnabled, contactEmail: data.contactEmail, updatedAt: data.updatedAt }
+  return object(data) && enumValue(data.serviceStatus, ['setup', 'open', 'paused', 'pilot'] as const) && typeof data.mediaUploadsEnabled === 'boolean' && text(data.contactEmail, 0, 200) && date(data.updatedAt)
+    && (data.serviceStatus === 'pilot' ? data.mediaUploadsEnabled === false && validPilotUserIds(data.pilotUserIds) : data.pilotUserIds === undefined)
+    ? { serviceStatus: data.serviceStatus, mediaUploadsEnabled: data.mediaUploadsEnabled, contactEmail: data.contactEmail, updatedAt: data.updatedAt, ...(data.serviceStatus === 'pilot' ? { pilotUserIds: data.pilotUserIds as string[] } : {}) }
     : { serviceStatus: 'setup', mediaUploadsEnabled: false, contactEmail: '', updatedAt: '' };
 }
 export function normalizeNotice(value: unknown, documentId?: string): EventNotice | null {

@@ -36,6 +36,12 @@ Después de verificar el acta, ejecutar `pnpm check:release`, compilar con modo 
 
 Fotos y vídeos continúan cerrados hasta patrocinio. El núcleo de coordinación y publicaciones de texto puede abrirse sin ellos cuando el resto de controles esté completo. La carga futura necesita cuotas y un servicio autorizado que valide los archivos; no basta con cambiar una variable de Vite.
 
+## Ensayo privado previo a la apertura
+
+La entrega de activación del 8 de octubre incorpora un [piloto privado](PILOT.md) de una a cinco cuentas Google verificadas, seleccionadas por UID tras comprobar su identidad en Auth. La compilación piloto exige `VITE_ENABLE_PILOT=true`, apertura pública, demo y medios desactivados. Las reglas restringen contenido y participación a las cuentas incluidas; no se genera un acta de apertura para realizar este ensayo. El responsable debe completar personalmente su perfil y aceptar las condiciones.
+
+El piloto permite reunir evidencia del recorrido entre cuentas reales. No marca automáticamente `twoAccounts`, soporte, revisión legal ni derechos como comprobados. Pasar del piloto al acceso público conserva todos los controles de este documento; una compilación abierta rechaza la bandera de piloto.
+
 ## Configuración preparada el 7 de octubre
 
 La identificación y el contacto declarados por el propietario están incorporados en la publicación. El acceso a Firebase se recuperó mediante el propietario y se aplicaron y verificaron las reglas, los 18 índices y los dominios. Consulta las comprobaciones y los pasos que siguen pendientes en [RELEASE_2026-10-07.md](RELEASE_2026-10-07.md).

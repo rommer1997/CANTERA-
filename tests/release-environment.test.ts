@@ -124,3 +124,37 @@ test('el acta debe corresponder al proyecto efectivo del proceso, no al del arch
     assert.match(result.output, /PENDIENTE · Acta de revisión de nube/);
   });
 });
+
+test('un build de piloto privado exige cierre público y no crea ni exige un acta ficticia', async () => {
+  await fixture({ '.env.local': fixtureEnvironment + '\nVITE_SERVICE_OPEN=false\nVITE_ENABLE_PILOT=true\n' }, directory => {
+    const result = check(buildCheck, directory);
+    assert.equal(result.status, 0, result.output);
+    assert.match(result.output, /Compilación para piloto privado/);
+    assert.doesNotMatch(result.output, /Acta de revisión/);
+  });
+});
+
+test('el piloto rechaza apertura pública simultánea, demo y archivos incluso con un acta de prueba completa', async () => {
+  await fixture({ '.env.local': fixtureEnvironment + '\nVITE_SERVICE_OPEN=false\nVITE_ENABLE_PILOT=true\n' }, async directory => {
+    await testApproval(directory, completeChecks);
+    for (const overrides of [{ VITE_SERVICE_OPEN: 'true' }, { VITE_ENABLE_DEMO: 'true' }, { VITE_ENABLE_MEDIA_UPLOADS: 'true' }, { VITE_OPERATOR_NAME: '' }]) {
+      const result = check(buildCheck, directory, overrides);
+      assert.equal(result.status, 1, result.output);
+      assert.match(result.output, /PENDIENTE/);
+      assert.doesNotMatch(result.output, /Compilación para piloto privado/);
+    }
+    const publicRelease = check(releaseCheck, directory, { VITE_SERVICE_OPEN: 'true' });
+    assert.equal(publicRelease.status, 1);
+    assert.match(publicRelease.output, /PENDIENTE · Piloto privado desactivado/);
+  });
+});
+
+test('el piloto necesita flags explícitos para impedir ambigüedad de despliegue', async () => {
+  await fixture({ '.env.local': 'VITE_ENABLE_PILOT=true\nVITE_OPERATOR_NAME=Prueba\nVITE_OPERATOR_COUNTRY=España\nVITE_CONTACT_EMAIL=prueba@example.test\n' }, directory => {
+    const result = check(buildCheck, directory);
+    assert.equal(result.status, 1, result.output);
+    assert.match(result.output, /PENDIENTE · Piloto privado sin apertura pública/);
+    assert.match(result.output, /PENDIENTE · Modo de prueba desactivado en el piloto/);
+    assert.match(result.output, /PENDIENTE · Carga multimedia desactivada en el piloto/);
+  });
+});

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 import * as normalization from '../src/community/normalization.ts';
+import * as pilotAccess from '../src/community/pilotAccess.ts';
 import { TERMS_VERSION } from '../src/community/policy.ts';
 
 const date = '2026-10-08T12:00:00.000Z';
@@ -13,13 +14,14 @@ const fixture = (uid: string, extra = {}) => ({ id: uid, name: 'Mi perfil', bio:
 // Execute the actual provider with controlled Auth/Firestore callbacks. This
 // reproduces callback ordering and pending serverTimestamp metadata, rather
 // than mirroring a separate bootstrap helper or touching cloud/emulator data.
-function providerHarness({ buildOpen = true, existing = new Map<string, any>() } = {}) {
+function providerHarness({ buildOpen = true, pilotBuild = false, existing = new Map<string, any>() } = {}) {
   let cursor = 0, dirty = false;
   const slots: any[] = [], effects: Array<() => void> = [], cleanups: Array<(() => void) | undefined> = [];
   const snapshots: Array<{ target: any; options: any; next: (snapshot: any) => void; error: (error: any) => void; stopped: boolean }> = [];
   const writes: Array<{ path: string; value: any }> = [];
   const auth: { currentUser: any } = { currentUser: null };
   let authListener: (user: any) => Promise<void>;
+  let loginUser: any;
   let pauseNextRead = false, releaseRead: (() => void) | undefined;
   const noUser = () => {};
   const react = {
@@ -70,13 +72,15 @@ function providerHarness({ buildOpen = true, existing = new Map<string, any>() }
   const modules: Record<string, unknown> = {
     react, 'react/jsx-runtime': { jsx: (type: any, props: any) => ({ type, props }) },
     'firebase/auth': { onAuthStateChanged: (_auth: any, callback: any) => { authListener = callback; return () => {}; } },
-    'firebase/firestore': firestore, 'firebase/storage': {}, '../firebase': { auth, db: {}, storage: {} },
+    'firebase/firestore': firestore, 'firebase/storage': {}, '../firebase': { auth, db: {}, storage: {},
+      signInWithGoogle: async () => { auth.currentUser = loginUser; await authListener(loginUser); return loginUser; },
+      logout: async () => { auth.currentUser = null; await authListener(null); } },
     '../store/useAppStore': { useAppStore: (selector: any) => selector({ setUser: noUser }) },
     './local': {}, './localMediaCache': {}, './coalescedRefresh': {}, './invitationDemo': {},
     './legal': { legalReady: true, operator: { email: 'support@example.test' } }, './fixtureRecords': {}, './deliveryBatches': {},
-    './policy': { TERMS_VERSION }, './eventPrivacy': { canReadEvent: () => true, isPublicEvent: () => true }, './logic': { requireText: (value: string) => value.trim() }, './normalization': normalization,
+    './policy': { TERMS_VERSION }, './pilotAccess.ts': pilotAccess, './eventPrivacy': { canReadEvent: () => true, isPublicEvent: () => true }, './logic': { requireText: (value: string) => value.trim() }, './normalization': normalization,
   };
-  const source = readFileSync(new URL('../src/community/CommunityContext.tsx', import.meta.url), 'utf8').replaceAll('import.meta.env.DEV', 'false').replaceAll('import.meta.env.VITE_ENABLE_DEMO', "'false'").replaceAll('import.meta.env.VITE_SERVICE_OPEN', buildOpen ? "'true'" : "'false'");
+  const source = readFileSync(new URL('../src/community/CommunityContext.tsx', import.meta.url), 'utf8').replaceAll('import.meta.env.DEV', 'false').replaceAll('import.meta.env.VITE_ENABLE_DEMO', "'false'").replaceAll('import.meta.env.VITE_ENABLE_MEDIA_UPLOADS', "'false'").replaceAll('import.meta.env.VITE_ENABLE_PILOT', pilotBuild ? "'true'" : "'false'").replaceAll('import.meta.env.VITE_SERVICE_OPEN', buildOpen ? "'true'" : "'false'");
   const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
   const exports: any = {};
   new Function('exports', 'require', 'localStorage', 'window', compiled)(exports, (name: string) => modules[name], { getItem: () => null, removeItem: () => {} }, { addEventListener() {}, removeEventListener() {} });
@@ -91,13 +95,18 @@ function providerHarness({ buildOpen = true, existing = new Map<string, any>() }
   }
   async function settle() { for (let attempt = 0; attempt < 5; attempt++) { await new Promise(resolve => setImmediate(resolve)); render(); } return api; }
   render();
+  function identity(uid: string, { emailVerified = false, provider = '', admin = false } = {}) {
+    return { uid, displayName: '', emailVerified, getIdTokenResult: async () => ({ claims: { admin, email_verified: emailVerified, firebase: { sign_in_provider: provider } } }) };
+  }
   return {
     auth, writes, existing, render, settle,
-    async identify(uid = 'alpha') { const user = { uid, displayName: '', getIdTokenResult: async () => ({ claims: {} }) }; auth.currentUser = user; await authListener(user); await settle(); },
-    async runtime(serviceStatus: string) { emit('communityConfiguration/runtime', { serviceStatus, mediaUploadsEnabled: false, contactEmail: '', updatedAt: time }); await settle(); },
+    async identify(uid = 'alpha', options = {}) { const user = identity(uid, options); auth.currentUser = user; await authListener(user); await settle(); },
+    async login(uid: string, options = {}) { loginUser = identity(uid, options); await api.login(); await settle(); },
+    async runtime(serviceStatus: string, extra = {}) { const value = { serviceStatus, mediaUploadsEnabled: false, contactEmail: '', updatedAt: time, ...extra }; existing.set('communityConfiguration/runtime', value); emit('communityConfiguration/runtime', value); await settle(); },
     emitProfile(uid: string, value: any, pending = false) { emit(`communityProfiles/${uid}`, value, pending); return render(); },
     failProfile(uid: string, error: Error) { snapshots.slice().reverse().find(item => !item.stopped && item.target.path === `communityProfiles/${uid}`)!.error(error); return render(); },
     ownListener(uid = 'alpha') { return snapshots.slice().reverse().find(item => !item.stopped && item.target.path === `communityProfiles/${uid}`); },
+    activePaths() { return snapshots.filter(item => !item.stopped).map(item => item.target.path); },
     deferRead() { pauseNextRead = true; }, releaseRead() { releaseRead?.(); },
     cleanup() { cleanups.forEach(cleanup => cleanup?.()); },
   };
@@ -179,5 +188,71 @@ test('guardar perfil con aceptación nueva tolera proyección local pendiente ha
     await h.settle();
     assert.equal(h.render().profile.acceptedTermsVersion, TERMS_VERSION); assert.equal(h.render().error, '');
     assert.deepEqual(h.writes.slice(1).map(item => item.path), ['communityProfiles/alpha', 'communityPublicProfiles/alpha']);
+  } finally { h.cleanup(); }
+});
+
+const verifiedGoogle = { emailVerified: true, provider: 'google.com' };
+
+test('el piloto crea sólo un borrador privado para la identidad Google autorizada sin aceptar términos', async () => {
+  const h = providerHarness({ buildOpen: false, pilotBuild: true });
+  try {
+    await h.identify('alpha', verifiedGoogle);
+    await h.runtime('pilot', { pilotUserIds: ['alpha', 'beta'] });
+    const api = h.render();
+    assert.equal(api.serviceAvailable, true); assert.equal(api.runtimeConfig.serviceStatus, 'pilot');
+    assert.equal(api.pilotEnabled, true); assert.equal(api.demoEnabled, false); assert.equal(api.mediaUploadsEnabled, false);
+    assert.deepEqual(h.writes.map(item => item.path), ['communityProfiles/alpha']);
+    assert.equal(api.profile.adultConfirmed, false); assert.equal(api.profile.acceptedTermsVersion, '');
+    assert.equal(api.profile.acceptedTermsAt, ''); assert.equal(api.profile.city, '');
+    assert.ok(h.activePaths().includes('communityEvents'));
+  } finally { h.cleanup(); }
+});
+
+test('el piloto excluye otras cuentas, correo sin verificar, proveedor distinto y admin fuera de lista', async () => {
+  for (const [uid, identity] of [['outsider', verifiedGoogle], ['alpha', { emailVerified: false, provider: 'google.com' }], ['alpha', { emailVerified: true, provider: 'password' }], ['outsider', { ...verifiedGoogle, admin: true }]] as const) {
+    const h = providerHarness({ buildOpen: false, pilotBuild: true });
+    try {
+      await h.identify(uid, identity); await h.runtime('pilot', { pilotUserIds: ['alpha'] });
+      assert.equal(h.render().serviceAvailable, false); assert.equal(h.writes.length, 0);
+      assert.equal(h.activePaths().includes('communityEvents'), false);
+      assert.equal(h.activePaths().includes('communityPosts'), false);
+      assert.deepEqual(h.render().profiles, []); assert.deepEqual(h.render().publicProfiles, {});
+    } finally { h.cleanup(); }
+  }
+});
+
+test('ni un runtime piloto sin build autorizado ni un runtime abierto habilitan una compilación piloto', async () => {
+  for (const [pilotBuild, status] of [[false, 'pilot'], [true, 'open'], [true, 'paused']] as const) {
+    const h = providerHarness({ buildOpen: false, pilotBuild });
+    try {
+      await h.identify('alpha', verifiedGoogle);
+      await h.runtime(status, status === 'pilot' ? { pilotUserIds: ['alpha'] } : {});
+      assert.equal(h.render().serviceAvailable, false); assert.equal(h.writes.length, 0);
+    } finally { h.cleanup(); }
+  }
+});
+
+test('retirar el UID durante bootstrap de piloto descarta la escritura y cierra las consultas', async () => {
+  const h = providerHarness({ buildOpen: false, pilotBuild: true });
+  try {
+    await h.identify('alpha', verifiedGoogle); h.deferRead();
+    await h.runtime('pilot', { pilotUserIds: ['alpha', 'beta'] });
+    await h.runtime('pilot', { pilotUserIds: ['beta'] });
+    h.releaseRead(); await h.settle();
+    assert.equal(h.writes.length, 0); assert.equal(h.render().serviceAvailable, false);
+    assert.equal(h.activePaths().includes('communityEvents'), false);
+    await h.runtime('pilot', { pilotUserIds: ['alpha', 'beta'] });
+    assert.deepEqual(h.writes.map(item => item.path), ['communityProfiles/alpha']);
+  } finally { h.cleanup(); }
+});
+
+test('entrar con Google sin autorización cierra la sesión y no crea perfil aunque exista la identidad Auth', async () => {
+  const h = providerHarness({ buildOpen: false, pilotBuild: true });
+  try {
+    await h.runtime('pilot', { pilotUserIds: ['alpha'] });
+    await assert.rejects(h.login('outsider', verifiedGoogle), /todavía no está autorizada para el piloto privado/);
+    await h.settle();
+    assert.equal(h.auth.currentUser, null); assert.equal(h.writes.length, 0);
+    assert.equal(h.render().serviceAvailable, false);
   } finally { h.cleanup(); }
 });

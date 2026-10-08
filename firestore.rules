@@ -9,11 +9,28 @@ service cloud.firestore {
       return value is string && value.matches('[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9][.][0-9]{3}Z');
     }
     function date(value) { return value is timestamp || iso(value); }
-    function runtimeOpen() { return exists(/databases/$(database)/documents/communityConfiguration/runtime) && get(/databases/$(database)/documents/communityConfiguration/runtime).data.serviceStatus == 'open'; }
+    function pilotActor(config) {
+      return signed() && request.auth.token.get('email_verified', false) == true
+        && request.auth.token.get('firebase', {}).get('sign_in_provider', '') == 'google.com'
+        && request.auth.uid in config.get('pilotUserIds', []);
+    }
+    function runtimeAvailable() {
+      let config = get(/databases/$(database)/documents/communityConfiguration/runtime).data;
+      return config.serviceStatus == 'open' || config.serviceStatus == 'pilot' && pilotActor(config);
+    }
+    function pilotReadAllowed() {
+      return !exists(/databases/$(database)/documents/communityConfiguration/runtime)
+        || get(/databases/$(database)/documents/communityConfiguration/runtime).data.serviceStatus != 'pilot'
+        || pilotActor(get(/databases/$(database)/documents/communityConfiguration/runtime).data);
+    }
+    function pilotPeerAllowed(uid) {
+      let config = get(/databases/$(database)/documents/communityConfiguration/runtime).data;
+      return config.serviceStatus != 'pilot' || uid in config.get('pilotUserIds', []);
+    }
     function accountAllowed() { return !exists(/databases/$(database)/documents/communityAccountModeration/$(request.auth.uid)) || get(/databases/$(database)/documents/communityAccountModeration/$(request.auth.uid)).data.status != 'suspended'; }
     function actorProfile() { return get(/databases/$(database)/documents/communityProfiles/$(request.auth.uid)).data; }
     function active() {
-      return signed() && runtimeOpen() && accountAllowed() && exists(/databases/$(database)/documents/communityProfiles/$(request.auth.uid))
+      return signed() && runtimeAvailable() && accountAllowed() && exists(/databases/$(database)/documents/communityProfiles/$(request.auth.uid))
         && completedProfile(actorProfile());
     }
     function hasPost(id) { return text(id, 1, 128) && exists(/databases/$(database)/documents/communityPosts/$(id)); }
@@ -23,14 +40,14 @@ service cloud.firestore {
       return signed() && request.auth.uid in data.get('participantIds', data.participants.keys());
     }
     function eventReadable(data) {
-      return admin() || owner(data.ownerId) || eventParticipant(data) || runtimeOpen() && eventPublic(data);
+      return pilotReadAllowed() && (admin() || owner(data.ownerId) || eventParticipant(data) || runtimeAvailable() && eventPublic(data));
     }
     function eventListReadable(data) {
       // A direct get can keep legacy public documents readable. List queries must
       // prove an explicit public/owner/participant filter; a default value would
       // incorrectly authorize an unrestricted directory query.
-      return admin() || owner(data.ownerId) || signed() && request.auth.uid in data.participantIds
-        || runtimeOpen() && data.visibility == 'public';
+      return pilotReadAllowed() && (admin() || owner(data.ownerId) || signed() && request.auth.uid in data.participantIds
+        || runtimeAvailable() && data.visibility == 'public');
     }
     function relatedEventReadable(id) {
       return exists(/databases/$(database)/documents/communityEvents/$(id))
@@ -39,7 +56,7 @@ service cloud.firestore {
     function freshInvitationState(data) {
       return data.status == 'active' && data.ownerId != request.auth.uid
         && data.createdAt is timestamp && data.createdAt <= request.time
-        && data.createdAt + duration.value(10, 'm') > request.time && notBlocked(data.ownerId);
+        && data.createdAt + duration.value(10, 'm') > request.time && pilotPeerAllowed(data.ownerId) && notBlocked(data.ownerId);
     }
     function freshInvitation(data) { return verifiedActor() && freshInvitationState(data); }
     function validInvitation(data, id) {
@@ -122,7 +139,7 @@ service cloud.firestore {
       // moderation records, both connections and both blocks. A message read
       // adds its conversation document and stays within the ten-call budget.
       return signed() && request.auth.token.get('email_verified', false) == true
-        && get(/databases/$(database)/documents/communityConfiguration/runtime).data.serviceStatus == 'open'
+        && runtimeAvailable() && pilotPeerAllowed(peer)
         && completedProfile(get(/databases/$(database)/documents/communityProfiles/$(request.auth.uid)).data)
         && messagingAccountAllowed(request.auth.uid) && request.auth.uid in messagingPair(id)
         && completedProfile(get(/databases/$(database)/documents/communityProfiles/$(peer)).data)
@@ -244,10 +261,10 @@ service cloud.firestore {
     match /communityProfiles/{uid} {
       // Consent and age declarations are accessible only to the owner and administrator.
       allow read: if owner(uid) || admin();
-      allow create: if owner(uid) && validProfile(request.resource.data, uid)
+      allow create: if owner(uid) && pilotReadAllowed() && validProfile(request.resource.data, uid)
         && request.resource.data.createdAt == request.time && request.resource.data.verification == 'unverified' && mirroredPublic(uid, request.resource.data);
       allow update: if request.resource.data.createdAt == resource.data.createdAt && validProfile(request.resource.data, uid) && mirroredPublic(uid, request.resource.data) && (
-        owner(uid) && (request.resource.data.acceptedTermsAt == resource.data.acceptedTermsAt || request.resource.data.acceptedTermsAt == request.time || request.resource.data.acceptedTermsVersion == '' && request.resource.data.acceptedTermsAt == '') && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
+        owner(uid) && pilotReadAllowed() && (request.resource.data.acceptedTermsAt == resource.data.acceptedTermsAt || request.resource.data.acceptedTermsAt == request.time || request.resource.data.acceptedTermsVersion == '' && request.resource.data.acceptedTermsAt == '') && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
           ['name', 'bio', 'city', 'country', 'position', 'team', 'level', 'adultConfirmed', 'entityType',
            'acceptedTermsVersion', 'acceptedTermsAt'])
         || admin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['verification'])
@@ -257,15 +274,15 @@ service cloud.firestore {
       allow delete: if false;
     }
     match /communityPublicProfiles/{uid} {
-      allow read: if runtimeOpen();
-      allow create, update: if (owner(uid) || admin())
+      allow read: if runtimeAvailable();
+      allow create, update: if (owner(uid) && pilotReadAllowed() || admin())
         && completedProfile(getAfter(/databases/$(database)/documents/communityProfiles/$(uid)).data)
         && publicProjection(request.resource.data, getAfter(/databases/$(database)/documents/communityProfiles/$(uid)).data);
       allow delete: if false;
     }
     match /communityFollows/{id} {
       // Sporting relationships are public; the collection stores no contact or consent data.
-      allow read: if runtimeOpen() || owner(resource.data.followerId);
+      allow read: if runtimeAvailable() || owner(resource.data.followerId);
       allow create: if active() && request.resource.data.keys().hasAll(['followerId', 'followingId', 'createdAt'])
         && request.resource.data.keys().hasOnly(['followerId', 'followingId', 'createdAt'])
         && request.resource.data.followerId == request.auth.uid
@@ -636,7 +653,7 @@ service cloud.firestore {
         );
     }
     match /communityPosts/{id} {
-      allow read: if runtimeOpen() || owner(resource.data.authorId) || admin();
+      allow read: if runtimeAvailable() || pilotReadAllowed() && (owner(resource.data.authorId) || admin());
       allow create: if active() && request.resource.data.createdAt == request.time && validPost(request.resource.data, id);
       allow update: if false;
       allow delete: if owner(resource.data.authorId) || admin();
@@ -644,8 +661,8 @@ service cloud.firestore {
     // Removing the parent immediately hides other people's retained interactions.
     // Authors can still retrieve and withdraw their own data during a service pause.
     function readablePostInteraction(postId) {
-      return hasPost(postId) && (runtimeOpen()
-        || owner(get(/databases/$(database)/documents/communityPosts/$(postId)).data.authorId));
+      return hasPost(postId) && (runtimeAvailable()
+        || pilotReadAllowed() && owner(get(/databases/$(database)/documents/communityPosts/$(postId)).data.authorId));
     }
     match /communityLikes/{id} {
       // An absent document must remain readable for the first like transaction.
@@ -710,12 +727,23 @@ service cloud.firestore {
         && request.resource.data.status == 'resolved';
       allow delete: if false;
     }
+    function pilotUid(uid) { return uid is string && uid.matches('[A-Za-z0-9_-]{1,128}'); }
+    function validPilotUsers(ids) {
+      return ids is list && ids.size() >= 1 && ids.size() <= 5 && ids.size() == ids.toSet().size()
+        && pilotUid(ids[0]) && (ids.size() < 2 || pilotUid(ids[1]))
+        && (ids.size() < 3 || pilotUid(ids[2])) && (ids.size() < 4 || pilotUid(ids[3]))
+        && (ids.size() < 5 || pilotUid(ids[4]));
+    }
     match /communityConfiguration/{id} {
       allow read: if id == 'runtime' || admin();
       allow create, update: if admin() && id == 'runtime'
         && request.resource.data.keys().hasAll(['serviceStatus', 'mediaUploadsEnabled', 'contactEmail', 'updatedAt'])
-        && request.resource.data.keys().hasOnly(['serviceStatus', 'mediaUploadsEnabled', 'contactEmail', 'updatedAt'])
-        && request.resource.data.serviceStatus in ['setup', 'open', 'paused'] && request.resource.data.mediaUploadsEnabled == false
+        && (request.resource.data.serviceStatus == 'pilot'
+          ? request.resource.data.keys().hasOnly(['serviceStatus', 'mediaUploadsEnabled', 'contactEmail', 'updatedAt', 'pilotUserIds'])
+            && validPilotUsers(request.resource.data.pilotUserIds)
+          : request.resource.data.keys().hasOnly(['serviceStatus', 'mediaUploadsEnabled', 'contactEmail', 'updatedAt'])
+            && request.resource.data.serviceStatus in ['setup', 'open', 'paused'])
+        && request.resource.data.mediaUploadsEnabled == false
         && text(request.resource.data.contactEmail, 0, 200) && request.resource.data.updatedAt == request.time;
       allow delete: if false;
     }
@@ -767,7 +795,7 @@ service cloud.firestore {
     }
     function teamRecord(teamId) { return get(/databases/$(database)/documents/communityTeams/$(teamId)).data; }
     function teamMembership(teamId) { return get(/databases/$(database)/documents/communityTeamMembers/$(teamId + '_' + request.auth.uid)).data; }
-    function teamMember(teamId) { return signed() && exists(/databases/$(database)/documents/communityTeamMembers/$(teamId + '_' + request.auth.uid)); }
+    function teamMember(teamId) { return signed() && pilotReadAllowed() && exists(/databases/$(database)/documents/communityTeamMembers/$(teamId + '_' + request.auth.uid)); }
     function teamManager(teamId) { return teamMember(teamId) && teamMembership(teamId).role in ['owner', 'manager']; }
     function teamOwner(teamId) { return signed() && teamRecord(teamId).ownerId == request.auth.uid; }
     function validTeam(data, id) {
@@ -777,8 +805,8 @@ service cloud.firestore {
         && text(data.description, 0, 2000) && data.level in ['amateur', 'professional'] && data.status in ['active', 'archived'] && date(data.createdAt) && date(data.updatedAt);
     }
     match /communityTeams/{id} {
-      allow get: if runtimeOpen() || teamMember(id) || admin();
-      allow list: if runtimeOpen();
+      allow get: if pilotReadAllowed() && (runtimeAvailable() || teamMember(id) || admin());
+      allow list: if runtimeAvailable();
       allow create: if active() && validTeam(request.resource.data, id) && request.resource.data.ownerId == request.auth.uid
         && request.resource.data.status == 'active' && request.resource.data.createdAt == request.time && request.resource.data.updatedAt == request.time
         && getAfter(/databases/$(database)/documents/communityTeamMembers/$(id + '_' + request.auth.uid)).data.role == 'owner';
@@ -796,8 +824,8 @@ service cloud.firestore {
         && text(data.name, 1, 100) && data.role in ['owner', 'manager', 'member'] && date(data.joinedAt);
     }
     match /communityTeamMembers/{id} {
-      allow get: if signed() && (!exists(/databases/$(database)/documents/communityTeamMembers/$(id)) || owner(resource.data.userId) || teamMember(resource.data.teamId) || admin());
-      allow list: if owner(resource.data.userId) || teamMember(resource.data.teamId) || admin();
+      allow get: if signed() && (!exists(/databases/$(database)/documents/communityTeamMembers/$(id)) || owner(resource.data.userId) || teamMember(resource.data.teamId) || admin() && pilotReadAllowed());
+      allow list: if owner(resource.data.userId) || teamMember(resource.data.teamId) || admin() && pilotReadAllowed();
       allow create: if active() && validTeamMember(request.resource.data, id) && request.resource.data.joinedAt == request.time && (
         request.resource.data.userId == request.auth.uid && request.resource.data.name == actorProfile().name && request.resource.data.role == 'owner'
           && getAfter(/databases/$(database)/documents/communityTeams/$(request.resource.data.teamId)).data.ownerId == request.auth.uid
@@ -815,7 +843,7 @@ service cloud.firestore {
       allow delete: if signed() && resource.data.role != 'owner' && (owner(resource.data.userId) || active() && teamOwner(resource.data.teamId));
     }
     match /communityTeamInvites/{id} {
-      allow get: if signed();
+      allow get: if signed() && pilotReadAllowed();
       allow list: if teamManager(resource.data.teamId);
       allow create: if active() && teamManager(request.resource.data.teamId) && teamRecord(request.resource.data.teamId).status == 'active'
         && request.resource.data.keys().hasAll(['id', 'teamId', 'createdBy', 'revoked', 'expiresAt', 'createdAt'])
@@ -839,8 +867,8 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/communityTeamInvites/$(data.inviteId)).data.expiresAt > request.time;
     }
     match /communityTeamJoinRequests/{id} {
-      allow get: if signed() && (!exists(/databases/$(database)/documents/communityTeamJoinRequests/$(id)) || owner(resource.data.userId) || teamManager(resource.data.teamId) || admin());
-      allow list: if owner(resource.data.userId) || teamManager(resource.data.teamId) || admin();
+      allow get: if signed() && (!exists(/databases/$(database)/documents/communityTeamJoinRequests/$(id)) || owner(resource.data.userId) || teamManager(resource.data.teamId) || admin() && pilotReadAllowed());
+      allow list: if owner(resource.data.userId) || teamManager(resource.data.teamId) || admin() && pilotReadAllowed();
       allow create: if active() && validJoinRequest(request.resource.data, id) && request.resource.data.userId == request.auth.uid
         && request.resource.data.name == actorProfile().name && request.resource.data.status == 'pending' && request.resource.data.createdAt == request.time
         && request.resource.data.reviewedAt == '' && teamRecord(request.resource.data.teamId).status == 'active'

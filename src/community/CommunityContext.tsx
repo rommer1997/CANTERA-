@@ -12,6 +12,7 @@ import { legalReady, operator } from './legal';
 import { normalizeFixtureRecord, fixtureFields, sameFixture } from './fixtureRecords';
 import { commitDeliveryBatches } from './deliveryBatches';
 import { TERMS_VERSION } from './policy';
+import { pilotAccountAllowed, type PilotIdentity } from './pilotAccess.ts';
 import { canReadEvent, isPublicEvent } from './eventPrivacy';
 export { TERMS_VERSION } from './policy';
 import { joinParticipants, makeFixtures, recordScore, requireText, validateEvent, validateEventEdit, validateFixtureSchedule, validateMatchResult } from './logic';
@@ -25,7 +26,7 @@ function noticeRecipientAllowed(event: Pick<PlayEvent, 'visibility' | 'ownerId' 
 }
 interface CommunityAPI {
   profile: CommunityProfile | null; mode: Mode; loading: boolean; error: string; isAdmin: boolean;
-  demoEnabled: boolean; mediaUploadsEnabled: boolean; runtimeConfig: RuntimeConfig; accountModeration: AccountModeration | null;
+  demoEnabled: boolean; pilotEnabled: boolean; serviceAvailable: boolean; mediaUploadsEnabled: boolean; runtimeConfig: RuntimeConfig; accountModeration: AccountModeration | null;
   ownEvents: PlayEvent[]; ownEventsHasMore: boolean; ownEventsLoading: boolean; loadMoreOwnEvents(): Promise<void>; eventsHasMore: boolean; postsHasMore: boolean; eventsLoading: boolean; postsLoading: boolean;
   loadMoreEvents(reset?: boolean): Promise<void>; loadMorePosts(reset?: boolean): Promise<void>;
   adminRightsRequests: RightsRequest[]; adminQueueHasMore: Record<'verification' | 'reports' | 'rights', boolean>; adminQueueLoading: Record<'verification' | 'reports' | 'rights', boolean>; loadMoreAdminQueue(kind: 'verification' | 'reports' | 'rights'): Promise<void>;
@@ -76,7 +77,9 @@ export function friendlyError(error: unknown): string {
   if (code === 'storage/retry-limit-exceeded' || code === 'storage/canceled') return 'La carga no se ha completado. Puedes volver a intentarlo.';
   return error instanceof Error ? error.message : 'No se pudo completar la operación.';
 }
-const demoEnabled = import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEMO === 'true';
+const pilotEnabled = import.meta.env.VITE_ENABLE_PILOT === 'true' && import.meta.env.VITE_SERVICE_OPEN === 'false'
+  && import.meta.env.VITE_ENABLE_DEMO === 'false' && import.meta.env.VITE_ENABLE_MEDIA_UPLOADS === 'false';
+const demoEnabled = !pilotEnabled && (import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEMO === 'true');
 function defaultProfile(id: string, name: string): CommunityProfile {
   return { id, name: name.trim().slice(0, 100) || 'Mi perfil', bio: '', city: '', country: '', position: '', team: '', level: 'amateur', adultConfirmed: false,
     verification: 'unverified', entityType: 'individual', createdAt: stamp(), acceptedTermsVersion: '', acceptedTermsAt: '' };
@@ -84,6 +87,7 @@ function defaultProfile(id: string, name: string): CommunityProfile {
 export function CommunityProvider({ children }: { children: React.ReactNode }) {
   const [mode, setMode] = useState<Mode>(() => demoEnabled && localStorage.getItem('cantera-demo-active') === 'true' ? 'demo' : 'cloud');
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
+  const [pilotIdentity, setPilotIdentity] = useState<PilotIdentity | null>(null);
   const [runtimeConfig, setRuntimeConfig] = useState<RuntimeConfig>(normalizeRuntime(null));
   const [accountModeration, setAccountModeration] = useState<AccountModeration | null>(null);
   const [ownEvents, setOwnEvents] = useState<PlayEvent[]>([]);
@@ -129,9 +133,11 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
   const mediaCache = useRef<ReturnType<typeof createLocalMediaCache> | null>(null);
   const localMedia = useCallback(() => mediaCache.current ||= createLocalMediaCache(getLocalMedia, blob => URL.createObjectURL(blob), url => URL.revokeObjectURL(url)), []);
   const setLegacyUser = useAppStore(s => s.setUser);
-  const serviceOpen = mode === 'demo' || import.meta.env.VITE_SERVICE_OPEN === 'true' && legalReady && runtimeConfig.serviceStatus === 'open';
+  const serviceOpen = mode === 'demo' || legalReady && (
+    !pilotEnabled && import.meta.env.VITE_SERVICE_OPEN === 'true' && runtimeConfig.serviceStatus === 'open'
+    || pilotEnabled && pilotIdentity?.uid === firebaseUser?.uid && pilotAccountAllowed(runtimeConfig, pilotIdentity));
   const serviceOpenRef = useRef(serviceOpen); serviceOpenRef.current = serviceOpen;
-  const readScope = JSON.stringify([mode, firebaseUser?.uid || '', isAdmin, runtimeConfig.serviceStatus, serviceOpen]);
+  const readScope = JSON.stringify([mode, firebaseUser?.uid || '', isAdmin, runtimeConfig.serviceStatus, serviceOpen, runtimeConfig.pilotUserIds]);
   const currentReadScope = useRef(readScope); currentReadScope.current = readScope;
   const eventViewer = mode === 'demo' ? profile?.id : firebaseUser?.uid;
   const currentEventViewer = useRef(eventViewer); currentEventViewer.current = eventViewer;
@@ -274,6 +280,7 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
       const generation = ++authGeneration;
       const current = () => active && generation === authGeneration && auth.currentUser?.uid === user?.uid;
       setFirebaseUser(user);
+      setPilotIdentity(null);
       setAdmin(false);
       if (!user) { setLoading(false); return; }
       setMode('cloud'); setRuntimeConfig(normalizeRuntime(null)); setLoading(true); setError('');
@@ -281,6 +288,8 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
       try {
         const token = await user.getIdTokenResult();
         if (!current()) return;
+        setPilotIdentity({ uid: user.uid, emailVerified: user.emailVerified && token.claims.email_verified === true,
+          provider: typeof token.claims.firebase === 'object' && token.claims.firebase ? String((token.claims.firebase as Record<string, unknown>).sign_in_provider || '') : '' });
         setAdmin(token.claims.admin === true);
       } catch (err) { if (current()) readFailure(err); }
     });
@@ -288,11 +297,11 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
   }, [readFailure]);
 
   useEffect(() => {
-    if (mode !== 'cloud' || !firebaseUser || !serviceOpen && !isAdmin) return;
+    if (mode !== 'cloud' || !firebaseUser || !serviceOpen && !(isAdmin && !pilotEnabled && runtimeConfig.serviceStatus !== 'pilot')) return;
     let active = true;
     const user = firebaseUser;
     const current = () => active && currentMode.current === 'cloud' && auth.currentUser === user
-      && currentReadScope.current === readScope && (serviceOpenRef.current || isAdmin);
+      && currentReadScope.current === readScope && (serviceOpenRef.current || isAdmin && !pilotEnabled && runtimeConfig.serviceStatus !== 'pilot');
     // Auth can be restored before the runtime document arrives. Retrying when
     // the service opens is separate from the identity callback, and the
     // transaction creates only an absent private draft. Existing profiles and
@@ -622,6 +631,7 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
   }
   async function updateRuntimeStatus(status: RuntimeConfig['serviceStatus']) {
     sessionActor(); if (!isAdmin || mode !== 'cloud' || !['setup', 'open', 'paused'].includes(status)) throw new Error('Esta acción requiere la cuenta administradora.');
+    if (status === 'open' && import.meta.env.VITE_SERVICE_OPEN !== 'true') throw new Error('Esta versión sólo permite un piloto privado. La apertura pública requiere su propia revisión.');
     if (status === 'open' && !legalReady) throw new Error('Completa el nombre, país y contacto del responsable antes de abrir el servicio.');
     await setDoc(doc(db, 'communityConfiguration', 'runtime'), { serviceStatus: status, mediaUploadsEnabled: false, contactEmail: operator.email || runtimeConfig.contactEmail, updatedAt: serverTimestamp() });
   }
@@ -779,9 +789,24 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
       }); } catch { throw new Error('El cambio se ha guardado, pero no se han podido entregar todos los avisos. El organizador puede usar «Recuperar avisos» para completar la entrega.'); }
     }
   }
-  async function login() { if (!serviceOpen) throw new Error('El acceso está disponible cuando el servicio esté abierto.'); setError(''); await signInWithGoogle(); }
+  async function login() {
+    if (!serviceOpen && !(pilotEnabled && legalReady && runtimeConfig.serviceStatus === 'pilot')) throw new Error('El acceso está disponible cuando el servicio esté abierto.');
+    setError('');
+    const user = await signInWithGoogle();
+    if (pilotEnabled) {
+      const token = await user.getIdTokenResult(true);
+      const snapshot = await getDoc(doc(db, 'communityConfiguration', 'runtime'));
+      const runtime = normalizeRuntime(snapshot.exists() ? snapshot.data() : null);
+      const identity = { uid: user.uid, emailVerified: user.emailVerified && token.claims.email_verified === true,
+        provider: typeof token.claims.firebase === 'object' && token.claims.firebase ? String((token.claims.firebase as Record<string, unknown>).sign_in_provider || '') : '' };
+      if (auth.currentUser?.uid !== user.uid || !pilotAccountAllowed(runtime, identity)) {
+        if (auth.currentUser?.uid === user.uid) await logout();
+        throw new Error('Esta cuenta todavía no está autorizada para el piloto privado. Contacta con el administrador para solicitar acceso.');
+      }
+    }
+  }
   async function loginAdmin() { setError(''); const user = await signInWithGoogle(); const token = await user.getIdTokenResult(true); if (token.claims.admin !== true) { await logout(); throw new Error('Esta cuenta no tiene el permiso de administración.'); } }
-  async function signOut() { await logout(); localStorage.removeItem('cantera-demo-active'); setFirebaseUser(null); setProfile(null); setLegacyUser(null); setMode('cloud'); }
+  async function signOut() { await logout(); localStorage.removeItem('cantera-demo-active'); setFirebaseUser(null); setPilotIdentity(null); setProfile(null); setLegacyUser(null); setMode('cloud'); }
   async function beginDemo(name: string) {
     if (!demoEnabled) throw new Error('El modo de prueba no está disponible en producción.');
     if (auth.currentUser) await logout();
@@ -1004,8 +1029,8 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
     if (removePost) { if (report.commentId) await deleteComment(report.postId, report.commentId); else await deletePost(report.postId); }
     await updateDoc(doc(db, 'communityReports', id), { status: 'resolved' });
   }
-  const value: CommunityAPI = { profile, mode, loading, error, isAdmin, demoEnabled, accountModeration, mediaUploadsEnabled: mode === 'demo', runtimeConfig: mode === 'demo' ? { serviceStatus: 'open', mediaUploadsEnabled: true, contactEmail: '', updatedAt: '' } : { ...runtimeConfig, serviceStatus: serviceOpen ? 'open' : runtimeConfig.serviceStatus === 'paused' ? 'paused' : 'setup' }, adminRightsRequests, adminQueueHasMore, adminQueueLoading, loadMoreAdminQueue, suspendAccount, reviewRightsRequest, updateRuntimeStatus, ownEvents: readableOwnEvents, ownEventsHasMore: false, ownEventsLoading: loading, loadMoreOwnEvents, ...pages, loadMoreEvents, loadMorePosts, fixtureData, fixtureStates, watchFixtureData, eventHistories, watchEventHistory, eventNotices, rightsRequests, blockedIds, toggleBlock, markNoticeRead, requestRights, retryEventNotices, postInteractionStates, watchPostInteractions, loadMoreComments, deleteComment, reportComment, searchPeople, events: availableEvents, posts: availablePosts, likes, comments, verificationRequests, reports, hiddenPostIds,
-    profiles: peoplePage.mode === mode ? peoplePage.profiles : [], publicProfiles: publicCaches[mode], publicProfileStates: profileStates[mode], followingIds,
+  const value: CommunityAPI = { profile, mode, loading, error, isAdmin, demoEnabled, pilotEnabled, serviceAvailable: serviceOpen, accountModeration, mediaUploadsEnabled: mode === 'demo', runtimeConfig: mode === 'demo' ? { serviceStatus: 'open', mediaUploadsEnabled: true, contactEmail: '', updatedAt: '' } : { ...runtimeConfig, serviceStatus: runtimeConfig.serviceStatus === 'pilot' ? 'pilot' : serviceOpen ? 'open' : runtimeConfig.serviceStatus === 'paused' ? 'paused' : 'setup' }, adminRightsRequests, adminQueueHasMore, adminQueueLoading, loadMoreAdminQueue, suspendAccount, reviewRightsRequest, updateRuntimeStatus, ownEvents: readableOwnEvents, ownEventsHasMore: false, ownEventsLoading: loading, loadMoreOwnEvents, ...pages, loadMoreEvents, loadMorePosts, fixtureData, fixtureStates, watchFixtureData, eventHistories, watchEventHistory, eventNotices, rightsRequests, blockedIds, toggleBlock, markNoticeRead, requestRights, retryEventNotices, postInteractionStates, watchPostInteractions, loadMoreComments, deleteComment, reportComment, searchPeople, events: serviceOpen ? availableEvents : [], posts: serviceOpen ? availablePosts : [], likes, comments, verificationRequests, reports, hiddenPostIds,
+    profiles: serviceOpen && peoplePage.mode === mode ? peoplePage.profiles : [], publicProfiles: serviceOpen ? publicCaches[mode] : {}, publicProfileStates: profileStates[mode], followingIds,
     peopleLoading: peoplePage.mode === mode && peoplePage.loading, peopleError: peoplePage.mode === mode ? peoplePage.error : '', peopleHasMore: peoplePage.mode !== mode || peoplePage.hasMore,
     loadMorePeople, watchPublicProfile, toggleFollow, watchPost, linkedPostStates: linkedStates[mode],
     login, loginAdmin, signOut, beginDemo, saveProfile, createEvent, createEventSeries, updateEvent, removeGuest, setRsvp, joinWaitlist, leaveWaitlist, saveMatchResult, scheduleFixture, joinEvent, leaveEvent, addGuest, setEventStatus, generateFixtures, saveScore,

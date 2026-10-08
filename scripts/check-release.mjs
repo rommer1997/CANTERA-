@@ -9,6 +9,7 @@ const requirements = {
   'Correo público de contacto': /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(env.VITE_CONTACT_EMAIL || ''),
   'País del responsable': Boolean(env.VITE_OPERATOR_COUNTRY?.trim()),
   'Apertura pública expresamente configurada': env.VITE_SERVICE_OPEN === 'true',
+  'Piloto privado desactivado para la apertura pública': env.VITE_ENABLE_PILOT !== 'true',
   'Modo de prueba desactivado': env.VITE_ENABLE_DEMO !== 'true',
   'Carga multimedia permanece cerrada hasta financiación': env.VITE_ENABLE_MEDIA_UPLOADS !== 'true',
   'Versión Node 24 o superior': Number(process.versions.node.split('.')[0]) >= 24,

@@ -28,7 +28,7 @@ export interface EventChange { revision: number; changedAt: string; summary: str
 export interface MatchResult { homeName: string; awayName: string; homeScore: number; awayScore: number; }
 export interface FixtureSchedule { startAt: string; timeZone: string; venue: string; }
 export interface AccountModeration { status: 'active' | 'suspended'; reason: string; updatedAt: string; }
-export interface RuntimeConfig { serviceStatus: 'setup' | 'open' | 'paused'; mediaUploadsEnabled: boolean; contactEmail: string; updatedAt: string; }
+export interface RuntimeConfig { serviceStatus: 'setup' | 'open' | 'paused' | 'pilot'; mediaUploadsEnabled: boolean; contactEmail: string; updatedAt: string; pilotUserIds?: string[]; }
 export interface EventNotice { id: string; eventId: string; recipientId: string; revision: number; title: string; summary: string; createdAt: string; readAt: string; kind?: 'change' | 'place'; deliveryId?: string; }
 export interface RightsRequest { id: string; userId: string; kind: 'export' | 'delete'; status: 'pending' | 'processing' | 'completed' | 'rejected'; createdAt: string; reviewedAt: string; }
 export interface PostInteractionState { loading: boolean; error: string; hasMoreComments: boolean; likesCount: number; commentsCount: number; }

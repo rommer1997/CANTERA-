@@ -329,74 +329,52 @@
           "arrayConfig": "CONTAINS"
         }
       ]
-    }
-  ],
-  "fieldOverrides": [
+    },
     {
       "collectionGroup": "members",
-      "fieldPath": "userId",
-      "indexes": [
+      "queryScope": "COLLECTION_GROUP",
+      "density": "DENSE",
+      "fields": [
         {
-          "order": "ASCENDING",
-          "queryScope": "COLLECTION"
+          "fieldPath": "userId",
+          "order": "ASCENDING"
         },
         {
-          "order": "DESCENDING",
-          "queryScope": "COLLECTION"
-        },
-        {
-          "arrayConfig": "CONTAINS",
-          "queryScope": "COLLECTION"
-        },
-        {
-          "order": "ASCENDING",
-          "queryScope": "COLLECTION_GROUP"
+          "fieldPath": "__name__",
+          "order": "ASCENDING"
         }
       ]
     },
     {
       "collectionGroup": "members",
-      "fieldPath": "peerId",
-      "indexes": [
+      "queryScope": "COLLECTION_GROUP",
+      "density": "DENSE",
+      "fields": [
         {
-          "order": "ASCENDING",
-          "queryScope": "COLLECTION"
+          "fieldPath": "peerId",
+          "order": "ASCENDING"
         },
         {
-          "order": "DESCENDING",
-          "queryScope": "COLLECTION"
-        },
-        {
-          "arrayConfig": "CONTAINS",
-          "queryScope": "COLLECTION"
-        },
-        {
-          "order": "ASCENDING",
-          "queryScope": "COLLECTION_GROUP"
+          "fieldPath": "__name__",
+          "order": "ASCENDING"
         }
       ]
     },
     {
       "collectionGroup": "messages",
-      "fieldPath": "senderId",
-      "indexes": [
+      "queryScope": "COLLECTION_GROUP",
+      "density": "DENSE",
+      "fields": [
         {
-          "order": "ASCENDING",
-          "queryScope": "COLLECTION"
+          "fieldPath": "senderId",
+          "order": "ASCENDING"
         },
         {
-          "order": "DESCENDING",
-          "queryScope": "COLLECTION"
-        },
-        {
-          "arrayConfig": "CONTAINS",
-          "queryScope": "COLLECTION"
-        },
-        {
-          "order": "ASCENDING",
-          "queryScope": "COLLECTION_GROUP"
+          "fieldPath": "__name__",
+          "order": "ASCENDING"
         }
       ]
     }
-  ]
+  ],
+  "fieldOverrides": []
 }

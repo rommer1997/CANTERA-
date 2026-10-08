@@ -402,8 +402,8 @@ export default function EventsPage() {
   const city = queryLocation(searchParams.get('city'), 80);
   const type = requestedType === 'match' || requestedType === 'tournament' ? requestedType : 'all';
   const view = searchParams.get('view') === 'mine' ? 'mine' : 'explore';
-  const { events, loading, profile, mode, runtimeConfig, eventsHasMore, eventsLoading, loadMoreEvents, ownEventsHasMore, ownEventsLoading, loadMoreOwnEvents } = useCommunity();
-  const serviceUnavailable = mode === 'cloud' && runtimeConfig.serviceStatus !== 'open';
+  const { events, loading, profile, mode, runtimeConfig, serviceAvailable, eventsHasMore, eventsLoading, loadMoreEvents, ownEventsHasMore, ownEventsLoading, loadMoreOwnEvents } = useCommunity();
+  const serviceUnavailable = mode === 'cloud' && !serviceAvailable;
   const readableEvents = useMemo(() => events.filter(event => canReadEvent(event, profile?.id)), [events, profile?.id]);
   const publicEvents = useMemo(() => readableEvents.filter(isPublicEvent), [readableEvents]);
   const listedEvent = eventId ? readableEvents.find(item => item.id === eventId) : undefined;

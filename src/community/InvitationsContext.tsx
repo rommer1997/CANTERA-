@@ -23,9 +23,9 @@ const Context = createContext<InvitationsAPI | null>(null);
 const validUid = (id: string) => id.length > 0 && id.length <= 128 && !['.', '..', '__proto__', 'constructor', 'prototype'].includes(id) && !/[\/\\\u0000-\u001f\u007f]/.test(id);
 
 export function InvitationsProvider({ children }: { children: React.ReactNode }) {
-  const api = useCommunity(); const { mode, profile, runtimeConfig, accountModeration } = api;
+  const api = useCommunity(); const { mode, profile, runtimeConfig, serviceAvailable, accountModeration } = api;
   const uid = profile?.id || '';
-  const scope = `${mode}:${uid}:${runtimeConfig.serviceStatus}`;
+  const scope = `${mode}:${uid}:${runtimeConfig.serviceStatus}:${serviceAvailable}`;
   const currentScope = useRef(scope); currentScope.current = scope;
   const [state, setState] = useState<{ scope: string; connections: CommunityConnection[]; invitations: CommunityInvitation[]; loading: boolean; error: string }>({ scope, connections: [], invitations: [], loading: false, error: '' });
   const eligible = !!profile?.adultConfirmed && profile.acceptedTermsVersion === TERMS_VERSION && !!profile.city.trim() && !!profile.country.trim();
@@ -58,7 +58,7 @@ export function InvitationsProvider({ children }: { children: React.ReactNode })
 
   function actor(participating = true) {
     if (!profile || currentScope.current !== scope || mode === 'cloud' && auth.currentUser?.uid !== uid || mode === 'demo' && readDemo().profile?.id !== uid) throw new InvitationError('signin-required');
-    if (participating && (!eligible || runtimeConfig.serviceStatus !== 'open' || accountModeration?.status === 'suspended')) throw new InvitationError('unavailable');
+    if (participating && (!eligible || !serviceAvailable || accountModeration?.status === 'suspended')) throw new InvitationError('unavailable');
     return profile;
   }
   function codeOf(raw: string) { const code = normalizeInvitationCode(raw); if (!code) throw new InvitationError('invalid-code'); return code; }

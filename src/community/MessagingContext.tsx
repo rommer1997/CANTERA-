@@ -19,14 +19,16 @@ interface MessagingAPI {
 const Context = createContext<MessagingAPI | null>(null);
 
 export function MessagingProvider({ children }: { children: React.ReactNode }) {
-  const { mode, profile, runtimeConfig, accountModeration, blockedIds } = useCommunity();
+  const { mode, profile, runtimeConfig, serviceAvailable, accountModeration, blockedIds } = useCommunity();
   const { connections, loading, error } = useInvitations();
   const uid = profile?.id || '';
   const eligible = mode === 'cloud' && validMessagingUid(uid) && auth.currentUser?.uid === uid && auth.currentUser.emailVerified
     && !!profile?.adultConfirmed && profile.acceptedTermsVersion === TERMS_VERSION && !!profile.acceptedTermsAt
-    && !!profile.city.trim() && !!profile.country.trim() && runtimeConfig.serviceStatus === 'open' && accountModeration?.status !== 'suspended';
-  const available = connections.filter(connection => connection.ownerId === uid && validMessagingUid(connection.peerId) && !blockedIds.includes(connection.peerId));
-  const scope = `${mode}:${uid}:${eligible}:${available.map(item => item.peerId).sort().join(',')}:${blockedIds.slice().sort().join(',')}`;
+    && !!profile.city.trim() && !!profile.country.trim() && serviceAvailable && accountModeration?.status !== 'suspended';
+  const pilotPeers = runtimeConfig.serviceStatus === 'pilot' ? runtimeConfig.pilotUserIds || [] : null;
+  const available = connections.filter(connection => connection.ownerId === uid && validMessagingUid(connection.peerId) && !blockedIds.includes(connection.peerId)
+    && (pilotPeers === null || pilotPeers.includes(connection.peerId)));
+  const scope = `${mode}:${uid}:${eligible}:${available.map(item => item.peerId).sort().join(',')}:${blockedIds.slice().sort().join(',')}:${pilotPeers?.slice().sort().join(',') || ''}`;
   const scopeRef = useRef(scope); scopeRef.current = scope;
   const conversations: MessagingConversation[] = eligible ? available.map(connection => ({ id: conversationIdFor(uid, connection.peerId), participantIds: conversationParticipants(conversationIdFor(uid, connection.peerId))!, createdAt: connection.createdAt })) : [];
   function actor(participating = true) {
