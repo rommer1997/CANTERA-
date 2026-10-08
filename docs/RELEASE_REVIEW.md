@@ -53,3 +53,6 @@ node scripts/prepare-auth-domain.cjs --domain cantera-tau.vercel.app --dry-run
 Sólo tras revisar el resultado y autorizar el cambio, `--apply` añade ese dominio y vuelve a consultar la lista. No habilita proveedores, no crea cuentas, no concede administración y no modifica facturación. La API no admite precondición sobre la lista; evitar cambios simultáneos desde la consola al aplicar.
 
 La limpieza física de likes/comentarios retirados tiene una alternativa manual con simulación por defecto y sin Functions. Las reglas preparadas cierran la lectura de interacciones huérfanas a terceros, manteniendo acceso y retirada propios. El procedimiento está en [ACCOUNT_RIGHTS.md](ACCOUNT_RIGHTS.md).
+
+
+Actualización del 8 de octubre: el acceso administrativo real ya está comprobado. La ampliación de chat, derechos y respaldo se registra en [la entrega por fases](RELEASE_2026-10-08.md); no confundir este registro histórico con la versión de reglas todavía pendiente.

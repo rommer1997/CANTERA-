@@ -1,12 +1,13 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { onAuthStateChanged, type User } from 'firebase/auth';
-import { collection, deleteDoc, getCountFromServer, serverTimestamp, doc, getDoc, getDocs, limit, onSnapshot, orderBy, query, runTransaction, setDoc, startAfter, updateDoc, where, writeBatch, type DocumentData, type QueryDocumentSnapshot } from 'firebase/firestore';
+import { collection, deleteDoc, getCountFromServer, serverTimestamp, doc, getDoc, getDocs, limit, onSnapshot, orderBy, query, runTransaction, setDoc, startAfter, updateDoc, where, writeBatch, type DocumentData, type DocumentSnapshot, type QueryDocumentSnapshot } from 'firebase/firestore';
 import { deleteObject, getDownloadURL, ref, uploadBytesResumable } from 'firebase/storage';
 import { auth, db, logout, signInWithGoogle, storage } from '../firebase';
 import { useAppStore } from '../store/useAppStore';
 import { deleteLocalMedia, getLocalMedia, readDemo, saveLocalMedia, writeDemo, type DemoData } from './local';
 import { createLocalMediaCache, publishLocalPosts } from './localMediaCache';
 import { createCoalescedRefresh } from './coalescedRefresh';
+import { removeDemoConnection } from './invitationDemo';
 import { legalReady, operator } from './legal';
 import { normalizeFixtureRecord, fixtureFields, sameFixture } from './fixtureRecords';
 import { commitDeliveryBatches } from './deliveryBatches';
@@ -63,6 +64,7 @@ const stamp = () => new Date().toISOString();
 const newId = () => crypto.randomUUID();
 const peoplePageSize = 40;
 const contentPageSize = { events: 40, posts: 24 } as const;
+const invalidOwnProfileError = 'Tu perfil contiene datos no válidos y necesita revisión.';
 const validProfileId = (id: string) => id.length > 0 && id.length <= 128 && !['__proto__', 'constructor', 'prototype', '.', '..'].includes(id) && !/[\/\\\u0000-\u001f\u007f]/.test(id);
 export function friendlyError(error: unknown): string {
   const code = (error as { code?: string })?.code;
@@ -267,28 +269,44 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let active = true;
+    let authGeneration = 0;
     const stop = onAuthStateChanged(auth, async user => {
+      const generation = ++authGeneration;
+      const current = () => active && generation === authGeneration && auth.currentUser?.uid === user?.uid;
       setFirebaseUser(user);
       setAdmin(false);
       if (!user) { setLoading(false); return; }
       setMode('cloud'); setRuntimeConfig(normalizeRuntime(null)); setLoading(true); setError('');
       localStorage.removeItem('cantera-demo-active');
       try {
-        const [snapshot, token] = await Promise.all([getDoc(doc(db, 'communityProfiles', user.uid)), user.getIdTokenResult()]);
-        if (!active || auth.currentUser?.uid !== user.uid) return;
+        const token = await user.getIdTokenResult();
+        if (!current()) return;
         setAdmin(token.claims.admin === true);
-        if (!snapshot.exists() && !serviceOpenRef.current && token.claims.admin !== true) { setProfile(null); setLoading(false); return; }
-        if (!snapshot.exists()) {
-          const fresh = defaultProfile(user.uid, user.displayName || 'Mi perfil');
-          await setDoc(doc(db, 'communityProfiles', user.uid), { ...fresh, createdAt: serverTimestamp() });
-        } else {
-          const current = normalizeProfile(snapshot.data(), snapshot.id);
-          if (serviceOpenRef.current && current?.adultConfirmed && current.acceptedTermsVersion === TERMS_VERSION && current.city.trim() && current.country.trim()) await setDoc(doc(db, 'communityPublicProfiles', user.uid), { ...normalizePublicProfile(current)!, createdAt: snapshot.data().createdAt, searchTokens: profileSearchTokens(current) });
-        }
-      } catch (err) { if (active) readFailure(err); }
+      } catch (err) { if (current()) readFailure(err); }
     });
     return () => { active = false; stop(); };
   }, [readFailure]);
+
+  useEffect(() => {
+    if (mode !== 'cloud' || !firebaseUser || !serviceOpen && !isAdmin) return;
+    let active = true;
+    const user = firebaseUser;
+    const current = () => active && currentMode.current === 'cloud' && auth.currentUser === user
+      && currentReadScope.current === readScope && (serviceOpenRef.current || isAdmin);
+    // Auth can be restored before the runtime document arrives. Retrying when
+    // the service opens is separate from the identity callback, and the
+    // transaction creates only an absent private draft. Existing profiles and
+    // public projections are never rewritten on session restoration.
+    setLoading(true);
+    void runTransaction(db, async transaction => {
+      const target = doc(db, 'communityProfiles', user.uid);
+      const stored = await transaction.get(target);
+      if (!current() || stored.exists()) return;
+      const fresh = defaultProfile(user.uid, user.displayName || 'Mi perfil');
+      transaction.set(target, { ...fresh, createdAt: serverTimestamp() });
+    }).catch(err => { if (current()) readFailure(err); }).finally(() => { if (current()) setLoading(false); });
+    return () => { active = false; };
+  }, [mode, firebaseUser, serviceOpen, isAdmin, readScope, readFailure]);
 
   useEffect(() => {
     let active = true;
@@ -313,9 +331,19 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
       return () => { active = false; window.removeEventListener('storage', refresh); window.removeEventListener('cantera-demo-updated', refresh); };
     }
     const runtimeStop = onSnapshot(doc(db, 'communityConfiguration', 'runtime'), snapshot => { if (isCurrentRead()) setRuntimeConfig(normalizeRuntime(snapshot.exists() ? snapshot.data() : null)); }, () => { if (isCurrentRead()) setRuntimeConfig(normalizeRuntime(null)); });
+    const receiveOwnProfile = (snapshot: DocumentSnapshot<DocumentData>) => {
+      // serverTimestamp fields are temporarily null in a local pending write.
+      // Preserve the last confirmed profile until acknowledgement instead of
+      // treating this transient projection as corrupted account data.
+      if (!isCurrentRead() || snapshot.metadata.hasPendingWrites) return;
+      const current = snapshot.exists() ? normalizeProfile(snapshot.data(), snapshot.id) : null;
+      setProfile(current);
+      if (snapshot.exists() && !current) readFailure(new Error(invalidOwnProfileError));
+      else setError(previous => previous === invalidOwnProfileError ? '' : previous);
+    };
     if (!serviceOpen) {
       const stops = [runtimeStop];
-      if (firebaseUser) stops.push(onSnapshot(doc(db, 'communityProfiles', firebaseUser.uid), snapshot => { if (isCurrentRead()) setProfile(snapshot.exists() ? normalizeProfile(snapshot.data(), snapshot.id) : null); }, failed));
+      if (firebaseUser) stops.push(onSnapshot(doc(db, 'communityProfiles', firebaseUser.uid), { includeMetadataChanges: true }, receiveOwnProfile, failed));
       if (firebaseUser) {
         stops.push(onSnapshot(query(collection(db, 'communityEventNotices'), where('recipientId', '==', firebaseUser.uid), orderBy('createdAt', 'desc'), limit(100)), snapshot => { if (isCurrentRead()) setEventNotices(snapshot.docs.map(d => normalizeNotice(d.data(), d.id)).filter((n): n is EventNotice => n !== null)); }, failed));
         stops.push(onSnapshot(query(collection(db, 'communityRightsRequests'), where('userId', '==', firebaseUser.uid), orderBy('createdAt', 'desc'), limit(30)), snapshot => { if (isCurrentRead()) setRightsRequests(snapshot.docs.map(d => normalizeRightsRequest(d.data(), d.id)).filter((r): r is RightsRequest => r !== null)); }, failed));
@@ -346,12 +374,7 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
       return () => { active = false; stops.forEach(stop => stop()); };
     }
     const stops = [runtimeStop,
-      onSnapshot(doc(db, 'communityProfiles', firebaseUser.uid), snapshot => {
-        if (!isCurrentRead()) return;
-        const current = snapshot.exists() ? normalizeProfile(snapshot.data(), snapshot.id) : null;
-        setProfile(current);
-        if (snapshot.exists() && !current) readFailure(new Error('Tu perfil contiene datos no válidos y necesita revisión.'));
-      }, failed),
+      onSnapshot(doc(db, 'communityProfiles', firebaseUser.uid), { includeMetadataChanges: true }, receiveOwnProfile, failed),
       listen('communityEvents', normalizeEvent, values => { setEvents(values); setLoading(false); }),
       listen('communityPosts', normalizePost, setPosts),
       ...(['owner', 'joined', 'waiting'] as const).map(source => onSnapshot(query(collection(db, 'communityEvents'), source === 'owner' ? where('ownerId', '==', firebaseUser.uid) : where(source === 'joined' ? 'participantIds' : 'waitlistOrder', 'array-contains', firebaseUser.uid), ...(source === 'waiting' ? [where('visibility', '==', 'public')] : [])), snapshot => { if (isCurrentRead()) { ownSources.current[source] = snapshot.docs.map(d => normalizeEvent(d.data(), d.id)).filter((e): e is PlayEvent => e !== null && canReadEvent(e, firebaseUser.uid)); setOwnEvents([...new Map(Object.values(ownSources.current).flat().map(e => [e.id, e])).values()]); } }, failed)),
@@ -549,8 +572,24 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
 
   async function toggleBlock(id: string) {
     const user = sessionActor(); if (!validProfileId(id) || id === user.id) throw new Error('Cuenta inválida.');
-    if (mode === 'demo') mutateDemo(data => { const current = data.blocked[user.id] || []; return { ...data, blocked: { ...data.blocked, [user.id]: current.includes(id) ? current.filter(uid => uid !== id) : [...current, id] } }; });
-    else await runTransaction(db, async tx => { const target = doc(db, 'communityBlocks', `${user.id}_${id}`); const current = await tx.get(target); if (current.exists()) tx.delete(target); else tx.set(target, { ownerId: user.id, blockedId: id, createdAt: serverTimestamp() }); });
+    if (mode === 'demo') {
+      const blocking = !(readDemo().blocked[user.id] || []).includes(id);
+      mutateDemo(data => { const current = data.blocked[user.id] || []; return { ...data, blocked: { ...data.blocked, [user.id]: current.includes(id) ? current.filter(uid => uid !== id) : [...current, id] } }; });
+      if (blocking) removeDemoConnection(user.id, id);
+    } else {
+      const target = doc(db, 'communityBlocks', `${user.id}_${id}`);
+      if (blockedIds.includes(id)) await deleteDoc(target);
+      else {
+        // A block removes both connections atomically. Each recipient observes
+        // their own contacts disappear, so an open chat clears immediately
+        // without revealing the other person's private block document.
+        const batch = writeBatch(db);
+        batch.set(target, { ownerId: user.id, blockedId: id, createdAt: serverTimestamp() });
+        batch.delete(doc(db, 'communityConnections', user.id, 'members', id));
+        batch.delete(doc(db, 'communityConnections', id, 'members', user.id));
+        await batch.commit();
+      }
+    }
   }
   async function deleteComment(postId: string, commentId: string) {
     const user = sessionActor();
@@ -784,21 +823,23 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
     });
   }
   async function saveProfile(input: Omit<CommunityProfile, 'id' | 'verification' | 'createdAt'>) {
-    if (!profile) throw new Error('Inicia sesión primero.');
+    const user = sessionActor();
     if (!input.adultConfirmed) throw new Error('La beta requiere confirmar la mayoría de edad.');
     if (input.acceptedTermsVersion !== TERMS_VERSION) throw new Error('Debes aceptar los términos de uso.');
     if (!['individual', 'group', 'club'].includes(input.entityType) || !['amateur', 'professional'].includes(input.level)) throw new Error('Tipo de perfil inválido.');
     const cleaned = { ...input, name: requireText(input.name, 'Nombre', 100), country: requireText(input.country, 'País', 100),
       city: requireText(input.city, 'Ciudad', 100), bio: input.bio.trim(), team: input.team.trim(), position: input.position.trim() };
     if (cleaned.bio.length > 1000 || cleaned.team.length > 100 || cleaned.position.length > 100) throw new Error('El texto del perfil supera el límite.');
-    const updated = { ...profile, ...cleaned };
+    const updated = { ...user, ...cleaned };
     if (mode === 'demo') mutateDemo(data => ({ ...data, profile: updated }));
     else {
-      const target = doc(db, 'communityProfiles', profile.id); const stored = await getDoc(target);
+      const target = doc(db, 'communityProfiles', user.id); const stored = await getDoc(target);
+      sessionActor();
       const createdAt = stored.exists() ? stored.data().createdAt : serverTimestamp();
       const acceptedTermsAt = stored.exists() && stored.data().acceptedTermsVersion === input.acceptedTermsVersion ? stored.data().acceptedTermsAt : serverTimestamp();
       const batch = writeBatch(db); batch.set(target, { ...updated, createdAt, acceptedTermsAt });
-      batch.set(doc(db, 'communityPublicProfiles', profile.id), { ...normalizePublicProfile(updated)!, createdAt, searchTokens: profileSearchTokens(updated) }); await batch.commit();
+      batch.set(doc(db, 'communityPublicProfiles', user.id), { ...normalizePublicProfile(updated)!, createdAt, searchTokens: profileSearchTokens(updated) }); await batch.commit();
+      if (auth.currentUser?.uid === user.id) setError(previous => previous === invalidOwnProfileError ? '' : previous);
     }
   }
   async function createEvent(input: EventInput) {

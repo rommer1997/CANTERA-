@@ -1,8 +1,10 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowRight, CheckCircle2, KeyRound, LockKeyhole, ScanLine, UserRound, Users } from 'lucide-react';
+import { ArrowRight, CheckCircle2, KeyRound, LockKeyhole, MessageCircle, ScanLine, UserRound, Users } from 'lucide-react';
 import { useCommunity } from './CommunityContext';
 import { useInvitations } from './InvitationsContext';
+import { useMessaging } from './MessagingContext';
+import { safeMessagingError } from './messagingLogic';
 import { InvitationButton, InvitationDialog } from './InvitationDialog';
 import { formatInvitationCode, formatInvitationCountdown, invitationExpiresAt, invitationSecondsRemaining, normalizeInvitationCode, safeInvitationError } from './invitations';
 import type { CommunityConnection, CommunityInvitation } from './invitationTypes';
@@ -11,11 +13,18 @@ import './invitations.css';
 const QrScanner = lazy(() => import('./QrScanner'));
 
 function ConnectionCard({ connection }: { connection: CommunityConnection }) {
-  const api = useCommunity(); const invitations = useInvitations();
+  const api = useCommunity(); const invitations = useInvitations(); const messaging = useMessaging(); const navigate = useNavigate();
   const [confirm, setConfirm] = useState(false); const [busy, setBusy] = useState(false); const [error, setError] = useState('');
   useEffect(() => api.watchPublicProfile(connection.peerId), [connection.peerId, api.watchPublicProfile]);
   const peer = api.publicProfiles[connection.peerId];
-  return <article className="ci-person-card"><div className="ci-person-main"><span className="c-avatar" aria-hidden="true">{peer?.name.slice(0, 1).toUpperCase() || <UserRound size={20} />}</span><div><h3>{peer?.name || 'Conexión de LaCantera'}</h3><p>{peer ? `${peer.city}, ${peer.country}` : api.publicProfileStates[connection.peerId] === 'loading' ? 'Cargando perfil…' : 'El perfil público no está disponible.'}</p></div></div><div className="ci-person-actions">{peer ? <Link to={`/people/${connection.peerId}`} className="c-button secondary">Ver perfil <ArrowRight size={16} /></Link> : null}{confirm ? <><p className="c-small">La conexión se eliminará para ambos.</p><button className="ci-revoke" disabled={busy} onClick={() => { setBusy(true); setError(''); void invitations.removeConnection(connection.peerId).catch(err => setError(safeInvitationError(err))).finally(() => setBusy(false)); }}>{busy ? 'Eliminando…' : 'Confirmar desconexión'}</button><button className="ci-text-button" disabled={busy} onClick={() => setConfirm(false)}>Conservar conexión</button></> : <button className="ci-text-button" onClick={() => setConfirm(true)}>Desconectar</button>}</div>{error ? <p className="c-error" role="alert">{error}</p> : null}</article>;
+  async function message() {
+    if (busy) return;
+    setBusy(true); setError('');
+    try { const id = await messaging.openConversation(connection.peerId); navigate(`/messages/${encodeURIComponent(id)}`); }
+    catch (err) { setError(safeMessagingError(err)); }
+    finally { setBusy(false); }
+  }
+  return <article className="ci-person-card"><div className="ci-person-main"><span className="c-avatar" aria-hidden="true">{peer?.name.slice(0, 1).toUpperCase() || <UserRound size={20} />}</span><div><h3>{peer?.name || 'Conexión de LaCantera'}</h3><p>{peer ? `${peer.city}, ${peer.country}` : api.publicProfileStates[connection.peerId] === 'loading' ? 'Cargando perfil…' : 'El perfil público no está disponible.'}</p></div></div><div className="ci-person-actions">{messaging.eligible && !api.blockedIds.includes(connection.peerId) ? <button className="c-button" type="button" disabled={busy} onClick={() => void message()}><MessageCircle size={16} aria-hidden="true" />{busy && !confirm ? 'Abriendo…' : 'Mensaje'}</button> : null}{peer ? <Link to={`/people/${connection.peerId}`} className="c-button secondary">Ver perfil <ArrowRight size={16} /></Link> : null}{confirm ? <><p className="c-small">La conexión se eliminará para ambos. También dejaréis de tener acceso a la conversación.</p><button className="ci-revoke" disabled={busy} onClick={() => { setBusy(true); setError(''); void invitations.removeConnection(connection.peerId).catch(err => setError(safeInvitationError(err))).finally(() => setBusy(false)); }}>{busy ? 'Eliminando…' : 'Confirmar desconexión'}</button><button className="ci-text-button" disabled={busy} onClick={() => setConfirm(false)}>Conservar conexión</button></> : <button className="ci-text-button" disabled={busy} onClick={() => setConfirm(true)}>Desconectar</button>}</div>{error ? <p className="c-error" role="alert">{error}</p> : null}</article>;
 }
 
 function InvitationAcceptance({ rawCode }: { rawCode: string }) {

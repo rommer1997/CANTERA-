@@ -1,6 +1,6 @@
 # Checklist de publicación legal y transparencia de Cantera
 
-Versión 0.7 · 6 de octubre de 2026. Documento operativo interno, relacionado con [PLAN_CANTERA.md](../PLAN_CANTERA.md) y [WHITEPAPER.md](../WHITEPAPER.md). Las casillas de lanzamiento permanecen abiertas hasta comprobar el servicio final; la evidencia local y de CI se registra por separado. Este archivo no sustituye los textos públicos ni certifica cumplimiento internacional. La versión de aceptación de los términos en el código sigue siendo `2026-10-06`.
+Versión 0.8 · 8 de octubre de 2026. Documento operativo interno, relacionado con [PLAN_CANTERA.md](../PLAN_CANTERA.md) y [WHITEPAPER.md](../WHITEPAPER.md). Las casillas de lanzamiento permanecen abiertas hasta comprobar el servicio final; la evidencia local y de CI se registra por separado. Este archivo no sustituye los textos públicos ni certifica cumplimiento internacional. La versión de aceptación de los términos en el código es `2026-10-08`.
 
 ## 0. Evidencia de esta entrega y puertas abiertas
 
@@ -15,9 +15,7 @@ La matriz vigente de implementación y pruebas está en [PLAN_CANTERA.md](../PLA
 | Instalación | Manifest y caché de archivos estáticos preparados | Instalación, actualización y recuperación en navegador publicado; sin prometer escritura offline ni push. |
 | Financiación | Esperar a patrocinador para medios | No activar facturación, Storage o funciones; las reglas preparadas rechazan subidas cloud. |
 
-Auditoría de Firebase del 6 de octubre: base nombrada en `eur3` con reglas de bloqueo total (`deny-all`), sin buckets y con facturación deshabilitada. Falta `cantera-tau.vercel.app` en dominios autorizados de Google Auth. No se modificaron esos servicios.
-
-La revisión automática rechazó desplegar Firestore porque sustituir el bloqueo total por acceso a nuevas colecciones, incluidas lecturas públicas, requiere autorización humana específica. La aprobación solicitada en el chat está pendiente. Completar documentos o superar pruebas no aporta esa autorización.
+El estado actual se registra en [puesta en marcha](RELEASE_2026-10-07.md): Hosting publicado, Google habilitado y dominios autorizados. Las reglas anteriores y sus 18 índices se desplegaron con autorización el 7 de octubre. Las nuevas invitaciones y el chat de esta sesión requieren su despliegue concreto y verificación. El 8 de octubre runtime sigue ausente y la cuenta administradora ya tiene correo Google verificado y claim seguro; el acceso al panel está comprobado en el navegador. Registro cerrado; no hay acta aprobada. Las referencias al bloqueo inicial del 6 de octubre son históricas.
 
 Decisión D-09: facturación, Storage y funciones esperan financiación de un patrocinador. La demostración explícita admite medios locales; el núcleo publicado mantiene cerradas las subidas cloud incluso si se cambia una bandera del cliente. Esta elección no implica un patrocinador confirmado.
 
@@ -83,7 +81,7 @@ Inventario de partida obtenido del código local; revisar de nuevo tras cambios 
 | Caché `cantera-shell-*` del service worker | Archivos estáticos para abrir la interfaz instalada | No almacena datos de Firebase, APIs ni medios. Comprobar actualización publicada. |
 | Repositorio local de demostración | Perfiles, eventos y publicaciones en el dispositivo | Claves reales, uso exclusivo de desarrollo y mecanismo de vaciado. |
 | `cantera-media-v1` en IndexedDB | Medios locales de demostración | Confirmar que no se activa en producción y que puede borrarse. |
-| `acceptedTermsVersion` y `acceptedTermsAt` | Perfil de cuenta: versión `2026-10-06` y momento de aceptación; repositorio local solo en demo | Comprobar grabación y lectura cloud tras activación; no confundir esta aceptación con marketing. |
+| `acceptedTermsVersion` y `acceptedTermsAt` | Perfil de cuenta: versión `2026-10-08` y momento de aceptación; repositorio local solo en demo | Comprobar grabación y lectura cloud tras activación; no confundir esta aceptación con marketing. |
 | Proveedores de medios y enlaces externos | Archivos Firebase o recursos de terceros | Auditar solicitudes y lo que cargan antes y después de interactuar. |
 | Tipografía | Fuentes remotas de Google retiradas del código de esta entrega | Confirmar ausencia de solicitudes de fuentes externas en el navegador publicado. |
 | Analítica o marketing | No se habilitan por defecto en esta edición | Verificar ausencia real de etiquetas, píxeles y recursos que los activen indirectamente. |
@@ -133,7 +131,7 @@ La revisión española puede utilizar la [guía de cookies de la AEPD](https://w
 | Registro e información | Flujo probado con versión correcta y enlaces accesibles | Desarrollo/producto | UI y aceptación integradas; datos legales y prueba cloud pendientes |
 | Derechos y eliminación | Petición de prueba y efecto en datos/archivos | Operación/desarrollo | Limpieza de post preparada con 16 pruebas con dobles, también superadas en CI; despliegue y recorrido de derechos pendientes |
 | CI de código | Ejecución alojada sobre commit identificado | Desarrollo | Ver matriz vigente del plan y ejecución CI del commit de entrega; sin despliegue ni cuentas reales |
-| Permisos y admin | Intentos de acciones no autorizadas denegados | Desarrollo/operación | Reglas ampliadas con pruebas de emulador; ver matriz vigente. Reglas reales y claim pendientes |
+| Permisos y admin | Intentos de acciones no autorizadas denegados | Desarrollo/operación | Reglas ampliadas con pruebas de emulador; ver matriz vigente. Reglas nuevas remotas pendientes; claim y panel administrativo comprobados |
 | Moderación y soporte | Caso de prueba recibido, atendido y trazado | Administrador | Pendiente |
 | Publicación | URL, versión de código, fecha y documentos efectivos | Responsable de lanzamiento | Pendiente |
 
@@ -150,3 +148,5 @@ La publicación se considera lista cuando los datos están completos, las revisi
 | 0.7 | 6 de octubre de 2026 | Términos 2026-10-06, equipos privados, coordinación y derechos preparados; evidencia vigente en plan/whitepaper y puerta de apertura explícita. |
 
 Estado de publicación: **pendiente**. La orientación sin finalidad lucrativa no implica una entidad constituida. Las cuentas juveniles siguen fuera de la primera apertura hasta contar con tutela, controles y revisión.
+
+| 0.8 | 8 de octubre de 2026 | Términos 2026-10-08, mensajería, administración comprobada, derechos y respaldo ampliados; apertura y revisión operativa pendientes. |

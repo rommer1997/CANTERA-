@@ -31,7 +31,7 @@ test('exportación no exige aceptar términos nuevos y filtra autoría de cada c
   const result = buildAccountExport(source({ privateProfile: row(uid, { id: uid, name: 'Persona', adultConfirmed: false, acceptedTermsVersion: '', acceptedTermsAt: '', customClaims: { admin: true } }), collections }));
   assert.equal(result.account.privateProfile!.adultConfirmed, false);
   assert.equal(result.account.privateProfile!.acceptedTermsVersion, '');
-  for (const name of exportCollections) { assert.equal(result.collections[name].length, 1); assert.equal(result.counts[name], 1); }
+  for (const name of exportCollections) { const count = name === 'communityMessages' ? 0 : 1; assert.equal(result.collections[name].length, count); assert.equal(result.counts[name], count); }
   assert.equal(result.collections.communityPosts[0].createdAt, '2026-10-06T12:00:00.000Z');
   assert.ok(!JSON.stringify(result).includes('SECRET'));
   assert.equal(result.scope.mediaBinariesIncluded, false);
@@ -264,6 +264,12 @@ test('índice de recibos ausente aborta sin consultar miembros o cuentas sin fil
   await assert.rejects(() => cli.collectAccountSource({ db, auth: { getUser: async () => null }, uid, projectId: 'demo-cantera', databaseId: 'test', FieldPath: FakeFieldPath, policies: accountQueryPolicies }), error => error === indexFailure);
   assert.equal(reads.filter(read => read.scope === '**/members').length, 1);
   assert.ok(!reads.some(read => ['members', 'communityEventAdmissions', 'communityConnections', 'users'].includes(read.scope)));
+});
+
+test('CLI de exportación sólo admite el proyecto y la base nombrada autorizados antes de cargar Admin', () => {
+  const expected = { projectId: 'gen-lang-client-0853130215', firestoreDatabaseId: 'ai-studio-647af55f-499b-43f3-9268-9bf5f62701bb' };
+  assert.doesNotThrow(() => cli.validateExportConfig(expected));
+  for (const config of [null, {}, { ...expected, projectId: 'other-project' }, { ...expected, firestoreDatabaseId: '(default)' }, { ...expected, firestoreDatabaseId: 'ai-studio-9d2b1bbc-aff5-458a-bdf8-f2475620add0' }]) assert.throws(() => cli.validateExportConfig(config), /base nombrada autorizados/);
 });
 
 test('CLI tiene simulación por defecto y exige UID/salida para aplicar', () => {

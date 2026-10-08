@@ -64,11 +64,47 @@ Una simulación o una ejecución limitada no acredita que toda la limpieza esté
 
 ### Cuenta completa
 
-Esta herramienta **no borra datos**, no cambia Auth, no concede permisos y no despliega servicios. Las solicitudes de eliminación quedan para revisión del operador. Antes de automatizarlas hay que acordar cómo transferir o cerrar equipos y encuentros organizados, tratar resultados compartidos y conservar o retirar registros de coordinación y moderación. La exportación no acredita por sí sola que una solicitud de borrado esté resuelta.
+El exportador anterior no borra datos. La nueva herramienta `scripts/erase-account.cjs` permite al operador preparar un plan y aplicar una **supresión limitada al esquema conocido**, con revisión previa y reanudación. No se ha ejecutado contra la nube durante su desarrollo. No es una eliminación recursiva general ni resuelve por sí sola todos los casos de conservación.
+
+Primero verificar la identidad y solicitud del titular, el UID exacto, proyecto y base nombrada. Usar las mismas dependencias Admin/ADC que el exportador. Preparar un plan de sólo lectura de nube:
+
+```sh
+node scripts/erase-account.cjs --uid UID --dry-run --output output/private/supresion-plan.json
+```
+
+Sin `--output` sólo se muestran recuentos, bloqueos y la huella del plan. Con `--output` se crea exclusivamente un archivo privado `0600` en una carpeta `0700` excluida de Git; no se sobrescriben archivos. El plan contiene UID, rutas y huellas de documentos, sin texto, correos ni credenciales. Las rutas de invitaciones contienen códigos: el plan también es material confidencial. Revisarlo de forma privada, no adjuntarlo a un PR ni servirlo desde `public/`.
+
+La planificación bloquea administradores, cuentas organizadoras, membresías de gestión, inscripciones/esperas/respuestas o resultados conservados, conversaciones compartidas, medios publicados, interacciones ajenas en publicaciones propias, seguimientos entrantes, bloqueos ajenos, coordinación compartida y cualquier colección raíz o subcolección propia desconocida. No ignora esos residuos ni borra mensajes o documentos de otras personas para conseguir un resumen verde. En esos casos resolver primero la transferencia, cierre o tratamiento específico con el responsable; volver a generar y revisar un plan nuevo. No se inventa un plazo de conservación ni se aplica una política de anonimización al texto libre.
+
+Un plan sin bloqueos puede retirar documentos propios de perfiles, publicaciones de texto, comentarios, reacciones, seguimientos salientes, bloqueos propios, avisos, verificaciones, reportes y solicitudes de derechos; membresías personales sin gestión, solicitudes e invitaciones de equipo propias; códigos propios, contactos con sus dos extremos, recibos de admisión, mensajes propios y datos legados del usuario. Los registros de operación/moderación/derechos incluidos deben haberse revisado antes de aprobar su retirada. La herramienta no conserva automáticamente un expediente adicional ni modifica una solicitud como «completada».
+
+Para una invitación consumida que pertenece a otra persona, conserva el documento y su estado `used`, pero vacía únicamente `usedBy` y `usedAt`. Así retira el vínculo personal sin reactivar el código ni borrar el registro del otro creador. En chats sólo se retiran mensajes de `senderId == UID`; la existencia de metadatos compartidos con el UID bloquea la supresión completa hasta definir su tratamiento. No se borra el mensaje de la otra persona ni el padre de la conversación.
+
+La detección de contactos espejo huérfanos requiere el índice de grupo `members.peerId`. Los recibos requieren `members.userId` y los mensajes `messages.senderId`. Una consulta/indexación que falle aborta; nunca se sustituye por una descarga sin filtro de todos los contactos, recibos, chats o cuentas.
+
+Aplicar sólo después de revisar y autorizar ese alcance, coordinando una ventana de mantenimiento en la que `communityConfiguration/runtime.serviceStatus` no sea `open`, todos los demás operadores se abstengan de modificar la cuenta y no haya tareas Admin que escriban sus documentos. La herramienta **no pausa la app por sí sola** ni ejecuta el cambio de infraestructura:
+
+```sh
+node scripts/erase-account.cjs --uid UID --apply --plan output/private/supresion-plan.json --confirm HUELLA_SHA256_DEL_PLAN --journal output/private/supresion-ejecucion.json --max-batches 8
+```
+
+`--apply` necesita UID, plan, huella exacta y diario distinto. La configuración debe coincidir con el proyecto y base nombrada de `functions/config.mjs`; no utiliza la base por defecto. Antes de modificar datos vuelve a leer el alcance y exige que coincida con lo revisado. Bloquea un administrador; nunca retira su claim para saltarse ese control.
+
+La primera aplicación deshabilita Auth y revoca sus sesiones renovables. Registra una prueba de esa congelación y devuelve `waiting-token-expiry` durante **65 minutos**, sin borrar documentos en esa espera. Deshabilitar Auth/revocar la renovación no garantiza la caducidad inmediata de los tokens ya emitidos; la espera conservadora cubre ese intervalo. No reducirla ni editar fechas del diario. Si Auth ya estaba ausente al planificar, no necesita congelar una identidad inexistente.
+
+Repetir el mismo comando después de la espera o de un resultado parcial. Cada ejecución admite de 1 a 32 lotes (8 por defecto), normalmente de 50 operaciones y nunca más de 100 documentos por transacción. Los dos extremos de cada contacto se procesan juntos, incluso cuando sólo queda un espejo. La verificación final de las rutas originales también se reparte en lotes. Un plan admite hasta 5000 operaciones; un volumen mayor exige dividir y revisar el procedimiento, no ampliar la herramienta sin control.
+
+Cada lote lee transaccionalmente el estado de mantenimiento y cada documento: si cambió su huella, identidad, propiedad o un espejo previsto como ausente reaparece, aborta el lote. Una promoción a administrador, reactivación de Auth, cambio de identidad, nuevo registro o residuo bloquea la continuación. Las modificaciones de Auth y Firestore no forman una transacción conjunta: por eso la coordinación entre operadores es una condición necesaria, especialmente para impedir cambios de claims durante el paso final.
+
+El diario privado se reemplaza atómicamente después de cada lote y permite repetir borrados ya confirmados o una redacción ya aplicada. Se mantiene un bloqueo local por diario para evitar dos procesos simultáneos con el mismo archivo; no lanzar la misma cuenta usando otro diario. Tras una interrupción anormal puede quedar `.lock`: comprobar primero que no siga ejecutándose ningún proceso antes de retirarlo manualmente. Conservar plan y diario íntegros para la revisión. Los recuentos describen operaciones observadas y asentadas en el diario; un commit seguido de un fallo local puede haberse aplicado antes de quedar contado.
+
+Si aparecen cambios, archivos incompletos o referencias nuevas, no editar la huella ni la lista de rutas para forzar la ejecución. Revisar el estado actual con una nueva simulación y acordar la recuperación con el responsable. La cuenta puede quedar deshabilitada y parcialmente retirada; no se reactiva automáticamente ni se revierte el borrado.
+
+Auth se elimina **al final**, después de consultar de nuevo los datos personales del esquema y verificar las rutas originales, incluidos los espejos que desaparecieron de la subcolección propia. Un resultado `completed` con `completeKnownScope: true` acredita ese alcance técnico, no una certificación de todos los datos posibles: revisar también respaldos, archivos/medios externos, copias locales, contenido libre de otras personas, nuevas colecciones, expedientes conservados y obligaciones decididas por el responsable. Marcar o comunicar el cumplimiento sólo cuando esa revisión y la entrega correspondiente hayan terminado. No hay un envío automático al solicitante.
 
 ### Invitaciones, contactos y recibos privados
 
-La caducidad a los diez minutos, la cancelación de un código y la retirada de un contacto son controles de acceso; no acreditan la eliminación física de todos los datos de una cuenta. No existe una supresión automática de estas nuevas colecciones ni una tarea TTL desplegada. El script de exportación sólo las consulta.
+La caducidad a los diez minutos, la cancelación de un código y la retirada de un contacto son controles de acceso; no acreditan la eliminación física de todos los datos de una cuenta. No existe una tarea TTL desplegada. El exportador sólo consulta estas colecciones; la herramienta de supresión operativa anterior las trata con un plan explícito y revisado, sin ejecutarse automáticamente por una solicitud.
 
 Al tramitar la supresión, el operador debe revisar por UID las invitaciones creadas y los consumos propios, los contactos actuales y sus recibos de admisión. Los códigos activos creados por la cuenta deben quedar inutilizables antes de retirar su identidad. El tratamiento de invitaciones compartidas que pertenecen a otro creador exige revisar qué datos propios se retiran y qué comprobantes se conservan; no debe resolverse borrando indiscriminadamente documentos ajenos. El responsable debe definir y aplicar su política de conservación de forma explícita.
 

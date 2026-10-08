@@ -4,7 +4,14 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { createRequire } = require('node:module');
 const { execFileSync } = require('node:child_process');
+const { PROJECT_ID, DATABASE_ID } = require('../functions/config.mjs');
 const usage = 'Uso: node scripts/export-account.cjs --uid UID [--dry-run | --apply --output output/private/cuenta.json]';
+
+function validateExportConfig(config) {
+  if (!config || config.projectId !== PROJECT_ID || config.firestoreDatabaseId !== DATABASE_ID || DATABASE_ID === '(default)') {
+    throw new Error('La exportación requiere el proyecto y la base nombrada autorizados de Cantera.');
+  }
+}
 
 function parseArgs(args) {
   const result = { apply: false, dryRun: false, help: false, uid: '', output: '' };
@@ -99,7 +106,7 @@ async function collectAccountSource({ db, auth, uid, projectId, databaseId, Fiel
   const [identity, direct] = await Promise.all([getAuth(), db.getAll(...directNames.map(name => db.collection(name).doc(uid)))]);
   const collections = {};
   // Bounded concurrency without truncating any collection to a UI page window.
-  const names = Object.keys(policies).filter(name => !['communityConnections', 'communityEventAdmissions'].includes(name));
+  const names = Object.keys(policies).filter(name => !['communityConnections', 'communityEventAdmissions', 'communityMessages'].includes(name));
   for (let index = 0; index < names.length; index += 4) await Promise.all(names.slice(index, index + 4).map(async name => {
     collections[name] = await readAll(db.collection(name).where(policies[name], '==', uid));
   }));
@@ -118,6 +125,10 @@ async function collectAccountSource({ db, auth, uid, projectId, databaseId, Fiel
     const parts = row.path.split('/');
     return parts.length === 4 && parts[0] === 'communityEventAdmissions' && parts[2] === 'members'
       && parts[3] === uid && row.id === uid && row.data.userId === uid && row.data.eventId === parts[1];
+  });
+  collections.communityMessages = (await readAll(db.collectionGroup('messages').where('senderId', '==', uid))).filter(row => {
+    const parts = row.path?.split('/') || [];
+    return parts.length === 4 && parts[0] === 'communityConversations' && parts[2] === 'messages' && parts[3] === row.id;
   });
   const eventCollection = db.collection('communityEvents');
   const events = [];
@@ -169,7 +180,7 @@ async function main() {
     let target;
     if (options.output) { target = outputPath(root, options.output); assertIgnored(root, target); }
     const config = JSON.parse(fs.readFileSync(path.join(root, 'firebase-applet-config.json'), 'utf8'));
-    if (typeof config.projectId !== 'string' || !config.projectId || typeof config.firestoreDatabaseId !== 'string' || !config.firestoreDatabaseId) throw new Error('Falta la base nombrada de Cantera.');
+    validateExportConfig(config);
     stage = 'credentials';
     const requireFunctions = createRequire(path.join(root, 'functions/package.json'));
     const { initializeApp, applicationDefault, deleteApp } = requireFunctions('firebase-admin/app');
@@ -193,5 +204,5 @@ async function main() {
   }
 }
 
-module.exports = { parseArgs, outputPath, assertIgnored, writePrivateJson, collectAccountSource };
+module.exports = { parseArgs, validateExportConfig, outputPath, assertIgnored, writePrivateJson, collectAccountSource };
 if (require.main === module) void main();

@@ -53,6 +53,14 @@ const completeChecks = {
   authDomain: true, backupRestore: true, support: true, legalAndPrivacy: true, accountRights: true,
 };
 
+test('una compilación de producción rechaza la configuración de emuladores aunque el servicio esté cerrado', async () => {
+  await fixture({ '.env.local': 'VITE_SERVICE_OPEN=false\nVITE_FIREBASE_EMULATORS=true\n' }, directory => {
+    const result = check(buildCheck, directory);
+    assert.equal(result.status, 1);
+    assert.match(result.output, /producción no permite emuladores Firebase/);
+  });
+});
+
 test('un flag de apertura del proceso no puede saltarse el acta aunque .env.local indique false', async () => {
   await fixture({ '.env.local': fixtureEnvironment + '\nVITE_SERVICE_OPEN=false\n' }, directory => {
     const result = check(buildCheck, directory, { VITE_SERVICE_OPEN: 'true' });

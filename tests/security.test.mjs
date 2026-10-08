@@ -15,7 +15,7 @@ if (!projectId.startsWith('demo-') || !process.env.FIRESTORE_EMULATOR_HOST || !p
   throw new Error('Ejecuta con firebase emulators:exec --project demo-cantera-security --only firestore,storage "node --test tests/security.test.mjs".');
 }
 const DATABASE_ID = 'ai-studio-647af55f-499b-43f3-9268-9bf5f62701bb';
-const TERMS_VERSION = '2026-10-06';
+const TERMS_VERSION = '2026-10-08';
 const stamp = () => serverTimestamp();
 const profile = (id, overrides = {}) => ({ id, name: id, bio: '', city: 'Madrid', country: 'España', position: 'Centro', team: 'Cantera', level: 'amateur', adultConfirmed: true, verification: 'unverified', entityType: 'individual', createdAt: stamp(), acceptedTermsVersion: TERMS_VERSION, acceptedTermsAt: stamp(), ...overrides });
 const publicProfile = data => { const { adultConfirmed, acceptedTermsAt, acceptedTermsVersion, ...sports } = data; return sports; };

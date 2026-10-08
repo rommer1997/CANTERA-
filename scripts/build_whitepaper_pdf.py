@@ -171,8 +171,8 @@ class Cover(Flowable):
 
         c.setFillColor(WHITE)
         c.setFont('CanteraTitleBold', 42)
-        c.drawString(MARGIN, PAGE_HEIGHT - 87, 'cantera')
-        brand_width = pdfmetrics.stringWidth('cantera', 'CanteraTitleBold', 42)
+        c.drawString(MARGIN, PAGE_HEIGHT - 87, 'LaCantera')
+        brand_width = pdfmetrics.stringWidth('LaCantera', 'CanteraTitleBold', 42)
         c.setFillColor(LIME)
         c.rect(MARGIN + brand_width + 3, PAGE_HEIGHT - 87, 7, 7, stroke=0, fill=1)
         c.setFillColor(colors.HexColor('#ccccd2'))
@@ -209,7 +209,7 @@ class Cover(Flowable):
         c.setFillColor(colors.HexColor('#c3c3cc'))
         c.setFont('CanteraTitle', 8.1)
         c.drawString(MARGIN, 55, f'VERSIÓN {self.version}  |  {self.date.upper()}')
-        c.drawRightString(PAGE_WIDTH - MARGIN, 55, 'CANTERA / WHITEPAPER')
+        c.drawRightString(PAGE_WIDTH - MARGIN, 55, 'LaCantera / WHITEPAPER')
 
 
 class SectionHeading(Paragraph):
@@ -237,7 +237,7 @@ class WhitepaperDocument(BaseDocTemplate):
         c.saveState()
         c.setFillColor(FOREST)
         c.setFont('CanteraTitleBold', 10)
-        c.drawString(MARGIN, PAGE_HEIGHT - 31, 'cantera')
+        c.drawString(MARGIN, PAGE_HEIGHT - 31, 'LaCantera')
         c.setFillColor(MUTED)
         c.setFont('CanteraBody', 7.3)
         c.drawRightString(PAGE_WIDTH - MARGIN, PAGE_HEIGHT - 30, f'WHITEPAPER DEL PROYECTO / V{self.version}')
@@ -334,7 +334,7 @@ def parse_content(markdown: str, renderer: MarkdownRenderer, style: dict[str, Pa
         line = lines[index].rstrip()
         if not line.strip():
             flush()
-        elif line.startswith('# CANTERA') or line.startswith('## Whitepaper del proyecto'):
+        elif line.startswith(('# CANTERA', '# LaCantera')) or line.startswith('## Whitepaper del proyecto'):
             flush()
         elif line.startswith('## '):
             flush()
@@ -392,8 +392,8 @@ def build(source: Path, output: Path, publish: bool, expected_sha: str | None) -
     renderer = MarkdownRenderer()
     body = parse_content(markdown, renderer, style)
     output.parent.mkdir(parents=True, exist_ok=True)
-    document = WhitepaperDocument(str(output), version, pagesize=A4, title=f'Cantera - Whitepaper del proyecto - v{version}',
-                                 author='Cantera', subject='Misión, producto, gobernanza, sostenibilidad y trazabilidad. Lanzamiento pendiente.',
+    document = WhitepaperDocument(str(output), version, pagesize=A4, title=f'LaCantera - Whitepaper del proyecto - v{version}',
+                                 author='LaCantera', subject='Misión, producto, gobernanza, sostenibilidad y trazabilidad. Lanzamiento pendiente.',
                                  pageCompression=1)
     contents = TableOfContents()
     contents.levelStyles = [style['toc']]

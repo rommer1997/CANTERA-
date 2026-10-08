@@ -4,13 +4,15 @@ Comunidad de fútbol para organizar partidos y torneos gratis, coordinar equipos
 
 ## Estado de esta revisión
 
+Actualización del 8 de octubre: administración real comprobada, mensajería privada, derechos y respaldo ampliados. Estado y límites actuales en [entrega por fases](docs/RELEASE_2026-10-08.md). Las referencias del 7 de octubre que siguen son históricas.
+
 **Edición del 7 de octubre de 2026: web publicada en [lacantera.web.app](https://lacantera.web.app/), con registro todavía en preparación.** Las reglas e índices de la base nombrada están aplicados y el dominio tiene acceso autorizado en Google Auth. El estado de esta puesta en marcha está en [RELEASE_2026-10-07.md](docs/RELEASE_2026-10-07.md). No se declara el producto terminado para clientes. El sitio anterior de Vercel no se ha retirado ni actualizado a producción.
 
 El acceso se recuperó mediante el inicio de sesión del propietario el 7 de octubre. La base `ai-studio-647af55f-499b-43f3-9268-9bf5f62701bb`, región `eur3`, estaba vacía y protegida con `deny-all`. Tras la autorización concreta del propietario se aplicaron las reglas revisadas y las 18 definiciones de índices; el contenido remoto de reglas se comprobó frente al commit `a2c7078`; las reglas nuevas de invitaciones siguen pendientes de aprobación y despliegue. Se añadieron `lacantera.web.app` y el dominio anterior autorizado `cantera-tau.vercel.app` a Auth conservando sus dominios previos. Google está habilitado. La facturación sigue desactivada.
 
 El sitio `lacantera` está creado en el proyecto existente. La configuración y los comandos de [FIREBASE_HOSTING.md](docs/FIREBASE_HOSTING.md) apuntan únicamente a ese sitio mediante el target `cantera`.
 
-La versión vigente de aceptación es **`2026-10-06`**. El propietario ha declarado Rommer, persona física, España y `Rommer@garitocastizo.com`; estos datos están incorporados en la web publicada. Queda identificar la cuenta administradora, probar el recorrido entre dos cuentas reales, comprobar el canal atendido y completar la revisión de operación, recuperación y derechos. No se ha fabricado una identidad jurídica, una aprobación o un patrocinador.
+La versión vigente de aceptación es **`2026-10-08`**. El propietario ha declarado Rommer, persona física, España y `Rommer@garitocastizo.com`; estos datos están incorporados en la web publicada. Queda identificar la cuenta administradora, probar el recorrido entre dos cuentas reales, comprobar el canal atendido y completar la revisión de operación, recuperación y derechos. No se ha fabricado una identidad jurídica, una aprobación o un patrocinador.
 
 ## Alcance implementado en código local
 

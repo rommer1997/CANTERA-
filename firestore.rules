@@ -100,6 +100,66 @@ service cloud.firestore {
         && consumedInvitation(receipt.inviteId, 'event', eventId)
         && getAfter(/databases/$(database)/documents/communityInvitations/$(receipt.inviteId)).data.ownerId == resource.data.ownerId;
     }
+    // One canonical, deterministic path per pair; no public conversation
+    // directory, message previews, administrator bypass, groups or attachments.
+    function messagingPair(id) { return id.split(':'); }
+    function validMessagingPair(id) {
+      let pair = messagingPair(id);
+      return id.matches('[A-Za-z0-9_-]{1,128}:[A-Za-z0-9_-]{1,128}')
+        && pair.size() == 2 && pair[0] < pair[1];
+    }
+    function messagingPeer(id) {
+      let pair = messagingPair(id);
+      return request.auth.uid == pair[0] ? pair[1] : pair[0];
+    }
+    function messagingAccountAllowed(uid) {
+      let moderation = get(/databases/$(database)/documents/communityAccountModeration/$(uid));
+      return moderation == null || moderation.data.status != 'suspended';
+    }
+    function messagingAllowed(id) {
+      let peer = messagingPeer(id);
+      // Nine distinct dependency documents: runtime, both profiles and
+      // moderation records, both connections and both blocks. A message read
+      // adds its conversation document and stays within the ten-call budget.
+      return signed() && request.auth.token.get('email_verified', false) == true
+        && get(/databases/$(database)/documents/communityConfiguration/runtime).data.serviceStatus == 'open'
+        && completedProfile(get(/databases/$(database)/documents/communityProfiles/$(request.auth.uid)).data)
+        && messagingAccountAllowed(request.auth.uid) && request.auth.uid in messagingPair(id)
+        && completedProfile(get(/databases/$(database)/documents/communityProfiles/$(peer)).data)
+        && messagingAccountAllowed(peer)
+        && get(/databases/$(database)/documents/communityConnections/$(request.auth.uid)/members/$(peer)).data.peerId == peer
+        && get(/databases/$(database)/documents/communityConnections/$(peer)/members/$(request.auth.uid)).data.peerId == request.auth.uid
+        && notBlocked(peer);
+    }
+    function validConversation(data, id) {
+      return data.keys().hasAll(['id', 'participantIds', 'createdAt'])
+        && data.keys().hasOnly(['id', 'participantIds', 'createdAt'])
+        && data.id == id && data.participantIds == messagingPair(id) && data.createdAt is timestamp;
+    }
+    function messageConversation(id) {
+      return validConversation(get(/databases/$(database)/documents/communityConversations/$(id)).data, id);
+    }
+    match /communityConversations/{id} {
+      allow get: if signed() && validMessagingPair(id) && messagingAllowed(id);
+      allow list, update, delete: if false;
+      allow create: if signed() && validMessagingPair(id) && messagingAllowed(id)
+        && validConversation(request.resource.data, id) && request.resource.data.createdAt == request.time;
+      match /messages/{messageId} {
+        allow get: if signed() && validMessagingPair(id) && messagingAllowed(id) && messageConversation(id);
+        allow list: if signed() && validMessagingPair(id) && messagingAllowed(id) && messageConversation(id)
+          && request.query.limit != null && request.query.limit > 0 && request.query.limit <= 40;
+        allow create: if signed() && validMessagingPair(id) && messagingAllowed(id) && messageConversation(id)
+          && messageId.matches('[A-Za-z0-9]{20}')
+          && request.resource.data.keys().hasAll(['id', 'senderId', 'text', 'createdAt'])
+          && request.resource.data.keys().hasOnly(['id', 'senderId', 'text', 'createdAt'])
+          && request.resource.data.id == messageId && request.resource.data.senderId == request.auth.uid
+          && text(request.resource.data.text, 1, 2000) && request.resource.data.createdAt == request.time;
+        allow update: if false;
+        // Withdrawal remains possible when paused, disconnected or suspended.
+        // No read or sender reassignment bypass accompanies this permission.
+        allow delete: if owner(resource.data.senderId);
+      }
+    }
     match /communityInvitations/{code} {
       // No public lookup or listing. A recipient must know the exact random code.
       allow get: if owner(resource.data.ownerId) || admin()
@@ -160,9 +220,9 @@ service cloud.firestore {
         && text(data.team, 0, 100) && data.level in ['amateur', 'professional']
         && data.adultConfirmed is bool && data.verification in ['unverified', 'verified']
         && data.entityType in ['individual', 'group', 'club'] && date(data.createdAt)
-        && data.acceptedTermsVersion in ['', '2026-10-05', '2026-10-06'] && (data.acceptedTermsAt == '' || date(data.acceptedTermsAt))
+        && data.acceptedTermsVersion in ['', '2026-10-05', '2026-10-06', '2026-10-08'] && (data.acceptedTermsAt == '' || date(data.acceptedTermsAt))
         && (data.acceptedTermsVersion == '' && data.acceptedTermsAt == ''
-          || data.acceptedTermsVersion in ['2026-10-05', '2026-10-06'] && date(data.acceptedTermsAt));
+          || data.acceptedTermsVersion in ['2026-10-05', '2026-10-06', '2026-10-08'] && date(data.acceptedTermsAt));
     }
     function publicProjection(data, profile) {
       return data.keys().hasAll(['id', 'name', 'bio', 'city', 'country', 'position', 'team', 'level', 'verification', 'entityType', 'createdAt'])
@@ -174,7 +234,7 @@ service cloud.firestore {
         && data.entityType == profile.entityType && data.createdAt == profile.createdAt;
     }
     function completedProfile(profile) {
-      return profile.adultConfirmed == true && profile.acceptedTermsVersion == '2026-10-06' && date(profile.acceptedTermsAt) && text(profile.city, 1, 100) && text(profile.country, 1, 100);
+      return profile.adultConfirmed == true && profile.acceptedTermsVersion == '2026-10-08' && date(profile.acceptedTermsAt) && text(profile.city, 1, 100) && text(profile.country, 1, 100);
     }
     function mirroredPublic(uid, profile) {
       return completedProfile(profile)
@@ -665,6 +725,8 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['ownerId', 'blockedId', 'createdAt'])
         && request.resource.data.ownerId == request.auth.uid && text(request.resource.data.blockedId, 1, 128)
         && request.resource.data.blockedId != request.auth.uid && id == request.auth.uid + '_' + request.resource.data.blockedId
+        && !existsAfter(/databases/$(database)/documents/communityConnections/$(request.auth.uid)/members/$(request.resource.data.blockedId))
+        && !existsAfter(/databases/$(database)/documents/communityConnections/$(request.resource.data.blockedId)/members/$(request.auth.uid))
         && request.resource.data.createdAt == request.time;
       allow update: if false;
       allow delete: if owner(resource.data.ownerId);

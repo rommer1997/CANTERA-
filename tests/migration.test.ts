@@ -138,7 +138,7 @@ test('public search prefixes use the existing sporting projection, preserving id
 });
 
 test('private profiles are not projected and existing public records with extra fields are blocked', () => {
-  const privateProfile = { ...profile, email: 'private@example.test', adultConfirmed: true, acceptedTermsVersion: '2026-10-06', acceptedTermsAt: iso, role: 'ADMIN' };
+  const privateProfile = { ...profile, email: 'private@example.test', adultConfirmed: true, acceptedTermsVersion: '2026-10-08', acceptedTermsAt: iso, role: 'ADMIN' };
   const privatePlan = planMigration('communityProfiles', 'alice', privateProfile);
   assert.deepEqual(privatePlan.patches.map(patch => patch.path), [['createdAt'], ['acceptedTermsAt']]);
   for (const extra of ['email', 'adultConfirmed', 'acceptedTermsAt', 'acceptedTermsVersion', 'admin', 'role']) {

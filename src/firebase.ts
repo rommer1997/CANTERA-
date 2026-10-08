@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { connectAuthEmulator, getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
+import { connectFirestoreEmulator, getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import localConfig from '../firebase-applet-config.json';
 
@@ -34,6 +34,10 @@ const getFirebaseConfig = () => {
 };
 
 const config = getFirebaseConfig();
+const useLocalEmulators = import.meta.env.DEV && import.meta.env.VITE_FIREBASE_EMULATORS === 'true';
+if (useLocalEmulators && (!config.projectId?.startsWith('demo-') || !['localhost', '127.0.0.1'].includes(window.location.hostname))) {
+  throw new Error('Las pruebas Firebase requieren un proyecto demo-* y una web local.');
+}
 
 if (!config.apiKey || config.apiKey.includes('TODO')) {
   console.warn("Firebase API Key is missing or invalid. Check the public Firebase build configuration.");
@@ -43,6 +47,10 @@ const app = initializeApp(config);
 export const auth = getAuth(app);
 export const db = getFirestore(app, config.databaseId || '(default)');
 export const storage = getStorage(app);
+if (useLocalEmulators) {
+  connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
+  connectFirestoreEmulator(db, '127.0.0.1', 8080);
+}
 export const googleProvider = new GoogleAuthProvider();
 
 export const signInWithGoogle = async () => {

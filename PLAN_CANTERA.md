@@ -1,8 +1,8 @@
-# Cantera: plan de producto y ejecución
+# LaCantera: plan de producto y ejecución
 
-Versión 0.9 · 6 de octubre de 2026. Edición de trabajo pendiente del cierre de validación. Relacionado con [Whitepaper 0.8](WHITEPAPER.md), [comparación competitiva](docs/COMPETITIVE_BASELINE.md) y [puerta de publicación](docs/RELEASE_REVIEW.md).
+Versión 1.0 · 8 de octubre de 2026. Edición de trabajo pendiente del cierre de validación. Relacionado con [Whitepaper 0.9](WHITEPAPER.md), [comparación competitiva](docs/COMPETITIVE_BASELINE.md) y [puerta de publicación](docs/RELEASE_REVIEW.md).
 
-El alcance completo se define mediante resultados y controles verificables. No se atribuyen porcentajes de avance al código, a la documentación o a las pruebas. Esta revisión amplía la implementación local; el servicio real permanece cerrado y la web pública conserva el prototipo anterior.
+El alcance completo se define mediante resultados y controles verificables. No se atribuyen porcentajes de avance al código, a la documentación o a las pruebas. Esta revisión amplía la implementación local; el servicio real permanece cerrado y el frontend de LaCantera está publicado en Firebase Hosting.
 
 ## 1. Decisiones de producto
 
@@ -17,7 +17,7 @@ El alcance completo se define mediante resultados y controles verificables. No s
 | Alcance internacional | País, ciudad y zona horaria en eventos. La visión global no acredita idiomas, soporte o revisión normativa de todos los territorios. |
 | Orientación | Iniciativa sin finalidad lucrativa en esta etapa. No equivale a asociación/fundación constituida. |
 | Publicación | Dos puertas: build autorizada para apertura y runtime del servidor abierto. Ausencia/error de configuración falla cerrado. |
-| Términos | Versión vigente `2026-10-06`; la fecha documental no sustituye el registro real de aceptación. |
+| Términos | Versión vigente `2026-10-08`; la fecha documental no sustituye el registro real de aceptación. |
 
 ## 2. Recorrido central
 
@@ -34,7 +34,7 @@ En móvil la navegación inferior y el creador compacto abren acciones rápidas.
 | Área | Código local y contrato | Evidencia/estado de esta revisión | Pendiente de apertura o ampliación |
 |---|---|---|---|
 | Acceso y sesión | Firebase Auth, Google, restauración y cierre; alta real vacía | `CommunityContext.tsx`, `ProfilePage.tsx` | Dominios y prueba entre cuentas reales. |
-| Perfil propio | Nombre, biografía, entidad, ubicación, equipo/posición, nivel, mayoría de edad y términos | Perfil editable con versión `2026-10-06` | Responsable/contacto y operación legal identificados. |
+| Perfil propio | Nombre, biografía, entidad, ubicación, equipo/posición, nivel, mayoría de edad y términos | Perfil editable con versión `2026-10-08` | Responsable/contacto y operación legal identificados. |
 | Perfil público | Proyección exclusivamente deportiva, autor por enlace y actividad paginada | `communityPublicProfiles`; edad/consentimiento privados | Migración, reglas y permisos reales comprobados. |
 | Directorio | Prefijos de nombre/ciudad/país consultados en servidor, paginación por cursor | `PeoplePages.tsx`, `profileSearchTokens` | Validación de índices; no búsqueda libre global/semántica. |
 | Seguimiento/bloqueo | Relaciones reales, Siguiendo, bloqueo/desbloqueo y controles del propio actor | `CommunityContext.tsx`, `FeedPage.tsx` | Prueba con dos cuentas y casos de suspensión. |
@@ -118,7 +118,7 @@ Fotos, reels y logros comparten contexto deportivo. El visor vertical muestra v�
 | Verificación y denuncias | Solicitante o administración según recurso | Evidencia mínima; no publicar documentación sensible. |
 | Publicaciones y archivos publicados | Públicos cuando se habiliten | Un enlace de descarga puede difundirse; no prometer confidencialidad del medio publicado. |
 
-El alta real no asigna un usuario demo. Perfil incompleto no aparece automáticamente en el directorio. La aceptación vigente es `2026-10-06`, con registro privado; beta 18+ autodeclarada no equivale a verificación de edad. No se habilitan menores hasta completar tutela, permisos y revisión por territorio.
+El alta real no asigna un usuario demo. Perfil incompleto no aparece automáticamente en el directorio. La aceptación vigente es `2026-10-08`, con registro privado; beta 18+ autodeclarada no equivale a verificación de edad. No se habilitan menores hasta completar tutela, permisos y revisión por territorio.
 
 La solicitud de derechos conserva estados pendiente/en trámite/completada/rechazada. El exportador Admin del operador reúne registros propios con cursor, filtra datos ajenos/credenciales y puede escribir un JSON privado local. No descarga binarios ni ejecuta una supresión. Solicitar, preparar o revisar no equivale a entregar ni eliminar. Retenciones, entrega segura, baja, copias y responsables siguen siendo puertas de operación por cerrar.
 
@@ -193,11 +193,11 @@ QA histórico del dispositivo: liga/copa de tres, corrección/recarga, foto/logr
 
 ## 16. Servicio real y requisitos abiertos
 
-Auditoría del 6 de octubre: base nombrada en `eur3`, reglas remotas `deny-all`, sin bucket, facturación deshabilitada y dominio Vercel aún no autorizado en Auth. No se ha aplicado un cambio remoto. La revisión automática rechazó sustituir el bloqueo total por acceso a colecciones públicas/privadas; la autorización específica pendiente no la concede este documento.
+La auditoría inicial del 6 de octubre encontró bloqueo total. El 7 de octubre, con autorización específica, se aplicaron las reglas anteriores, 18 índices y dominios Auth; se publicó LaCantera en `lacantera.web.app`. El 8 de octubre se confirma por consulta remota que runtime está ausente y que la cuenta Google elegida tiene correo verificado y el claim de administrador aplicado; el acceso al panel está comprobado en el navegador. Las reglas nuevas de invitaciones y chat siguen pendientes de despliegue y verificación. No se utilizan los snapshots históricos como estado actual.
 
-Puertas abiertas: comprobar la versión publicada y cruces canónicos en nube; identificar responsable/contacto/país y atención; revisión de textos/retenciones/derechos; reglas/índices/migración autorizados; dominios/administración; dos cuentas reales/otro dispositivo; recuperación; acta y despliegue final. Medios y funciones esperan además financiación y comprobación real.
+Puertas abiertas: backend actualizado y recorrido entre cuentas reales, revisión de textos y retenciones, atención de derechos y recuperación. Datos declarados del responsable ya están incorporados: Rommer, Madrid, España, persona física y Rommer@garitocastizo.com. No se inventan una entidad constituida o datos legales adicionales. Medios y Functions esperan financiación. Menores, scouting, correo/push e idiomas adicionales siguen fuera de la entrega adulta inicial.
 
-El prototipo público anterior no demuestra que estos nuevos recorridos estén disponibles. No hay una declaración de producto listo para clientes ni una aprobación legal mundial. Los documentos deben actualizarse con evidencia antes de publicar una afirmación diferente.
+Esta sesión corrige las promesas de multimedia y privacidad y completa código de chat entre contactos y herramientas operativas de derechos. Su evidencia final se registra después de las comprobaciones. Ningún porcentaje, documento o total de tests sustituye los resultados de nube y la operación humana.
 
 ## 17. Versiones y trazabilidad
 
@@ -206,5 +206,15 @@ El prototipo público anterior no demuestra que estos nuevos recorridos estén d
 | 0.7 | 6 de octubre de 2026 | Registro de CI histórico de 49 casos y puertas cloud pendientes. |
 | 0.8 | 6 de octubre de 2026 | Perfil público/seguimiento y rediseño social; 58 casos locales históricos. |
 | 0.9 | 6 de octubre de 2026 | Equipos, espera/avisos, cambios, recurrencia, cruces canónicos en validación, derechos, PWA, paginación y apertura cerrada. Sin anticipar resultados finales. |
+| 1.0 | 8 de octubre de 2026 | Chat privado, administración asignada, supresión conservadora y recuperación local; cierre de QA documentado por separado. |
 
 Cada requisito debe enlazar a código, prueba y entorno. Una edición documental no cierra un control; la aprobación de apertura exige la operación efectivamente comprobada. El whitepaper público reproduce la fuente Markdown; el PDF se genera por separado después de congelar esa fuente.
+
+## 18. Sesión por fases del 8 de octubre
+
+1. Contrato público: corregir anuncios de medios, privacidad y documentación descargable.
+2. Funciones: chat privado entre contactos recíprocos y herramientas de gestión de cuenta, sin servicios de pago.
+3. Verificación: TypeScript, dominio, reglas emuladas, interfaz móvil y revisión de los procedimientos de datos.
+4. Puesta en marcha: publicar el frontend verificado; aplicar sólo permisos concretos autorizados; abrir únicamente tras comprobar administración, cuentas reales y revisión del responsable.
+
+El chat corta acceso y envío al retirar conexión, bloquear, suspender o pausar. Los historiales conservados pueden volver a consultarse al reconectar. No hay cifrado de extremo a extremo, adjuntos, push ni lista global de conversaciones. La exportación sólo incluye mensajes propios, con referencias locales de conversación. Las bajas compartidas exigen transferencia o revisión y no se declaran completadas automáticamente.

@@ -45,7 +45,7 @@ function BlockButton({ id, name }: { id: string; name: string }) {
   const blocked = blockedIds.includes(id);
   if (!profile || profile.id === id) return null;
   async function toggle() {
-    if (busy || !blocked && !window.confirm(`¿Bloquear a ${name}? Se ocultará su contenido. Puedes desbloquear la cuenta cuando quieras.`)) return;
+    if (busy || !blocked && !window.confirm(`¿Bloquear a ${name}? Se ocultará su contenido y se retirará vuestra conexión, impidiendo nuevos mensajes. Desbloquear no reconecta: deberéis aceptar otra invitación válida.`)) return;
     setBusy(true); setError(''); try { await toggleBlock(id); } catch (err) { setError(friendlyError(err)); } finally { setBusy(false); }
   }
   return <div className="people-follow"><button type="button" className="people-button people-button-secondary" disabled={busy} onClick={() => void toggle()}><Ban size={17} aria-hidden="true" />{busy ? 'Guardando…' : blocked ? 'Desbloquear cuenta' : 'Bloquear cuenta'}</button>{error && <p className="people-error" role="alert">{error}</p>}</div>;
