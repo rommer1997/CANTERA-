@@ -1,0 +1,80 @@
+name: Cantera CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: TypeScript, dominio, build y reglas
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CI: 'true'
+
+    steps:
+      - name: Obtener el código
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Preparar pnpm, Node 24 y dependencias fijadas
+        uses: pnpm/setup@v3
+        with:
+          runtime: node@24
+          require-lockfile: true
+
+      - name: Preparar Java 21 para los emuladores
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Comprobar TypeScript
+        run: pnpm lint
+
+      - name: Probar dominio y normalización
+        run: pnpm test
+
+      - name: Compilar la aplicación
+        run: pnpm build
+
+      - name: Probar reglas en Firestore y Storage emulados
+        # Los tests exigen un ID demo-* y las variables de ambos emuladores.
+        run: pnpm exec firebase emulators:exec --non-interactive --project demo-cantera --only firestore,storage "node --test tests/*security.test.mjs"
+
+  cleanup:
+    name: Limpieza de publicaciones (Node 22)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      CI: 'true'
+
+    steps:
+      - name: Obtener el código
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Preparar pnpm y el runtime de la función
+        uses: pnpm/setup@v3
+        with:
+          runtime: node@22
+          working-directory: functions
+          install: false
+
+      - name: Instalar dependencias fijadas de la función
+        run: pnpm --dir functions --ignore-workspace install --frozen-lockfile --ignore-scripts
+
+      - name: Comprobar el código de la función
+        run: pnpm --dir functions --ignore-workspace check
+
+      - name: Probar limpieza con dobles locales de datos y archivos
+        run: pnpm --dir functions --ignore-workspace test

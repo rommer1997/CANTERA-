@@ -4,5 +4,14 @@ dist/
 coverage/
 .DS_Store
 *.log
+.audit/
+tmp/
+output/pdf/*.metadata.json
+output/pdf/*.qa.json
+firebase-debug.log
+.firebase/
 .env*
 !.env.example
+output/private/
+__pycache__/
+*.pyc

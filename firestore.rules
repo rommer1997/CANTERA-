@@ -1,21 +1,904 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function isAuthenticated() {
-      return request.auth != null;
+    function signed() { return request.auth != null; }
+    function owner(uid) { return signed() && request.auth.uid == uid; }
+    function admin() { return signed() && request.auth.token.get('admin', false) == true; }
+    function text(value, min, max) { return value is string && value.size() >= min && value.size() <= max; }
+    function iso(value) {
+      return value is string && value.matches('[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9][.][0-9]{3}Z');
     }
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
+    function date(value) { return value is timestamp || iso(value); }
+    function pilotActor(config) {
+      return signed() && request.auth.token.get('email_verified', false) == true
+        && request.auth.token.get('firebase', {}).get('sign_in_provider', '') == 'google.com'
+        && request.auth.uid in config.get('pilotUserIds', []);
+    }
+    function runtimeAvailable() {
+      let config = get(/databases/$(database)/documents/communityConfiguration/runtime).data;
+      return config.serviceStatus == 'open' || config.serviceStatus == 'pilot' && pilotActor(config);
+    }
+    function pilotReadAllowed() {
+      return !exists(/databases/$(database)/documents/communityConfiguration/runtime)
+        || get(/databases/$(database)/documents/communityConfiguration/runtime).data.serviceStatus != 'pilot'
+        || pilotActor(get(/databases/$(database)/documents/communityConfiguration/runtime).data);
+    }
+    function pilotPeerAllowed(uid) {
+      let config = get(/databases/$(database)/documents/communityConfiguration/runtime).data;
+      return config.serviceStatus != 'pilot' || uid in config.get('pilotUserIds', []);
+    }
+    function accountAllowed() { return !exists(/databases/$(database)/documents/communityAccountModeration/$(request.auth.uid)) || get(/databases/$(database)/documents/communityAccountModeration/$(request.auth.uid)).data.status != 'suspended'; }
+    function actorProfile() { return get(/databases/$(database)/documents/communityProfiles/$(request.auth.uid)).data; }
+    function active() {
+      return signed() && runtimeAvailable() && accountAllowed() && exists(/databases/$(database)/documents/communityProfiles/$(request.auth.uid))
+        && completedProfile(actorProfile());
+    }
+    function hasPost(id) { return text(id, 1, 128) && exists(/databases/$(database)/documents/communityPosts/$(id)); }
+    function verifiedActor() { return active() && request.auth.token.get('email_verified', false) == true; }
+    function eventPublic(data) { return data.get('visibility', 'public') == 'public'; }
+    function eventParticipant(data) {
+      return signed() && request.auth.uid in data.get('participantIds', data.participants.keys());
+    }
+    function eventReadable(data) {
+      return pilotReadAllowed() && (admin() || owner(data.ownerId) || eventParticipant(data) || runtimeAvailable() && eventPublic(data));
+    }
+    function eventListReadable(data) {
+      // A direct get can keep legacy public documents readable. List queries must
+      // prove an explicit public/owner/participant filter; a default value would
+      // incorrectly authorize an unrestricted directory query.
+      return pilotReadAllowed() && (admin() || owner(data.ownerId) || signed() && request.auth.uid in data.participantIds
+        || runtimeAvailable() && data.visibility == 'public');
+    }
+    function relatedEventReadable(id) {
+      return exists(/databases/$(database)/documents/communityEvents/$(id))
+        && eventReadable(get(/databases/$(database)/documents/communityEvents/$(id)).data);
+    }
+    function freshInvitationState(data) {
+      return data.status == 'active' && data.ownerId != request.auth.uid
+        && data.createdAt is timestamp && data.createdAt <= request.time
+        && data.createdAt + duration.value(10, 'm') > request.time && pilotPeerAllowed(data.ownerId) && notBlocked(data.ownerId);
+    }
+    function freshInvitation(data) { return verifiedActor() && freshInvitationState(data); }
+    function validInvitation(data, id) {
+      return id.matches('[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{16}')
+        && data.keys().hasAll(['id', 'ownerId', 'kind', 'eventId', 'status', 'createdAt', 'usedBy', 'usedAt'])
+        && data.keys().hasOnly(['id', 'ownerId', 'kind', 'eventId', 'status', 'createdAt', 'usedBy', 'usedAt'])
+        && data.id == id && text(data.ownerId, 1, 128) && data.kind in ['connection', 'event']
+        && data.status in ['active', 'used', 'revoked'] && data.createdAt is timestamp
+        && text(data.eventId, 0, 128) && text(data.usedBy, 0, 128)
+        && (data.usedAt == '' || data.usedAt is timestamp)
+        && (data.kind == 'connection' && data.eventId == '' || data.kind == 'event' && data.eventId != '');
+    }
+    function consumedInvitation(code, kind, eventId) {
+      let before = get(/databases/$(database)/documents/communityInvitations/$(code)).data;
+      let after = getAfter(/databases/$(database)/documents/communityInvitations/$(code)).data;
+      // Connections establish verifiedActor directly. Event admission callers
+      // prove absent -> present membership, whose event rule establishes it.
+      return freshInvitationState(before) && before.kind == kind && before.eventId == eventId
+        && after.status == 'used' && after.usedBy == request.auth.uid && after.usedAt == request.time;
+    }
+    function validConnection(data, ownerUid, peerUid) {
+      return data.keys().hasAll(['ownerId', 'peerId', 'inviteId', 'createdAt'])
+        && data.keys().hasOnly(['ownerId', 'peerId', 'inviteId', 'createdAt'])
+        && data.ownerId == ownerUid && data.peerId == peerUid && ownerUid != peerUid
+        && text(ownerUid, 1, 128) && text(peerUid, 1, 128)
+        && text(data.inviteId, 16, 16) && data.createdAt == request.time;
+    }
+    function connectionPair(code, inviter) {
+      let recipient = request.auth.uid;
+      let first = getAfter(/databases/$(database)/documents/communityConnections/$(inviter)/members/$(recipient)).data;
+      let second = getAfter(/databases/$(database)/documents/communityConnections/$(recipient)/members/$(inviter)).data;
+      return !exists(/databases/$(database)/documents/communityConnections/$(inviter)/members/$(recipient))
+        && !exists(/databases/$(database)/documents/communityConnections/$(recipient)/members/$(inviter))
+        && validConnection(first, inviter, recipient) && validConnection(second, recipient, inviter)
+        && first.inviteId == code && second.inviteId == code;
+    }
+    function connectionMirror(data, ownerUid, peerUid) {
+      let mirror = getAfter(/databases/$(database)/documents/communityConnections/$(peerUid)/members/$(ownerUid)).data;
+      return validConnection(mirror, peerUid, ownerUid) && mirror.inviteId == data.inviteId;
+    }
+    function validAdmission(data, eventId, uid) {
+      return data.keys().hasAll(['eventId', 'userId', 'inviteId', 'createdAt'])
+        && data.keys().hasOnly(['eventId', 'userId', 'inviteId', 'createdAt'])
+        && data.eventId == eventId && data.userId == uid && text(data.inviteId, 16, 16)
+        && data.createdAt == request.time;
+    }
+    function admissionPair(code, eventId, inviter) {
+      let before = get(/databases/$(database)/documents/communityEvents/$(eventId)).data;
+      let after = getAfter(/databases/$(database)/documents/communityEvents/$(eventId)).data;
+      let receipt = getAfter(/databases/$(database)/documents/communityEventAdmissions/$(eventId)/members/$(request.auth.uid)).data;
+      return before.get('visibility', 'public') == 'private' && before.ownerId == inviter
+        && !(request.auth.uid in before.participants) && request.auth.uid in after.participants
+        && validAdmission(receipt, eventId, request.auth.uid) && receipt.inviteId == code;
+    }
+    function privateAdmission(eventId) {
+      let receipt = getAfter(/databases/$(database)/documents/communityEventAdmissions/$(eventId)/members/$(request.auth.uid)).data;
+      return request.auth.token.get('email_verified', false) == true && validAdmission(receipt, eventId, request.auth.uid)
+        && consumedInvitation(receipt.inviteId, 'event', eventId)
+        && getAfter(/databases/$(database)/documents/communityInvitations/$(receipt.inviteId)).data.ownerId == resource.data.ownerId;
+    }
+    // One canonical, deterministic path per pair; no public conversation
+    // directory, message previews, administrator bypass, groups or attachments.
+    function messagingPair(id) { return id.split(':'); }
+    function validMessagingPair(id) {
+      let pair = messagingPair(id);
+      return id.matches('[A-Za-z0-9_-]{1,128}:[A-Za-z0-9_-]{1,128}')
+        && pair.size() == 2 && pair[0] < pair[1];
+    }
+    function messagingPeer(id) {
+      let pair = messagingPair(id);
+      return request.auth.uid == pair[0] ? pair[1] : pair[0];
+    }
+    function messagingAccountAllowed(uid) {
+      let moderation = get(/databases/$(database)/documents/communityAccountModeration/$(uid));
+      return moderation == null || moderation.data.status != 'suspended';
+    }
+    function messagingAllowed(id) {
+      let peer = messagingPeer(id);
+      // Nine distinct dependency documents: runtime, both profiles and
+      // moderation records, both connections and both blocks. A message read
+      // adds its conversation document and stays within the ten-call budget.
+      return signed() && request.auth.token.get('email_verified', false) == true
+        && runtimeAvailable() && pilotPeerAllowed(peer)
+        && completedProfile(get(/databases/$(database)/documents/communityProfiles/$(request.auth.uid)).data)
+        && messagingAccountAllowed(request.auth.uid) && request.auth.uid in messagingPair(id)
+        && completedProfile(get(/databases/$(database)/documents/communityProfiles/$(peer)).data)
+        && messagingAccountAllowed(peer)
+        && get(/databases/$(database)/documents/communityConnections/$(request.auth.uid)/members/$(peer)).data.peerId == peer
+        && get(/databases/$(database)/documents/communityConnections/$(peer)/members/$(request.auth.uid)).data.peerId == request.auth.uid
+        && notBlocked(peer);
+    }
+    function validConversation(data, id) {
+      return data.keys().hasAll(['id', 'participantIds', 'createdAt'])
+        && data.keys().hasOnly(['id', 'participantIds', 'createdAt'])
+        && data.id == id && data.participantIds == messagingPair(id) && data.createdAt is timestamp;
+    }
+    function messageConversation(id) {
+      return validConversation(get(/databases/$(database)/documents/communityConversations/$(id)).data, id);
+    }
+    match /communityConversations/{id} {
+      allow get: if signed() && validMessagingPair(id) && messagingAllowed(id);
+      allow list, update, delete: if false;
+      allow create: if signed() && validMessagingPair(id) && messagingAllowed(id)
+        && validConversation(request.resource.data, id) && request.resource.data.createdAt == request.time;
+      match /messages/{messageId} {
+        allow get: if signed() && validMessagingPair(id) && messagingAllowed(id) && messageConversation(id);
+        allow list: if signed() && validMessagingPair(id) && messagingAllowed(id) && messageConversation(id)
+          && request.query.limit != null && request.query.limit > 0 && request.query.limit <= 40;
+        allow create: if signed() && validMessagingPair(id) && messagingAllowed(id) && messageConversation(id)
+          && messageId.matches('[A-Za-z0-9]{20}')
+          && request.resource.data.keys().hasAll(['id', 'senderId', 'text', 'createdAt'])
+          && request.resource.data.keys().hasOnly(['id', 'senderId', 'text', 'createdAt'])
+          && request.resource.data.id == messageId && request.resource.data.senderId == request.auth.uid
+          && text(request.resource.data.text, 1, 2000) && request.resource.data.createdAt == request.time;
+        allow update: if false;
+        // Withdrawal remains possible when paused, disconnected or suspended.
+        // No read or sender reassignment bypass accompanies this permission.
+        allow delete: if owner(resource.data.senderId);
+      }
+    }
+    match /communityInvitations/{code} {
+      // No public lookup or listing. A recipient must know the exact random code.
+      allow get: if owner(resource.data.ownerId) || admin()
+        || freshInvitation(resource.data)
+        || verifiedActor() && resource.data.status == 'used' && owner(resource.data.usedBy);
+      allow list: if owner(resource.data.ownerId) || admin();
+      allow create: if active() && validInvitation(request.resource.data, code)
+        && request.resource.data.ownerId == request.auth.uid && request.resource.data.status == 'active'
+        && request.resource.data.createdAt == request.time && request.resource.data.usedBy == '' && request.resource.data.usedAt == ''
+        && (request.resource.data.kind == 'connection'
+          || owner(get(/databases/$(database)/documents/communityEvents/$(request.resource.data.eventId)).data.ownerId)
+            && get(/databases/$(database)/documents/communityEvents/$(request.resource.data.eventId)).data.get('visibility', 'public') == 'private');
+      allow update: if validInvitation(request.resource.data, code)
+        && (owner(resource.data.ownerId) && resource.data.status == 'active'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']) && request.resource.data.status == 'revoked'
+          || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'usedBy', 'usedAt'])
+            && request.resource.data.status == 'used' && request.resource.data.usedBy == request.auth.uid && request.resource.data.usedAt == request.time
+            && (resource.data.kind == 'connection' && freshInvitation(resource.data) && connectionPair(code, resource.data.ownerId)
+              // A private event admission must change absent -> present for this
+              // actor. Its event rule establishes verifiedActor exactly once;
+              // this branch still validates code freshness, blocks and receipt.
+              || resource.data.kind == 'event' && freshInvitationState(resource.data)
+                && admissionPair(code, resource.data.eventId, resource.data.ownerId)));
+      allow delete: if false;
+    }
+    match /communityConnections/{ownerUid}/members/{peerUid} {
+      allow get: if owner(ownerUid) || owner(peerUid) || admin();
+      allow list: if owner(ownerUid) || admin();
+      allow create: if verifiedActor() && validConnection(request.resource.data, ownerUid, peerUid)
+        && (request.auth.uid == ownerUid || request.auth.uid == peerUid)
+        && consumedInvitation(request.resource.data.inviteId, 'connection', '')
+        && getAfter(/databases/$(database)/documents/communityInvitations/$(request.resource.data.inviteId)).data.ownerId in [ownerUid, peerUid]
+        && connectionMirror(request.resource.data, ownerUid, peerUid);
+      allow update: if false;
+      // Either participant can withdraw the entire mirrored relationship while paused.
+      allow delete: if (owner(ownerUid) || owner(peerUid))
+        && !existsAfter(/databases/$(database)/documents/communityConnections/$(peerUid)/members/$(ownerUid));
+    }
+    match /communityEventAdmissions/{eventId}/members/{uid} {
+      allow get: if owner(uid) || admin()
+        || owner(get(/databases/$(database)/documents/communityEvents/$(eventId)).data.ownerId);
+      allow list: if admin() || owner(get(/databases/$(database)/documents/communityEvents/$(eventId)).data.ownerId);
+      // admissionPair requires a real new event membership in this same atomic
+      // operation, whose event rule enforces age/terms/runtime/email/suspension.
+      allow create, update: if owner(uid) && validAdmission(request.resource.data, eventId, uid)
+        && consumedInvitation(request.resource.data.inviteId, 'event', eventId)
+        && admissionPair(request.resource.data.inviteId, eventId,
+          getAfter(/databases/$(database)/documents/communityInvitations/$(request.resource.data.inviteId)).data.ownerId);
+      allow delete: if owner(uid) || admin();
+    }
+    function validProfile(data, uid) {
+      return data.keys().hasAll(['id', 'name', 'bio', 'city', 'country', 'position', 'team', 'level',
+          'adultConfirmed', 'verification', 'entityType', 'createdAt', 'acceptedTermsVersion', 'acceptedTermsAt'])
+        && data.keys().hasOnly(['id', 'name', 'bio', 'city', 'country', 'position', 'team', 'level',
+          'adultConfirmed', 'verification', 'entityType', 'createdAt', 'acceptedTermsVersion', 'acceptedTermsAt'])
+        && data.id == uid && text(data.name, 1, 100) && text(data.bio, 0, 1000)
+        && text(data.city, 0, 100) && text(data.country, 0, 100) && text(data.position, 0, 100)
+        && text(data.team, 0, 100) && data.level in ['amateur', 'professional']
+        && data.adultConfirmed is bool && data.verification in ['unverified', 'verified']
+        && data.entityType in ['individual', 'group', 'club'] && date(data.createdAt)
+        && data.acceptedTermsVersion in ['', '2026-10-05', '2026-10-06', '2026-10-08'] && (data.acceptedTermsAt == '' || date(data.acceptedTermsAt))
+        && (data.acceptedTermsVersion == '' && data.acceptedTermsAt == ''
+          || data.acceptedTermsVersion in ['2026-10-05', '2026-10-06', '2026-10-08'] && date(data.acceptedTermsAt));
+    }
+    function publicProjection(data, profile) {
+      return data.keys().hasAll(['id', 'name', 'bio', 'city', 'country', 'position', 'team', 'level', 'verification', 'entityType', 'createdAt'])
+        && data.keys().hasOnly(['id', 'name', 'bio', 'city', 'country', 'position', 'team', 'level', 'verification', 'entityType', 'createdAt', 'searchTokens'])
+        && (!('searchTokens' in data) || data.searchTokens is list && data.searchTokens.size() <= 600)
+        && data.id == profile.id && data.name == profile.name && data.bio == profile.bio
+        && data.city == profile.city && data.country == profile.country && data.position == profile.position
+        && data.team == profile.team && data.level == profile.level && data.verification == profile.verification
+        && data.entityType == profile.entityType && data.createdAt == profile.createdAt;
+    }
+    function completedProfile(profile) {
+      return profile.adultConfirmed == true && profile.acceptedTermsVersion == '2026-10-08' && date(profile.acceptedTermsAt) && text(profile.city, 1, 100) && text(profile.country, 1, 100);
+    }
+    function mirroredPublic(uid, profile) {
+      return completedProfile(profile)
+        ? publicProjection(getAfter(/databases/$(database)/documents/communityPublicProfiles/$(uid)).data, profile)
+        : !exists(/databases/$(database)/documents/communityPublicProfiles/$(uid));
+    }
+    match /communityProfiles/{uid} {
+      // Consent and age declarations are accessible only to the owner and administrator.
+      allow read: if owner(uid) || admin();
+      allow create: if owner(uid) && pilotReadAllowed() && validProfile(request.resource.data, uid)
+        && request.resource.data.createdAt == request.time && request.resource.data.verification == 'unverified' && mirroredPublic(uid, request.resource.data);
+      allow update: if request.resource.data.createdAt == resource.data.createdAt && validProfile(request.resource.data, uid) && mirroredPublic(uid, request.resource.data) && (
+        owner(uid) && pilotReadAllowed() && (request.resource.data.acceptedTermsAt == resource.data.acceptedTermsAt || request.resource.data.acceptedTermsAt == request.time || request.resource.data.acceptedTermsVersion == '' && request.resource.data.acceptedTermsAt == '') && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
+          ['name', 'bio', 'city', 'country', 'position', 'team', 'level', 'adultConfirmed', 'entityType',
+           'acceptedTermsVersion', 'acceptedTermsAt'])
+        || admin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['verification'])
+          && (request.resource.data.verification == 'unverified'
+            || getAfter(/databases/$(database)/documents/communityVerifications/$(uid)).data.status == 'approved')
+      );
+      allow delete: if false;
+    }
+    match /communityPublicProfiles/{uid} {
+      allow read: if runtimeAvailable();
+      allow create, update: if (owner(uid) && pilotReadAllowed() || admin())
+        && completedProfile(getAfter(/databases/$(database)/documents/communityProfiles/$(uid)).data)
+        && publicProjection(request.resource.data, getAfter(/databases/$(database)/documents/communityProfiles/$(uid)).data);
+      allow delete: if false;
+    }
+    match /communityFollows/{id} {
+      // Sporting relationships are public; the collection stores no contact or consent data.
+      allow read: if runtimeAvailable() || owner(resource.data.followerId);
+      allow create: if active() && request.resource.data.keys().hasAll(['followerId', 'followingId', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['followerId', 'followingId', 'createdAt'])
+        && request.resource.data.followerId == request.auth.uid
+        && text(request.resource.data.followingId, 1, 128)
+        && request.resource.data.followingId != request.auth.uid && notBlocked(request.resource.data.followingId)
+        && id == request.auth.uid + '_' + request.resource.data.followingId
+        && exists(/databases/$(database)/documents/communityPublicProfiles/$(request.resource.data.followingId))
+        && request.resource.data.createdAt == request.time;
+      allow update: if false;
+      allow delete: if owner(resource.data.followerId);
+    }
+    function validEvent(data, id) {
+      return data.keys().hasAll(['id', 'ownerId', 'ownerName', 'title', 'type', 'format', 'level', 'city', 'country', 'timeZone', 'venue', 'startAt', 'startAtMs', 'capacity', 'entry', 'description', 'status', 'tournamentFormat', 'participants', 'fixtures', 'createdAt'])
+        && data.keys().hasOnly(['id', 'ownerId', 'ownerName', 'title', 'type', 'format', 'level', 'city', 'country', 'timeZone', 'venue', 'startAt', 'startAtMs', 'capacity', 'entry', 'description', 'status', 'tournamentFormat', 'participants', 'participantIds', 'fixtures', 'fixtureIds', 'createdAt', 'updatedAt', 'revision', 'history', 'rsvps', 'waitlist', 'waitlistOrder', 'result', 'teamId', 'visibility'])
+        && data.id == id && text(data.ownerId, 1, 128) && text(data.ownerName, 1, 100)
+        && text(data.title, 1, 100) && data.type in ['match', 'tournament'] && data.format in ['5', '7', '11']
+        && data.level in ['amateur', 'professional'] && text(data.city, 1, 100) && text(data.country, 1, 100)
+        && text(data.timeZone, 1, 100) && text(data.venue, 1, 200) && iso(data.startAt)
+        && data.startAtMs is int && data.capacity is int && data.capacity >= 2 && data.capacity <= 64
+        && (data.type != 'tournament' || data.capacity <= 32) && data.entry in ['players', 'teams'] && text(data.description, 0, 2000)
+        && data.status in ['open', 'closed', 'cancelled', 'completed'] && data.tournamentFormat in ['league', 'knockout']
+        && data.participants is map && data.participants.size() <= data.capacity
+        && data.get('participantIds', data.participants.keys()) is list
+        && data.get('participantIds', data.participants.keys()).toSet() == data.participants.keys().toSet()
+        && data.get('participantIds', data.participants.keys()).size() == data.participants.size()
+        && data.get('visibility', 'public') in ['public', 'private']
+        && data.fixtures is list && data.fixtures.size() <= 496 && date(data.createdAt)
+        && data.get('fixtureIds', []) is list && data.get('fixtureIds', []).size() <= 496 && data.get('fixtureIds', []).size() == data.get('fixtureIds', []).toSet().size()
+        && data.get('rsvps', {}) is map && data.get('rsvps', {}).size() <= 128
+        && data.get('waitlist', {}) is map && data.get('waitlist', {}).size() <= 64
+        && data.get('waitlistOrder', []) is list && data.get('waitlistOrder', []).size() == data.get('waitlist', {}).size()
+        && data.get('waitlistOrder', []).toSet() == data.get('waitlist', {}).keys().toSet()
+        && data.get('revision', 0) is int && data.get('revision', 0) >= 0
+        && data.get('history', []) is list && data.get('history', []).size() <= 50
+        && (!('teamId' in data) || data.teamId == '' || text(data.teamId, 1, 128))
+        && (!('result' in data) || data.type == 'match' && data.status == 'completed'
+          && data.result.keys().hasAll(['homeName', 'awayName', 'homeScore', 'awayScore'])
+          && data.result.keys().hasOnly(['homeName', 'awayName', 'homeScore', 'awayScore'])
+          && text(data.result.homeName, 1, 100) && text(data.result.awayName, 1, 100) && data.result.homeName != data.result.awayName
+          && data.result.homeScore is int && data.result.homeScore >= 0 && data.result.homeScore <= 99
+          && data.result.awayScore is int && data.result.awayScore >= 0 && data.result.awayScore <= 99);
+    }
+    function validEventState(data) {
+      // Cache collection projections: repeated keys()/toSet() over a full roster
+      // otherwise exhaust the rules expression budget before atomic admission.
+      let participants = data.participants;
+      let participantKeys = participants.keys();
+      let participantIds = data.get('participantIds', participantKeys);
+      let fixtureIds = data.get('fixtureIds', []);
+      let rsvps = data.get('rsvps', {});
+      let waitlist = data.get('waitlist', {});
+      let waitlistOrder = data.get('waitlistOrder', []);
+      let revision = data.get('revision', 0);
+      let history = data.get('history', []);
+      return data.keys().hasOnly(['id', 'ownerId', 'ownerName', 'title', 'type', 'format', 'level', 'city', 'country', 'timeZone', 'venue', 'startAt', 'startAtMs', 'capacity', 'entry', 'description', 'status', 'tournamentFormat', 'participants', 'participantIds', 'fixtures', 'fixtureIds', 'createdAt', 'updatedAt', 'revision', 'history', 'rsvps', 'waitlist', 'waitlistOrder', 'result', 'teamId', 'visibility'])
+        && data.capacity is int && data.capacity >= 2 && data.capacity <= 64 && (data.type != 'tournament' || data.capacity <= 32)
+        && data.status in ['open', 'closed', 'cancelled', 'completed']
+        && participants is map && participantKeys.size() <= data.capacity
+        && participantIds is list && participantIds.toSet() == participantKeys.toSet() && participantIds.size() == participantKeys.size()
+        && data.get('visibility', 'public') in ['public', 'private']
+        && data.fixtures is list && data.fixtures.size() <= 496 && date(data.createdAt)
+        && fixtureIds is list && fixtureIds.size() <= 496 && fixtureIds.size() == fixtureIds.toSet().size()
+        && rsvps is map && rsvps.size() <= 128 && waitlist is map && waitlist.size() <= 64
+        && waitlistOrder is list && waitlistOrder.size() == waitlist.size() && waitlistOrder.toSet() == waitlist.keys().toSet()
+        && revision is int && revision >= 0 && history is list && history.size() <= 50
+        && (!('teamId' in data) || data.teamId == '' || text(data.teamId, 1, 128))
+        && (!('result' in data) || data.type == 'match' && data.status == 'completed'
+          && data.result.keys().hasAll(['homeName', 'awayName', 'homeScore', 'awayScore'])
+          && data.result.keys().hasOnly(['homeName', 'awayName', 'homeScore', 'awayScore'])
+          && text(data.result.homeName, 1, 100) && text(data.result.awayName, 1, 100) && data.result.homeName != data.result.awayName
+          && data.result.homeScore is int && data.result.homeScore >= 0 && data.result.homeScore <= 99
+          && data.result.awayScore is int && data.result.awayScore >= 0 && data.result.awayScore <= 99);
+    }
+    function fixtureDocument(data, docId) {
+      let event = getAfter(/databases/$(database)/documents/communityEvents/$(data.eventId)).data;
+      return data.keys().hasAll(['id', 'eventId', 'ownerId', 'round', 'homeId', 'awayId', 'homeScore', 'awayScore', 'kickoffAt', 'timeZone', 'venue', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'eventId', 'ownerId', 'round', 'homeId', 'awayId', 'homeScore', 'awayScore', 'kickoffAt', 'timeZone', 'venue', 'createdAt', 'updatedAt'])
+        && docId == data.eventId + '_' + data.id && data.ownerId == event.ownerId
+        && data.round is int && data.round >= 1 && data.round <= 64 && data.id.matches('r' + string(data.round) + '-[1-9][0-9]*')
+        && data.homeId in event.participants && data.homeId != data.awayId
+        && (data.awayId in event.participants || data.awayId == '' && event.tournamentFormat == 'knockout')
+        && (data.homeScore == null && data.awayScore == null
+          || data.awayId != '' && data.homeScore is int && data.awayScore is int && data.homeScore >= 0 && data.homeScore <= 99 && data.awayScore >= 0 && data.awayScore <= 99
+            && (event.tournamentFormat != 'knockout' || data.homeScore != data.awayScore))
+        && (data.kickoffAt == null || data.kickoffAt is timestamp)
+        && text(data.timeZone, 1, 100) && text(data.venue, 1, 200) && date(data.createdAt) && date(data.updatedAt)
+        && event.updatedAt == request.time && event.get('revision', 0) == get(/databases/$(database)/documents/communityEvents/$(data.eventId)).data.get('revision', 0) + 1
+        && data.id in event.get('fixtureIds', []) && event.type == 'tournament' && event.status in ['closed', 'completed'];
+    }
+    match /communityFixtures/{docId} {
+      allow read: if relatedEventReadable(resource.data.eventId);
+      allow create: if active() && fixtureDocument(request.resource.data, docId) && owner(request.resource.data.ownerId)
+        && request.resource.data.createdAt == request.time && request.resource.data.updatedAt == request.time;
+      allow update: if active() && owner(resource.data.ownerId) && fixtureDocument(request.resource.data, docId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['homeScore', 'awayScore', 'kickoffAt', 'timeZone', 'venue', 'updatedAt'])
+        && request.resource.data.updatedAt == request.time
+        && get(/databases/$(database)/documents/communityEvents/$(resource.data.eventId)).data.status == 'closed'
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['kickoffAt', 'timeZone', 'venue'])
+          || resource.data.homeScore == null && request.resource.data.kickoffAt is timestamp && request.resource.data.kickoffAt > request.time)
+        && (get(/databases/$(database)/documents/communityEvents/$(resource.data.eventId)).data.tournamentFormat != 'knockout'
+          || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['homeScore', 'awayScore'])
+          || !exists(/databases/$(database)/documents/communityFixtures/$(resource.data.eventId + '_r' + string(resource.data.round + 1) + '-1')));
+      allow delete: if false;
     }
 
-    match /users/{userId} {
-      allow read: if isAuthenticated();
-      allow create: if isOwner(userId);
-      allow update: if isOwner(userId);
+    function unchangedWaitlist() {
+      return request.resource.data.get('waitlist', {}) == resource.data.get('waitlist', {})
+        && request.resource.data.get('waitlistOrder', []) == resource.data.get('waitlistOrder', []);
     }
-    
-    match /{document=**} {
-      allow read, write: if false;
+    function promotesFirst() {
+      let before = resource.data.get('waitlist', {});
+      let order = resource.data.get('waitlistOrder', []);
+      let after = request.resource.data.get('waitlist', {});
+      let added = request.resource.data.participants.keys().removeAll(resource.data.participants.keys());
+      return order.size() > 0 && added.size() == 1 && added[0] == order[0]
+        && request.resource.data.participants[order[0]] == before[order[0]].name
+        && after.diff(before).affectedKeys().hasOnly([order[0]]) && !(order[0] in after)
+        && request.resource.data.get('waitlistOrder', []) == order.removeAll([order[0]]);
     }
+    function selfParticipation() {
+      let before = resource.data.participants;
+      let after = request.resource.data.participants;
+      let uid = request.auth.uid;
+      let removed = before.keys().removeAll(after.keys());
+      let added = after.keys().removeAll(before.keys());
+      let responseBefore = resource.data.get('rsvps', {});
+      let responseAfter = request.resource.data.get('rsvps', {});
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      let promoted = changed.hasAny(['waitlist', 'waitlistOrder']) && promotesFirst();
+      return changed.hasOnly(['participants', 'participantIds', 'rsvps', 'waitlist', 'waitlistOrder'])
+        && resource.data.fixtures.size() == 0 && resource.data.get('fixtureIds', []).size() == 0 && resource.data.startAtMs > request.time.toMillis()
+        && (responseAfter.diff(responseBefore).affectedKeys().hasOnly([uid]) || promoted && responseAfter.diff(responseBefore).affectedKeys().hasOnly([uid, resource.data.waitlistOrder[0]]) && !(resource.data.waitlistOrder[0] in responseAfter))
+        && (responseAfter == responseBefore || responseAfter[uid] in ['yes', 'no', 'maybe'])
+        && after.diff(before).changedKeys().size() == 0 && (
+          active() && !(uid in before) && uid in after && resource.data.status == 'open'
+            && (eventPublic(resource.data) || owner(resource.data.ownerId) || privateAdmission(resource.data.id))
+            && resource.data.get('waitlistOrder', []).size() == 0 && added.size() == 1 && removed.size() == 0
+            && text(after[uid], 1, 100) && unchangedWaitlist()
+          || uid in before && !(uid in after) && removed == [uid] && (
+            added.size() == 0 && unchangedWaitlist()
+            || resource.data.status == 'open' && promoted)
+        );
+    }
+    function selfRsvp() {
+      let uid = request.auth.uid;
+      return active() && uid in resource.data.participants && resource.data.startAtMs > request.time.toMillis()
+        && resource.data.status in ['open', 'closed']
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rsvps', 'participantIds', 'waitlist'])
+        && request.resource.data.participants == resource.data.participants && unchangedWaitlist()
+        && request.resource.data.get('rsvps', {}).diff(resource.data.get('rsvps', {})).affectedKeys().hasOnly([uid])
+        && request.resource.data.rsvps[uid] in ['yes', 'maybe'];
+    }
+    function selfWaitlist() {
+      let uid = request.auth.uid;
+      let before = resource.data.get('waitlist', {});
+      let after = request.resource.data.get('waitlist', {});
+      let order = resource.data.get('waitlistOrder', []);
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['waitlist', 'waitlistOrder', 'participantIds'])
+        && after.diff(before).affectedKeys().hasOnly([uid]) && (
+          active() && eventPublic(resource.data) && !(uid in resource.data.participants) && !(uid in before) && uid in after
+            && resource.data.status == 'open' && resource.data.fixtures.size() == 0 && resource.data.get('fixtureIds', []).size() == 0 && resource.data.startAtMs > request.time.toMillis()
+            && (resource.data.participants.size() == resource.data.capacity || order.size() > 0)
+            && after[uid].keys().hasOnly(['name', 'joinedAt']) && text(after[uid].name, 1, 100) && after[uid].joinedAt == request.time
+            && request.resource.data.get('waitlistOrder', []) == order.concat([uid])
+          || uid in before && !(uid in after) && request.resource.data.get('waitlistOrder', []) == order.removeAll([uid])
+        );
+    }
+    function organizerParticipants(promoted) {
+      let before = resource.data.participants;
+      let after = request.resource.data.participants;
+      let added = after.keys().removeAll(before.keys());
+      let removed = before.keys().removeAll(after.keys());
+      return resource.data.fixtures.size() == 0 && resource.data.get('fixtureIds', []).size() == 0 && resource.data.startAtMs > request.time.toMillis()
+        && after.diff(before).changedKeys().size() == 0 && (
+          resource.data.status == 'open' && added.size() == 1 && removed.size() == 0 && added[0].matches('guest-[a-zA-Z0-9_-]+')
+            && text(after[added[0]], 1, 100) && resource.data.get('waitlistOrder', []).size() == 0 && unchangedWaitlist()
+          || removed.size() == 1 && removed[0].matches('guest-[a-zA-Z0-9_-]+') && (
+            added.size() == 0 && unchangedWaitlist() || resource.data.status == 'open' && promoted)
+          || resource.data.status == 'open' && removed.size() == 0 && promoted
+        );
+    }
+    function validChangedMetadata(data, changed) {
+      return (!changed.hasAny(['title']) || text(data.title, 1, 100))
+        && (!changed.hasAny(['type']) || data.type in ['match', 'tournament'])
+        && (!changed.hasAny(['format']) || data.format in ['5', '7', '11'])
+        && (!changed.hasAny(['level']) || data.level in ['amateur', 'professional'])
+        && (!changed.hasAny(['city']) || text(data.city, 1, 100)) && (!changed.hasAny(['country']) || text(data.country, 1, 100))
+        && (!changed.hasAny(['timeZone']) || text(data.timeZone, 1, 100)) && (!changed.hasAny(['venue']) || text(data.venue, 1, 200))
+        && (!changed.hasAny(['startAt']) || iso(data.startAt)) && (!changed.hasAny(['startAtMs']) || data.startAtMs is int)
+        && (!changed.hasAny(['entry']) || data.entry in ['players', 'teams'])
+        && (!changed.hasAny(['description']) || text(data.description, 0, 2000))
+        && (!changed.hasAny(['tournamentFormat']) || data.tournamentFormat in ['league', 'knockout']);
+    }
+    function organizerEventUpdate(id) {
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      let data = request.resource.data;
+      let revision = resource.data.get('revision', 0) + 1;
+      let promoted = changed.hasAny(['waitlist', 'waitlistOrder']) && promotesFirst();
+      let change = getAfter(/databases/$(database)/documents/communityEventChanges/$(id + '_' + string(revision))).data;
+      return owner(resource.data.ownerId) && active() && data.get('revision', 0) == revision && data.updatedAt == request.time
+        && change.eventId == id && change.revision == revision && change.ownerId == request.auth.uid && change.createdAt == request.time
+        && data.get('fixtureIds', []).hasAll(resource.data.get('fixtureIds', []))
+        && data.get('history', []) == resource.data.get('history', []) && data.fixtures == resource.data.fixtures
+        && changed.hasOnly(['title', 'format', 'level', 'city', 'country', 'timeZone', 'venue', 'startAt', 'startAtMs', 'capacity', 'entry', 'description', 'type', 'tournamentFormat', 'participants', 'participantIds', 'fixtureIds', 'status', 'updatedAt', 'revision', 'waitlist', 'waitlistOrder', 'rsvps', 'result', 'teamId', 'visibility'])
+        && (!changed.hasAny(['title', 'format', 'level', 'city', 'country', 'timeZone', 'venue', 'startAt', 'startAtMs', 'capacity', 'entry', 'description', 'type', 'tournamentFormat']) || validChangedMetadata(data, changed))
+        && (!changed.hasAny(['rsvps']) || promoted && data.get('rsvps', {}).diff(resource.data.get('rsvps', {})).affectedKeys().hasOnly([resource.data.waitlistOrder[0]]) && !(resource.data.waitlistOrder[0] in data.get('rsvps', {})))
+        && (!changed.hasAny(['participants']) || organizerParticipants(promoted))
+        && (!changed.hasAny(['waitlist', 'waitlistOrder']) || unchangedWaitlist() || changed.hasAny(['participants']) && promoted)
+        && (resource.data.participants.size() == 0 || data.type == resource.data.type && data.entry == resource.data.entry)
+        && (resource.data.fixtures.size() == 0 && resource.data.get('fixtureIds', []).size() == 0 || data.format == resource.data.format && data.tournamentFormat == resource.data.tournamentFormat && data.type == resource.data.type && data.entry == resource.data.entry)
+        && (!changed.hasAny(['title', 'city', 'country', 'timeZone', 'venue', 'startAt', 'startAtMs', 'capacity', 'description']) || resource.data.status != 'completed' && data.startAtMs > request.time.toMillis())
+        && (!changed.hasAny(['fixtureIds']) || resource.data.status != 'cancelled' && data.status in ['closed', 'completed'] && data.participants.size() >= 2 && data.participants.size() <= 32)
+        && (data.status != 'open' || data.fixtures.size() == 0 && data.get('fixtureIds', []).size() == 0 && data.startAtMs > request.time.toMillis())
+        && (data.status != 'completed' || data.startAtMs <= request.time.toMillis() && resource.data.status != 'cancelled' && (data.type != 'match' || 'result' in data))
+        && (!changed.hasAny(['teamId']) || data.get('teamId', '') == '' || teamManager(data.teamId) && teamRecord(data.teamId).status == 'active');
+    }
+    function privateEventParticipation(id, changed) {
+      let before = resource.data;
+      let after = request.resource.data;
+      let uid = request.auth.uid;
+      let participantKeys = after.participants.keys();
+      let participantIds = after.get('participantIds', participantKeys);
+      let rsvps = after.get('rsvps', {});
+      // Only these three fields can differ: all metadata, capacity, fixture,
+      // history and waiting-list validations remain inherited unchanged from
+      // the validated event. Check every mutable invariant here once, then
+      // prove the verified recipient's atomic code + admission receipt.
+      return verifiedActor() && changed.hasOnly(['participants', 'participantIds', 'rsvps'])
+        && after.keys().hasAll(['participantIds', 'rsvps'])
+        && before.get('visibility', 'public') == 'private' && before.ownerId != uid
+        && !(uid in before.participants) && uid in after.participants
+        && before.status == 'open' && before.startAtMs > request.time.toMillis()
+        && before.fixtures.size() == 0 && before.get('fixtureIds', []).size() == 0
+        && before.get('waitlistOrder', []).size() == 0
+        && after.participants.diff(before.participants).affectedKeys().hasOnly([uid])
+        && text(after.participants[uid], 1, 100) && participantKeys.size() <= before.capacity
+        && participantIds is list && participantIds.size() == participantKeys.size()
+        && participantIds.toSet() == participantKeys.toSet()
+        && rsvps is map && rsvps.size() <= 128 && rsvps.diff(before.get('rsvps', {})).affectedKeys().hasOnly([uid])
+        && rsvps[uid] == 'yes' && privateAdmission(id);
+    }
+    function eventUpdate(id) {
+      let before = resource.data;
+      let after = request.resource.data;
+      let changed = after.diff(before).affectedKeys();
+      let privateJoin = before.get('visibility', 'public') == 'private' && before.ownerId != request.auth.uid
+        && after.participants is map && !(request.auth.uid in before.participants) && request.auth.uid in after.participants;
+      return privateJoin ? privateEventParticipation(id, changed)
+        : validEventState(after) && after.createdAt == before.createdAt && after.ownerId == before.ownerId
+          && after.ownerName == before.ownerName && after.id == before.id
+          && after.get('visibility', 'public') == before.get('visibility', 'public')
+          && (changed.hasAny(['revision']) ? organizerEventUpdate(id)
+            : changed.hasAny(['participants']) ? selfParticipation()
+              : changed.hasAny(['rsvps']) ? selfRsvp() : selfWaitlist());
+    }
+    match /communityEvents/{id} {
+      allow get: if eventReadable(resource.data);
+      allow list: if eventListReadable(resource.data);
+      allow create: if active() && validEvent(request.resource.data, id) && request.resource.data.createdAt == request.time
+        && request.resource.data.ownerId == request.auth.uid && request.resource.data.ownerName == actorProfile().name
+        && request.resource.data.startAtMs > request.time.toMillis() && request.resource.data.status == 'open'
+        && request.resource.data.participants.size() == 0 && request.resource.data.fixtures.size() == 0 && request.resource.data.get('fixtureIds', []).size() == 0
+        && request.resource.data.get('waitlist', {}).size() == 0 && request.resource.data.get('rsvps', {}).size() == 0
+        && request.resource.data.get('revision', 0) == 0 && request.resource.data.get('history', []).size() == 0
+        && (!('teamId' in request.resource.data) || request.resource.data.teamId == '' || teamManager(request.resource.data.teamId) && teamRecord(request.resource.data.teamId).status == 'active');
+      allow update: if signed() && eventUpdate(id);
+      allow delete: if false;
+    }
+    match /communityEventChanges/{id} {
+      allow read: if relatedEventReadable(resource.data.eventId);
+      allow create: if active() && request.resource.data.keys().hasAll(['id', 'eventId', 'ownerId', 'revision', 'summary', 'title', 'createdAt', 'audienceIds'])
+        && request.resource.data.keys().hasOnly(['id', 'eventId', 'ownerId', 'revision', 'summary', 'title', 'createdAt', 'audienceIds'])
+        && request.resource.data.id == id && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.revision is int && request.resource.data.revision >= 1 && text(request.resource.data.summary, 1, 500)
+        && text(request.resource.data.title, 1, 100) && request.resource.data.createdAt == request.time
+        && owner(get(/databases/$(database)/documents/communityEvents/$(request.resource.data.eventId)).data.ownerId)
+        && getAfter(/databases/$(database)/documents/communityEvents/$(request.resource.data.eventId)).data.revision == request.resource.data.revision
+        && id == request.resource.data.eventId + '_' + string(request.resource.data.revision)
+        && frozenAudience(request.resource.data);
+      allow update, delete: if false;
+    }
+    function frozenAudience(data) {
+      let before = get(/databases/$(database)/documents/communityEvents/$(data.eventId)).data;
+      let after = getAfter(/databases/$(database)/documents/communityEvents/$(data.eventId)).data;
+      return data.audienceIds is list && data.audienceIds.size() <= 129 && data.audienceIds.size() == data.audienceIds.toSet().size()
+        && data.audienceIds.toSet() == before.participants.keys().toSet().union(after.participants.keys().toSet())
+          .union(before.get('waitlist', {}).keys().toSet()).union(after.get('waitlist', {}).keys().toSet()).union([before.ownerId].toSet());
+    }
+    function changeNotice(data) {
+      let record = get(/databases/$(database)/documents/communityEventChanges/$(data.eventId + '_' + string(data.revision))).data;
+      return record.createdAt <= request.time && data.recipientId in record.audienceIds && record.summary == data.summary && record.title == data.title;
+    }
+    function placeNotice(data, id) {
+      let record = get(/databases/$(database)/documents/communityEventPromotions/$(data.eventId + '_' + data.deliveryId)).data;
+      return text(data.get('deliveryId', ''), 1, 128) && id == data.eventId + '_place_' + data.deliveryId
+        && (record.authorId == request.auth.uid || active() && owner(get(/databases/$(database)/documents/communityEvents/$(data.eventId)).data.ownerId))
+        && record.recipientId == data.recipientId && record.title == data.title
+        && record.summary == data.summary && record.createdAt <= request.time;
+    }
+    match /communityEventPromotions/{id} {
+      allow read: if owner(resource.data.authorId) || owner(resource.data.recipientId) || admin()
+        || owner(get(/databases/$(database)/documents/communityEvents/$(resource.data.eventId)).data.ownerId);
+      allow create: if signed() && request.resource.data.keys().hasAll(['eventId', 'authorId', 'recipientId', 'title', 'summary', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['eventId', 'authorId', 'recipientId', 'title', 'summary', 'createdAt'])
+        && request.resource.data.authorId == request.auth.uid && request.resource.data.createdAt == request.time
+        && request.resource.data.summary == 'Has conseguido una plaza al liberarse un puesto.' && promotionProof(request.resource.data);
+      allow update, delete: if false;
+    }
+    function promotionProof(data) {
+      let before = get(/databases/$(database)/documents/communityEvents/$(data.eventId)).data;
+      let after = getAfter(/databases/$(database)/documents/communityEvents/$(data.eventId)).data;
+      return (active() && owner(before.ownerId) || request.auth.uid in before.participants && !(request.auth.uid in after.participants))
+        && before.get('waitlistOrder', []).size() > 0 && data.recipientId == before.waitlistOrder[0]
+        && !(data.recipientId in before.participants) && data.recipientId in after.participants && !(data.recipientId in after.get('waitlist', {}))
+        && after.participants[data.recipientId] == before.waitlist[data.recipientId].name && data.title == after.title;
+    }
+    function deliveryMatches(data, id) {
+      let receipt = getAfter(/databases/$(database)/documents/communityEventDeliveries/$(id)).data;
+      return receipt.actorId == get(/databases/$(database)/documents/communityEvents/$(data.eventId)).data.ownerId
+        && receipt.eventId == data.eventId && receipt.recipientId == data.recipientId && receipt.createdAt == request.time;
+    }
+    function noticeAudienceAllowed(data) {
+      let event = get(/databases/$(database)/documents/communityEvents/$(data.eventId)).data;
+      return eventPublic(event) || data.recipientId == event.ownerId || data.recipientId in event.participants;
+    }
+    match /communityEventDeliveries/{id} {
+      allow get: if signed() && (!exists(/databases/$(database)/documents/communityEventDeliveries/$(id)) || owner(resource.data.actorId) || admin());
+      allow list: if owner(resource.data.actorId) || admin();
+      allow create: if signed() && request.resource.data.keys().hasAll(['actorId', 'eventId', 'recipientId', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['actorId', 'eventId', 'recipientId', 'createdAt'])
+        && request.resource.data.actorId == get(/databases/$(database)/documents/communityEvents/$(request.resource.data.eventId)).data.ownerId
+        && request.resource.data.createdAt == request.time
+        && getAfter(/databases/$(database)/documents/communityEventNotices/$(id)).data.eventId == request.resource.data.eventId
+        && getAfter(/databases/$(database)/documents/communityEventNotices/$(id)).data.recipientId == request.resource.data.recipientId
+        && getAfter(/databases/$(database)/documents/communityEventNotices/$(id)).data.createdAt == request.time;
+      allow update, delete: if false;
+    }
+    match /communityEventNotices/{id} {
+      allow read: if owner(resource.data.recipientId) || admin();
+      allow create: if signed() && request.resource.data.keys().hasAll(['id', 'eventId', 'recipientId', 'revision', 'title', 'summary', 'createdAt', 'readAt'])
+        && request.resource.data.keys().hasOnly(['id', 'eventId', 'recipientId', 'revision', 'title', 'summary', 'createdAt', 'readAt', 'kind', 'deliveryId'])
+        && request.resource.data.id == id && text(request.resource.data.recipientId, 1, 128)
+        && request.resource.data.revision is int && request.resource.data.revision >= 1
+        && request.resource.data.createdAt == request.time && request.resource.data.readAt == ''
+        && noticeAudienceAllowed(request.resource.data)
+        && deliveryMatches(request.resource.data, id)
+        && (request.resource.data.get('kind', 'change') == 'place' && placeNotice(request.resource.data, id)
+          || request.resource.data.get('kind', 'change') == 'change' && active() && owner(get(/databases/$(database)/documents/communityEvents/$(request.resource.data.eventId)).data.ownerId)
+            && changeNotice(request.resource.data) && id == request.resource.data.eventId + '_' + string(request.resource.data.revision) + '_' + request.resource.data.recipientId);
+      allow update: if owner(resource.data.recipientId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readAt']) && request.resource.data.readAt == request.time;
+      allow delete: if owner(resource.data.recipientId) || admin();
+    }
+    function validPost(data, id) {
+      let prefix = 'community/' + request.auth.uid + '/' + id;
+      return data.keys().hasAll(['id', 'authorId', 'authorName', 'kind', 'text', 'title', 'mediaUrl', 'mediaPath', 'createdAt', 'eventId'])
+        && data.keys().hasOnly(['id', 'authorId', 'authorName', 'kind', 'text', 'title', 'mediaUrl', 'mediaPath', 'createdAt', 'eventId'])
+        && data.id == id && data.authorId == request.auth.uid && data.authorName == actorProfile().name
+        && data.kind == 'achievement' && text(data.text, 1, 2000) && text(data.title, 0, 100)
+        && date(data.createdAt) && text(data.eventId, 0, 128)
+        && (data.eventId == '' || exists(/databases/$(database)/documents/communityEvents/$(data.eventId))
+          && eventPublic(get(/databases/$(database)/documents/communityEvents/$(data.eventId)).data))
+        && (
+          data.kind == 'achievement' && text(data.title, 1, 100) && data.mediaUrl == '' && data.mediaPath == ''
+          || data.kind == 'photo' && data.mediaPath in [prefix + '.jpg', prefix + '.png', prefix + '.webp']
+            && text(data.mediaUrl, 1, 2000) && data.mediaUrl.matches('https://firebasestorage[.]googleapis[.]com/.*')
+          || data.kind == 'reel' && data.mediaPath in [prefix + '.mp4', prefix + '.webm']
+            && text(data.mediaUrl, 1, 2000) && data.mediaUrl.matches('https://firebasestorage[.]googleapis[.]com/.*')
+        );
+    }
+    match /communityPosts/{id} {
+      allow read: if runtimeAvailable() || pilotReadAllowed() && (owner(resource.data.authorId) || admin());
+      allow create: if active() && request.resource.data.createdAt == request.time && validPost(request.resource.data, id);
+      allow update: if false;
+      allow delete: if owner(resource.data.authorId) || admin();
+    }
+    // Removing the parent immediately hides other people's retained interactions.
+    // Authors can still retrieve and withdraw their own data during a service pause.
+    function readablePostInteraction(postId) {
+      return hasPost(postId) && (runtimeAvailable()
+        || pilotReadAllowed() && owner(get(/databases/$(database)/documents/communityPosts/$(postId)).data.authorId));
+    }
+    match /communityLikes/{id} {
+      // An absent document must remain readable for the first like transaction.
+      allow get: if signed() && (!exists(/databases/$(database)/documents/communityLikes/$(id))
+        || owner(resource.data.userId) || admin() || readablePostInteraction(resource.data.postId));
+      allow list: if signed() && (owner(resource.data.userId) || admin() || readablePostInteraction(resource.data.postId));
+      allow create: if active() && interactionAllowed(request.resource.data.postId) && request.resource.data.keys().hasAll(['userId', 'postId', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['userId', 'postId', 'createdAt'])
+        && request.resource.data.userId == request.auth.uid && hasPost(request.resource.data.postId)
+        && id == request.resource.data.postId + '_' + request.auth.uid && request.resource.data.createdAt == request.time;
+      allow update: if false;
+      allow delete: if owner(resource.data.userId) && id == resource.data.postId + '_' + request.auth.uid;
+    }
+    match /communityComments/{id} {
+      allow get: if signed() && (!exists(/databases/$(database)/documents/communityComments/$(id))
+        || owner(resource.data.authorId) || admin() || readablePostInteraction(resource.data.postId));
+      allow list: if signed() && (owner(resource.data.authorId) || admin() || readablePostInteraction(resource.data.postId));
+      allow create: if active() && interactionAllowed(request.resource.data.postId) && request.resource.data.keys().hasAll(['id', 'authorId', 'authorName', 'text', 'createdAt', 'postId'])
+        && request.resource.data.keys().hasOnly(['id', 'authorId', 'authorName', 'text', 'createdAt', 'postId'])
+        && request.resource.data.id == id && request.resource.data.authorId == request.auth.uid
+        && request.resource.data.authorName == actorProfile().name && text(request.resource.data.text, 1, 1000)
+        && request.resource.data.createdAt == request.time && hasPost(request.resource.data.postId);
+      allow update: if false;
+      allow delete: if owner(resource.data.authorId) || admin();
+    }
+    function validVerification(data, uid) {
+      return data.keys().hasAll(['id', 'userId', 'name', 'organization', 'evidence', 'status', 'createdAt', 'reviewedAt'])
+        && data.keys().hasOnly(['id', 'userId', 'name', 'organization', 'evidence', 'status', 'createdAt', 'reviewedAt'])
+        && data.id == uid && data.userId == uid && text(data.name, 1, 100)
+        && text(data.organization, 1, 100) && text(data.evidence, 1, 2000)
+        && data.status in ['pending', 'approved', 'rejected'] && date(data.createdAt)
+        && (data.reviewedAt == '' || date(data.reviewedAt));
+    }
+    match /communityVerifications/{uid} {
+      allow get: if owner(uid) || admin();
+      allow list: if admin();
+      allow create: if active() && owner(uid) && validVerification(request.resource.data, uid)
+        && request.resource.data.name == actorProfile().name && actorProfile().verification == 'unverified'
+        && request.resource.data.createdAt == request.time && request.resource.data.status == 'pending' && request.resource.data.reviewedAt == '';
+      allow update: if signed() && validVerification(request.resource.data, uid) && (
+        active() && owner(uid) && request.resource.data.createdAt == request.time && resource.data.status == 'rejected' && actorProfile().verification == 'unverified'
+          && request.resource.data.name == actorProfile().name
+          && request.resource.data.status == 'pending' && request.resource.data.reviewedAt == ''
+        || admin() && resource.data.status == 'pending'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'reviewedAt'])
+          && request.resource.data.status in ['approved', 'rejected'] && request.resource.data.reviewedAt == request.time
+          && (request.resource.data.status != 'approved'
+            || getAfter(/databases/$(database)/documents/communityProfiles/$(uid)).data.verification == 'verified')
+      );
+      allow delete: if false;
+    }
+    match /communityReports/{id} {
+      allow read: if admin();
+      allow create: if signed() && request.resource.data.keys().hasAll(['id', 'reporterId', 'postId', 'reason', 'status', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['id', 'reporterId', 'postId', 'commentId', 'reason', 'status', 'createdAt'])
+        && (!('commentId' in request.resource.data) || text(request.resource.data.commentId, 1, 128) && get(/databases/$(database)/documents/communityComments/$(request.resource.data.commentId)).data.postId == request.resource.data.postId)
+        && request.resource.data.id == id && request.resource.data.reporterId == request.auth.uid
+        && hasPost(request.resource.data.postId) && text(request.resource.data.reason, 1, 1000)
+        && request.resource.data.status == 'open' && request.resource.data.createdAt == request.time;
+      allow update: if admin() && resource.data.status == 'open'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+        && request.resource.data.status == 'resolved';
+      allow delete: if false;
+    }
+    function pilotUid(uid) { return uid is string && uid.matches('[A-Za-z0-9_-]{1,128}'); }
+    function validPilotUsers(ids) {
+      return ids is list && ids.size() >= 1 && ids.size() <= 5 && ids.size() == ids.toSet().size()
+        && pilotUid(ids[0]) && (ids.size() < 2 || pilotUid(ids[1]))
+        && (ids.size() < 3 || pilotUid(ids[2])) && (ids.size() < 4 || pilotUid(ids[3]))
+        && (ids.size() < 5 || pilotUid(ids[4]));
+    }
+    match /communityConfiguration/{id} {
+      allow read: if id == 'runtime' || admin();
+      allow create, update: if admin() && id == 'runtime'
+        && request.resource.data.keys().hasAll(['serviceStatus', 'mediaUploadsEnabled', 'contactEmail', 'updatedAt'])
+        && (request.resource.data.serviceStatus == 'pilot'
+          ? request.resource.data.keys().hasOnly(['serviceStatus', 'mediaUploadsEnabled', 'contactEmail', 'updatedAt', 'pilotUserIds'])
+            && validPilotUsers(request.resource.data.pilotUserIds)
+          : request.resource.data.keys().hasOnly(['serviceStatus', 'mediaUploadsEnabled', 'contactEmail', 'updatedAt'])
+            && request.resource.data.serviceStatus in ['setup', 'open', 'paused'])
+        && request.resource.data.mediaUploadsEnabled == false
+        && text(request.resource.data.contactEmail, 0, 200) && request.resource.data.updatedAt == request.time;
+      allow delete: if false;
+    }
+    match /communityBlocks/{id} {
+      allow read: if owner(resource.data.ownerId);
+      allow create: if signed() && request.resource.data.keys().hasAll(['ownerId', 'blockedId', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['ownerId', 'blockedId', 'createdAt'])
+        && request.resource.data.ownerId == request.auth.uid && text(request.resource.data.blockedId, 1, 128)
+        && request.resource.data.blockedId != request.auth.uid && id == request.auth.uid + '_' + request.resource.data.blockedId
+        && !existsAfter(/databases/$(database)/documents/communityConnections/$(request.auth.uid)/members/$(request.resource.data.blockedId))
+        && !existsAfter(/databases/$(database)/documents/communityConnections/$(request.resource.data.blockedId)/members/$(request.auth.uid))
+        && request.resource.data.createdAt == request.time;
+      allow update: if false;
+      allow delete: if owner(resource.data.ownerId);
+    }
+    function notBlocked(uid) {
+      return !exists(/databases/$(database)/documents/communityBlocks/$(request.auth.uid + '_' + uid))
+        && !exists(/databases/$(database)/documents/communityBlocks/$(uid + '_' + request.auth.uid));
+    }
+    function interactionAllowed(postId) {
+      return hasPost(postId) && notBlocked(get(/databases/$(database)/documents/communityPosts/$(postId)).data.authorId);
+    }
+    match /communityAccountModeration/{uid} {
+      allow read: if owner(uid) || admin();
+      allow create, update: if admin() && request.resource.data.keys().hasAll(['status', 'reason', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['status', 'reason', 'updatedAt'])
+        && request.resource.data.status in ['active', 'suspended'] && text(request.resource.data.reason, 1, 1000)
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if admin();
+    }
+    match /communityRightsRequests/{id} {
+      allow read: if owner(resource.data.userId) || admin();
+      allow create: if signed() && request.resource.data.userId == request.auth.uid && rightsData(request.resource.data, id)
+        && request.resource.data.status == 'pending' && request.resource.data.createdAt == request.time && request.resource.data.reviewedAt == '';
+      allow update: if rightsData(request.resource.data, id) && (
+        owner(resource.data.userId) && resource.data.status in ['completed', 'rejected'] && request.resource.data.status == 'pending'
+          && request.resource.data.createdAt == request.time && request.resource.data.reviewedAt == ''
+          && request.resource.data.userId == resource.data.userId && request.resource.data.kind == resource.data.kind
+        || admin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'reviewedAt'])
+          && request.resource.data.status in ['processing', 'completed', 'rejected'] && request.resource.data.reviewedAt == request.time);
+      allow delete: if false;
+    }
+    function rightsData(data, id) {
+      return data.keys().hasAll(['id', 'userId', 'kind', 'status', 'createdAt', 'reviewedAt'])
+        && data.keys().hasOnly(['id', 'userId', 'kind', 'status', 'createdAt', 'reviewedAt'])
+        && data.id == id && text(data.userId, 1, 128) && data.kind in ['export', 'delete'] && id == data.userId + '_' + data.kind
+        && data.status in ['pending', 'processing', 'completed', 'rejected'] && date(data.createdAt)
+        && (data.reviewedAt == '' || date(data.reviewedAt));
+    }
+    function teamRecord(teamId) { return get(/databases/$(database)/documents/communityTeams/$(teamId)).data; }
+    function teamMembership(teamId) { return get(/databases/$(database)/documents/communityTeamMembers/$(teamId + '_' + request.auth.uid)).data; }
+    function teamMember(teamId) { return signed() && pilotReadAllowed() && exists(/databases/$(database)/documents/communityTeamMembers/$(teamId + '_' + request.auth.uid)); }
+    function teamManager(teamId) { return teamMember(teamId) && teamMembership(teamId).role in ['owner', 'manager']; }
+    function teamOwner(teamId) { return signed() && teamRecord(teamId).ownerId == request.auth.uid; }
+    function validTeam(data, id) {
+      return data.keys().hasAll(['id', 'ownerId', 'name', 'country', 'city', 'description', 'level', 'status', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'ownerId', 'name', 'country', 'city', 'description', 'level', 'status', 'createdAt', 'updatedAt'])
+        && data.id == id && text(data.ownerId, 1, 128) && text(data.name, 1, 100) && text(data.country, 1, 100) && text(data.city, 1, 100)
+        && text(data.description, 0, 2000) && data.level in ['amateur', 'professional'] && data.status in ['active', 'archived'] && date(data.createdAt) && date(data.updatedAt);
+    }
+    match /communityTeams/{id} {
+      allow get: if pilotReadAllowed() && (runtimeAvailable() || teamMember(id) || admin());
+      allow list: if runtimeAvailable();
+      allow create: if active() && validTeam(request.resource.data, id) && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.status == 'active' && request.resource.data.createdAt == request.time && request.resource.data.updatedAt == request.time
+        && getAfter(/databases/$(database)/documents/communityTeamMembers/$(id + '_' + request.auth.uid)).data.role == 'owner';
+      allow update: if active() && owner(resource.data.ownerId) && validTeam(request.resource.data, id)
+        && request.resource.data.createdAt == resource.data.createdAt && request.resource.data.updatedAt == request.time
+        && (request.resource.data.ownerId == resource.data.ownerId
+          || getAfter(/databases/$(database)/documents/communityTeamMembers/$(id + '_' + resource.data.ownerId)).data.role == 'manager'
+            && getAfter(/databases/$(database)/documents/communityTeamMembers/$(id + '_' + request.resource.data.ownerId)).data.role == 'owner'
+            && exists(/databases/$(database)/documents/communityTeamMembers/$(id + '_' + request.resource.data.ownerId)));
+      allow delete: if false;
+    }
+    function validTeamMember(data, id) {
+      return data.keys().hasAll(['id', 'teamId', 'userId', 'name', 'role', 'joinedAt']) && data.keys().hasOnly(['id', 'teamId', 'userId', 'name', 'role', 'joinedAt'])
+        && data.id == id && text(data.teamId, 1, 128) && text(data.userId, 1, 128) && id == data.teamId + '_' + data.userId
+        && text(data.name, 1, 100) && data.role in ['owner', 'manager', 'member'] && date(data.joinedAt);
+    }
+    match /communityTeamMembers/{id} {
+      allow get: if signed() && (!exists(/databases/$(database)/documents/communityTeamMembers/$(id)) || owner(resource.data.userId) || teamMember(resource.data.teamId) || admin() && pilotReadAllowed());
+      allow list: if owner(resource.data.userId) || teamMember(resource.data.teamId) || admin() && pilotReadAllowed();
+      allow create: if active() && validTeamMember(request.resource.data, id) && request.resource.data.joinedAt == request.time && (
+        request.resource.data.userId == request.auth.uid && request.resource.data.name == actorProfile().name && request.resource.data.role == 'owner'
+          && getAfter(/databases/$(database)/documents/communityTeams/$(request.resource.data.teamId)).data.ownerId == request.auth.uid
+          && !exists(/databases/$(database)/documents/communityTeams/$(request.resource.data.teamId))
+        || teamManager(request.resource.data.teamId) && teamRecord(request.resource.data.teamId).status == 'active' && request.resource.data.role == 'member'
+          && getAfter(/databases/$(database)/documents/communityTeamJoinRequests/$(id)).data.status == 'approved'
+          && get(/databases/$(database)/documents/communityTeamJoinRequests/$(id)).data.status == 'pending'
+          && request.resource.data.name == get(/databases/$(database)/documents/communityTeamJoinRequests/$(id)).data.name);
+      allow update: if active() && validTeamMember(request.resource.data, id) && teamOwner(resource.data.teamId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role']) && (
+          resource.data.userId != request.auth.uid && request.resource.data.role in ['member', 'manager']
+          || getAfter(/databases/$(database)/documents/communityTeams/$(resource.data.teamId)).data.ownerId != teamRecord(resource.data.teamId).ownerId
+            && (request.resource.data.userId == getAfter(/databases/$(database)/documents/communityTeams/$(resource.data.teamId)).data.ownerId && request.resource.data.role == 'owner'
+              || resource.data.userId == request.auth.uid && request.resource.data.role == 'manager'));
+      allow delete: if signed() && resource.data.role != 'owner' && (owner(resource.data.userId) || active() && teamOwner(resource.data.teamId));
+    }
+    match /communityTeamInvites/{id} {
+      allow get: if signed() && pilotReadAllowed();
+      allow list: if teamManager(resource.data.teamId);
+      allow create: if active() && teamManager(request.resource.data.teamId) && teamRecord(request.resource.data.teamId).status == 'active'
+        && request.resource.data.keys().hasAll(['id', 'teamId', 'createdBy', 'revoked', 'expiresAt', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['id', 'teamId', 'createdBy', 'revoked', 'expiresAt', 'createdAt'])
+        && request.resource.data.id == id && request.resource.data.createdBy == request.auth.uid && request.resource.data.revoked == false
+        && request.resource.data.createdAt == request.time && request.resource.data.expiresAt is timestamp
+        && request.resource.data.expiresAt > request.time && request.resource.data.expiresAt <= request.time + duration.value(30, 'd');
+      allow update: if active() && teamManager(resource.data.teamId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['revoked']) && request.resource.data.revoked == true;
+      allow delete: if false;
+    }
+    function validJoinRequest(data, id) {
+      return data.keys().hasAll(['id', 'teamId', 'userId', 'name', 'inviteId', 'status', 'createdAt', 'reviewedAt'])
+        && data.keys().hasOnly(['id', 'teamId', 'userId', 'name', 'inviteId', 'status', 'createdAt', 'reviewedAt'])
+        && data.id == id && text(data.teamId, 1, 128) && text(data.userId, 1, 128) && id == data.teamId + '_' + data.userId
+        && text(data.name, 1, 100) && text(data.inviteId, 0, 128) && data.status in ['pending', 'approved', 'rejected']
+        && date(data.createdAt) && (data.reviewedAt == '' || date(data.reviewedAt));
+    }
+    function validInvite(data) {
+      return data.inviteId == '' || get(/databases/$(database)/documents/communityTeamInvites/$(data.inviteId)).data.teamId == data.teamId
+        && get(/databases/$(database)/documents/communityTeamInvites/$(data.inviteId)).data.revoked == false
+        && get(/databases/$(database)/documents/communityTeamInvites/$(data.inviteId)).data.expiresAt > request.time;
+    }
+    match /communityTeamJoinRequests/{id} {
+      allow get: if signed() && (!exists(/databases/$(database)/documents/communityTeamJoinRequests/$(id)) || owner(resource.data.userId) || teamManager(resource.data.teamId) || admin() && pilotReadAllowed());
+      allow list: if owner(resource.data.userId) || teamManager(resource.data.teamId) || admin() && pilotReadAllowed();
+      allow create: if active() && validJoinRequest(request.resource.data, id) && request.resource.data.userId == request.auth.uid
+        && request.resource.data.name == actorProfile().name && request.resource.data.status == 'pending' && request.resource.data.createdAt == request.time
+        && request.resource.data.reviewedAt == '' && teamRecord(request.resource.data.teamId).status == 'active'
+        && !teamMember(request.resource.data.teamId) && validInvite(request.resource.data);
+      allow update: if active() && validJoinRequest(request.resource.data, id) && (
+        owner(resource.data.userId) && resource.data.status == 'rejected' && request.resource.data.status == 'pending'
+          && request.resource.data.createdAt == request.time && request.resource.data.reviewedAt == '' && validInvite(request.resource.data)
+          && request.resource.data.teamId == resource.data.teamId && request.resource.data.userId == resource.data.userId
+        || teamManager(resource.data.teamId) && teamRecord(resource.data.teamId).status == 'active' && resource.data.status == 'pending'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'reviewedAt']) && request.resource.data.status in ['approved', 'rejected']
+          && request.resource.data.reviewedAt == request.time && (request.resource.data.status != 'approved'
+            || getAfter(/databases/$(database)/documents/communityTeamMembers/$(id)).data.role == 'member'));
+      allow delete: if owner(resource.data.userId);
+    }
+
+    match /users/{uid} {
+      allow read: if owner(uid) || admin();
+      allow create: if owner(uid) && request.resource.data.uid == uid
+        && request.resource.data.role in ['PLAYER', 'GUARDIAN']
+        && request.resource.data.keys().hasOnly(['uid', 'email', 'displayName', 'photoURL', 'role', 'createdAt',
+          'bio', 'location', 'height', 'weight', 'updatedAt']);
+      allow update: if owner(uid) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
+        ['displayName', 'photoURL', 'bio', 'location', 'height', 'weight', 'updatedAt']);
+      allow delete: if false;
+      match /likes/{id} {
+        allow read, delete: if owner(uid);
+        allow create, update: if owner(uid) && request.resource.data.keys().hasOnly(['timestamp'])
+          && date(request.resource.data.timestamp);
+      }
+    }
+    match /{document=**} { allow read, write: if false; }
   }
 }

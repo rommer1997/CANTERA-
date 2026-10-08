@@ -33,7 +33,7 @@ interface AppState {
 export const useAppStore = create<AppState>((set) => ({
   user: null,
   notifications: [
-    { id: '1', title: 'Bienvenido', message: 'Gracias por unirte a Cantera.', time: 'Hace 2 min', read: false, type: 'info' },
+    { id: '1', title: 'Bienvenido', message: 'Gracias por unirte a LaCantera.', time: 'Hace 2 min', read: false, type: 'info' },
     { id: '2', title: 'Perfil Verificado', message: 'Tu identidad ha sido confirmada.', time: 'Hace 1 hora', read: false, type: 'success' },
   ],
   setUser: (user) => set({ user }),

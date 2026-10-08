@@ -341,7 +341,7 @@ export default function Cantera5Settings() {
                 
                 <div className="space-y-4 text-sm text-gray-600 dark:text-gray-300 h-[400px] overflow-y-auto pr-2 custom-scrollbar">
                   <h3 className="text-charcoal dark:text-white font-bold">1. Acceptance of Terms</h3>
-                  <p>By accessing and using CANTERA, you accept and agree to be bound by the terms and provision of this agreement.</p>
+                  <p>By accessing and using LaCantera, you accept and agree to be bound by the terms and provision of this agreement.</p>
                   
                   <h3 className="text-charcoal dark:text-white font-bold">2. User Accounts</h3>
                   <p>You are responsible for maintaining the confidentiality of your account and password and for restricting access to your computer or device.</p>

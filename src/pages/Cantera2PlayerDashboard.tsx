@@ -174,8 +174,8 @@ export default function Cantera2PlayerDashboard() {
     try {
       if (navigator.share) {
         await navigator.share({
-          title: 'Cantera Player Profile',
-          text: 'Check out my football profile on Cantera!',
+          title: 'LaCantera Player Profile',
+          text: 'Check out my football profile on LaCantera!',
           url: window.location.href,
         });
       } else {
@@ -214,7 +214,7 @@ export default function Cantera2PlayerDashboard() {
       case 0: setActiveTab('dashboard'); break; // Radar
       case 1: setActiveTab('profile'); break; // PRO Badge
       case 2: break; // Guardian (Header, any tab)
-      case 3: setActiveTab('network'); break; // Analytics
+      case 3: setActiveTab('dashboard'); break; // Analytics
       case 4: break; // Decision (Any tab)
       case 5: setActiveTab('dashboard'); break; // Compare
       case 6: 
@@ -340,7 +340,7 @@ export default function Cantera2PlayerDashboard() {
               className="bg-white dark:bg-charcoal p-8 rounded-3xl border border-border-subtle max-w-sm w-full text-center"
               onClick={e => e.stopPropagation()}
             >
-              <h3 className="text-xl font-bold mb-2">My Cantera QR</h3>
+              <h3 className="text-xl font-bold mb-2">My LaCantera QR</h3>
               <p className="text-sm text-charcoal/50 dark:text-ice/50 mb-8">Scouts can scan this to view your profile instantly.</p>
               
               <div className="bg-white p-4 rounded-2xl inline-block mb-8">
@@ -434,7 +434,7 @@ function NavButton({ icon, label, isActive, onClick }: { icon: React.ReactNode, 
         isActive ? "text-gold bg-gold/10 scale-110" : "text-charcoal/40 dark:text-ice/40 hover:text-charcoal/80 dark:hover:text-ice/80"
       )}
     >
-      {React.cloneElement(icon as React.ReactElement, { size: 20 })}
+      {React.cloneElement(icon as React.ReactElement<{ size?: number }>, { size: 20 })}
       <span className="text-[9px] font-bold uppercase tracking-tighter">{label}</span>
       {isActive && <motion.div layoutId="nav-indicator" className="w-1 h-1 bg-gold rounded-full absolute -bottom-1" />}
     </button>
