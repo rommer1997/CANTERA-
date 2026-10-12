@@ -1,8 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { onAuthStateChanged, type User } from 'firebase/auth';
 import { collection, deleteDoc, getCountFromServer, serverTimestamp, doc, getDoc, getDocs, limit, onSnapshot, orderBy, query, runTransaction, setDoc, startAfter, updateDoc, where, writeBatch, type DocumentData, type DocumentSnapshot, type QueryDocumentSnapshot } from 'firebase/firestore';
-import { deleteObject, getDownloadURL, ref, uploadBytesResumable } from 'firebase/storage';
-import { auth, db, logout, signInWithGoogle, storage } from '../firebase';
+import { auth, db, loadStorage, logout, signInWithGoogle } from '../firebase';
 import { useAppStore } from '../store/useAppStore';
 import { deleteLocalMedia, getLocalMedia, readDemo, saveLocalMedia, writeDemo, type DemoData } from './local';
 import { createLocalMediaCache, publishLocalPosts } from './localMediaCache';
@@ -954,6 +953,7 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
         else {
           const ext = ({ 'video/mp4': 'mp4', 'video/webm': 'webm', 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' } as Record<string, string>)[file.type];
           mediaPath = `community/${user.id}/${id}.${ext}`;
+          const { storage, ref, uploadBytesResumable, getDownloadURL } = await loadStorage();
           const asset = ref(storage, mediaPath); const upload = uploadBytesResumable(asset, file, { contentType: file.type });
           await new Promise<void>((resolve, reject) => upload.on('state_changed', state => progress?.(Math.round(state.bytesTransferred / state.totalBytes * 100)), reject, resolve));
           mediaUrl = await getDownloadURL(asset);
@@ -963,7 +963,7 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
       if (mode === 'demo') mutateDemo(data => ({ ...data, posts: [post, ...data.posts] }));
       else await setDoc(doc(db, 'communityPosts', id), { ...post, createdAt: serverTimestamp() });
     } catch (err) {
-      if (mediaPath) { try { if (mode === 'demo') await deleteLocalMedia(id); else await deleteObject(ref(storage, mediaPath)); } catch { /* cleanup can be retried by admin */ } }
+      if (mediaPath) { try { if (mode === 'demo') await deleteLocalMedia(id); else { const { storage, ref, deleteObject } = await loadStorage(); await deleteObject(ref(storage, mediaPath)); } } catch { /* cleanup can be retried by admin */ } }
       throw err;
     }
     return id;
@@ -980,7 +980,7 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
       // Retained interactions become unavailable to others under the prepared rules.
       // Physical cleanup uses the owner's bounded maintenance script until the trigger is funded.
       if (post.mediaPath) {
-        try { await deleteObject(ref(storage, post.mediaPath)); } catch (err) { console.error('Media cleanup deferred to the server', err); }
+        try { const { storage, ref, deleteObject } = await loadStorage(); await deleteObject(ref(storage, post.mediaPath)); } catch (err) { console.error('Media cleanup deferred to the server', err); }
       }
     }
   }

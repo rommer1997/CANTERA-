@@ -72,7 +72,7 @@ function providerHarness({ buildOpen = true, pilotBuild = false, existing = new 
   const modules: Record<string, unknown> = {
     react, 'react/jsx-runtime': { jsx: (type: any, props: any) => ({ type, props }) },
     'firebase/auth': { onAuthStateChanged: (_auth: any, callback: any) => { authListener = callback; return () => {}; } },
-    'firebase/firestore': firestore, 'firebase/storage': {}, '../firebase': { auth, db: {}, storage: {},
+    'firebase/firestore': firestore, '../firebase': { auth, db: {}, loadStorage: async () => ({}),
       signInWithGoogle: async () => { auth.currentUser = loginUser; await authListener(loginUser); return loginUser; },
       logout: async () => { auth.currentUser = null; await authListener(null); } },
     '../store/useAppStore': { useAppStore: (selector: any) => selector({ setUser: noUser }) },

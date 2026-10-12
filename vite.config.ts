@@ -8,7 +8,7 @@ export default defineConfig(({mode}) => {
   return {
     plugins: [react(), tailwindcss(), canteraShell()],
     base: './',
-    build: { rollupOptions: { output: { manualChunks: { 'firebase': ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/storage'], 'react': ['react', 'react-dom', 'react-router-dom'] } } } },
+    build: { rollupOptions: { output: { manualChunks: { 'firebase': ['firebase/app', 'firebase/auth', 'firebase/firestore'], 'react': ['react', 'react-dom', 'react-router-dom'] } } } },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
