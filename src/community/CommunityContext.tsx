@@ -25,7 +25,7 @@ function noticeRecipientAllowed(event: Pick<PlayEvent, 'visibility' | 'ownerId' 
   return isPublicEvent(event) || event.ownerId === recipientId || Object.hasOwn(event.participants, recipientId);
 }
 interface CommunityAPI {
-  profile: CommunityProfile | null; mode: Mode; loading: boolean; error: string; isAdmin: boolean;
+  profile: CommunityProfile | null; accountEmail: string | null; mode: Mode; loading: boolean; error: string; isAdmin: boolean;
   demoEnabled: boolean; pilotEnabled: boolean; serviceAvailable: boolean; mediaUploadsEnabled: boolean; runtimeConfig: RuntimeConfig; accountModeration: AccountModeration | null;
   ownEvents: PlayEvent[]; ownEventsHasMore: boolean; ownEventsLoading: boolean; loadMoreOwnEvents(): Promise<void>; eventsHasMore: boolean; postsHasMore: boolean; eventsLoading: boolean; postsLoading: boolean;
   loadMoreEvents(reset?: boolean): Promise<void>; loadMorePosts(reset?: boolean): Promise<void>;
@@ -99,6 +99,7 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
   const [adminQueueHasMore, setAdminQueueHasMore] = useState({ verification: true, reports: true, rights: true });
   const [adminQueueLoading, setAdminQueueLoading] = useState({ verification: false, reports: false, rights: false });
   const adminCursors = useRef<Record<'verification' | 'reports' | 'rights', QueryDocumentSnapshot<DocumentData> | null>>({ verification: null, reports: null, rights: null });
+  const adminQueueRequests = useRef<Partial<Record<'verification' | 'reports' | 'rights', symbol>>>({});
   const deliveryCursors = useRef(new Map<string, { stage: 'changes' | 'promotions' | 'done'; cursor: QueryDocumentSnapshot<DocumentData> | null; candidates: Array<{ id: string; value: DocumentData }>; busy: boolean }>());
   const [rightsRequests, setRightsRequests] = useState<RightsRequest[]>([]);
   const [blockedIds, setBlockedIds] = useState<string[]>([]);
@@ -109,7 +110,11 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
   const [olderEvents, setOlderEvents] = useState<PlayEvent[]>([]);
   const [olderPosts, setOlderPosts] = useState<CommunityPost[]>([]);
   const peopleSearch = useRef<{ value: string; field: PeopleSearchField }>({ value: '', field: 'name' });
-  const [profile, setProfile] = useState<CommunityProfile | null>(null);
+  const [profileState, setProfileState] = useState<{ mode: Mode; value: CommunityProfile | null }>({ mode, value: null });
+  const setProfile = (value: CommunityProfile | null) => setProfileState({ mode, value });
+  const identityMatches = mode === 'demo' || Boolean(firebaseUser && auth.currentUser?.uid === firebaseUser.uid);
+  const profile = profileState.mode === mode && identityMatches
+    && (mode === 'demo' || profileState.value?.id === firebaseUser?.uid) ? profileState.value : null;
   const [events, setEvents] = useState<PlayEvent[]>([]);
   const [posts, setPosts] = useState<CommunityPost[]>([]);
   const [likes, setLikes] = useState<Record<string, string[]>>({});
@@ -139,6 +144,10 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
   const serviceOpenRef = useRef(serviceOpen); serviceOpenRef.current = serviceOpen;
   const readScope = JSON.stringify([mode, firebaseUser?.uid || '', isAdmin, runtimeConfig.serviceStatus, serviceOpen, runtimeConfig.pilotUserIds]);
   const currentReadScope = useRef(readScope); currentReadScope.current = readScope;
+  const dataReadScope = useRef('');
+  const readReady = dataReadScope.current === readScope && (mode === 'demo' || auth.currentUser?.uid === firebaseUser?.uid);
+  const privateReadReady = identityMatches && readReady;
+  const adminReadReady = privateReadReady && mode === 'cloud' && isAdmin;
   const eventViewer = mode === 'demo' ? profile?.id : firebaseUser?.uid;
   const currentEventViewer = useRef(eventViewer); currentEventViewer.current = eventViewer;
   const fixtureWatches = useRef(new Map<string, symbol>());
@@ -148,7 +157,10 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     setAccountModeration(null); if (mode !== 'cloud' || !firebaseUser) return;
-    return onSnapshot(doc(db, 'communityAccountModeration', firebaseUser.uid), snapshot => { const data = snapshot.data(); const at = data?.updatedAt?.toDate?.(); setAccountModeration(data && ['active', 'suspended'].includes(data.status) && typeof data.reason === 'string' && at instanceof Date ? { status: data.status, reason: data.reason, updatedAt: at.toISOString() } : null); }, readFailure);
+    let active = true;
+    const current = () => active && currentMode.current === 'cloud' && auth.currentUser?.uid === firebaseUser.uid;
+    const stop = onSnapshot(doc(db, 'communityAccountModeration', firebaseUser.uid), snapshot => { if (!current()) return; const data = snapshot.data(); const at = data?.updatedAt?.toDate?.(); setAccountModeration(data && ['active', 'suspended'].includes(data.status) && typeof data.reason === 'string' && at instanceof Date ? { status: data.status, reason: data.reason, updatedAt: at.toISOString() } : null); }, error => { if (current()) readFailure(error); });
+    return () => { active = false; stop(); };
   }, [mode, firebaseUser?.uid, readFailure]);
 
   const watchPublicProfile = useCallback((id: string) => {
@@ -280,9 +292,13 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
     }
     setFollowingIds([]);
     if (!firebaseUser || !serviceOpen) return;
-    return onSnapshot(query(collection(db, 'communityFollows'), where('followerId', '==', firebaseUser.uid)), snapshot => {
+    let active = true;
+    const current = () => active && currentMode.current === mode && auth.currentUser?.uid === firebaseUser.uid;
+    const stop = onSnapshot(query(collection(db, 'communityFollows'), where('followerId', '==', firebaseUser.uid)), snapshot => {
+      if (!current()) return;
       setFollowingIds(snapshot.docs.map(item => normalizeFollow(item.data(), item.id)).filter(item => item !== null).map(item => item.followingId));
-    }, readFailure);
+    }, error => { if (current()) readFailure(error); });
+    return () => { active = false; stop(); };
   }, [mode, firebaseUser?.uid, runtimeConfig.serviceStatus, serviceOpen, readFailure]);
 
   useEffect(() => {
@@ -333,6 +349,12 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
     let active = true;
     const isCurrentRead = () => active && currentReadScope.current === readScope && (mode === 'demo' || auth.currentUser?.uid === firebaseUser?.uid);
     const failed = (err: unknown) => { if (isCurrentRead()) readFailure(err); };
+    dataReadScope.current = readScope;
+    adminQueueRequests.current = {};
+    adminCursors.current = { verification: null, reports: null, rights: null };
+    setAdminQueueLoading({ verification: false, reports: false, rights: false });
+    setAdminQueueHasMore({ verification: true, reports: true, rights: true });
+    setAdminRightsRequests([]);
     setError(''); setFixtureData({}); setFixtureStates({}); setEventHistories({}); if (mode === 'cloud' && !serviceOpen) { setLinkedPosts(previous => ({ ...previous, cloud: {} })); setPublicCaches(previous => ({ ...previous, cloud: {} })); } ownSources.current = { owner: [], joined: [], waiting: [] }; setOlderEvents([]); setOlderPosts([]); setOwnEvents([]); setEventNotices([]); setRightsRequests([]); setBlockedIds([]); setPostInteractionStates({}); pageCursors.current = { events: { cursor: null, offset: 0, busy: false, ready: false }, posts: { cursor: null, offset: 0, busy: false, ready: false } }; setPages({ eventsHasMore: serviceOpen, postsHasMore: serviceOpen, eventsLoading: serviceOpen, postsLoading: serviceOpen }); setEvents([]); setPosts([]); setLikes({}); setComments({}); setVerifications([]); setReports([]); setProfile(null);
     setLoading(true);
     if (mode === 'demo') {
@@ -623,15 +645,18 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
     else await setDoc(doc(db, 'communityReports', report.id), { ...report, createdAt: serverTimestamp() });
   }
   async function loadMoreAdminQueue(kind: 'verification' | 'reports' | 'rights') {
-    sessionActor(); if (!isAdmin || mode !== 'cloud' || adminQueueLoading[kind]) return;
+    const user = sessionActor(); if (!isAdmin || mode !== 'cloud' || adminQueueRequests.current[kind]) return;
+    const request = Symbol(kind); adminQueueRequests.current[kind] = request;
+    const current = () => adminQueueRequests.current[kind] === request && currentReadScope.current === readScope && currentMode.current === 'cloud' && auth.currentUser?.uid === user.id;
     setAdminQueueLoading(previous => ({ ...previous, [kind]: true }));
     try { const names = { verification: 'communityVerifications', reports: 'communityReports', rights: 'communityRightsRequests' }; const condition = kind === 'rights' ? where('status', 'in', ['pending', 'processing']) : where('status', '==', kind === 'verification' ? 'pending' : 'open');
       const cursor = adminCursors.current[kind]; const snapshot = await getDocs(query(collection(db, names[kind]), condition, orderBy('createdAt', 'asc'), ...(cursor ? [startAfter(cursor)] : []), limit(100)));
+      if (!current()) return;
       adminCursors.current[kind] = snapshot.docs.at(-1) || cursor; setAdminQueueHasMore(previous => ({ ...previous, [kind]: snapshot.size === 100 }));
       if (kind === 'verification') { const values = snapshot.docs.map(d => normalizeVerification(d.data(), d.id)).filter((v): v is VerificationRequest => v !== null); setVerifications(previous => [...new Map([...previous, ...values].map(v => [v.id, v])).values()]); }
       else if (kind === 'reports') { const values = snapshot.docs.map(d => normalizeReport(d.data(), d.id)).filter((v): v is ContentReport => v !== null); setReports(previous => [...new Map([...previous, ...values].map(v => [v.id, v])).values()]); }
       else { const values = snapshot.docs.map(d => normalizeRightsRequest(d.data(), d.id)).filter((v): v is RightsRequest => v !== null); setAdminRightsRequests(previous => [...new Map([...previous, ...values].map(v => [v.id, v])).values()]); }
-    } finally { setAdminQueueLoading(previous => ({ ...previous, [kind]: false })); }
+    } finally { if (current()) { delete adminQueueRequests.current[kind]; setAdminQueueLoading(previous => ({ ...previous, [kind]: false })); } }
   }
   async function suspendAccount(userId: string, reason: string, suspend = true) {
     const user = sessionActor(); if (!isAdmin || mode !== 'cloud') throw new Error('Esta acción requiere la cuenta administradora.'); if (!validProfileId(userId) || userId === user.id) throw new Error('Cuenta inválida o propia.');
@@ -1050,8 +1075,8 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
     if (removePost) { if (report.commentId) await deleteComment(report.postId, report.commentId); else await deletePost(report.postId); }
     await updateDoc(doc(db, 'communityReports', id), { status: 'resolved' });
   }
-  const value: CommunityAPI = { profile, mode, loading, error, isAdmin, demoEnabled, pilotEnabled, serviceAvailable: serviceOpen, accountModeration, mediaUploadsEnabled: mode === 'demo', runtimeConfig: mode === 'demo' ? { serviceStatus: 'open', mediaUploadsEnabled: true, contactEmail: '', updatedAt: '' } : { ...runtimeConfig, serviceStatus: runtimeConfig.serviceStatus === 'pilot' ? 'pilot' : serviceOpen ? 'open' : runtimeConfig.serviceStatus === 'paused' ? 'paused' : 'setup' }, adminRightsRequests, adminQueueHasMore, adminQueueLoading, loadMoreAdminQueue, suspendAccount, reviewRightsRequest, updateRuntimeStatus, ownEvents: readableOwnEvents, ownEventsHasMore: false, ownEventsLoading: loading, loadMoreOwnEvents, ...pages, loadMoreEvents, loadMorePosts, fixtureData, fixtureStates, watchFixtureData, eventHistories, watchEventHistory, eventNotices, rightsRequests, blockedIds, toggleBlock, markNoticeRead, requestRights, retryEventNotices, postInteractionStates, watchPostInteractions, loadMoreComments, deleteComment, reportComment, searchPeople, events: serviceOpen ? availableEvents : [], posts: serviceOpen ? availablePosts : [], likes, comments, verificationRequests, reports, hiddenPostIds,
-    profiles: serviceOpen && peoplePage.mode === mode ? peoplePage.profiles : [], publicProfiles: serviceOpen ? publicCaches[mode] : {}, publicProfileStates: profileStates[mode], followingIds,
+  const value: CommunityAPI = { profile, accountEmail: identityMatches && mode === 'cloud' && firebaseUser?.uid === profile?.id ? firebaseUser?.email || null : null, mode, loading, error, isAdmin: identityMatches && mode === 'cloud' && isAdmin, demoEnabled, pilotEnabled, serviceAvailable: serviceOpen, accountModeration: privateReadReady ? accountModeration : null, mediaUploadsEnabled: mode === 'demo', runtimeConfig: mode === 'demo' ? { serviceStatus: 'open', mediaUploadsEnabled: true, contactEmail: '', updatedAt: '' } : { ...runtimeConfig, serviceStatus: runtimeConfig.serviceStatus === 'pilot' ? 'pilot' : serviceOpen ? 'open' : runtimeConfig.serviceStatus === 'paused' ? 'paused' : 'setup' }, adminRightsRequests: adminReadReady ? adminRightsRequests : [], adminQueueHasMore, adminQueueLoading, loadMoreAdminQueue, suspendAccount, reviewRightsRequest, updateRuntimeStatus, ownEvents: privateReadReady ? readableOwnEvents : [], ownEventsHasMore: false, ownEventsLoading: loading, loadMoreOwnEvents, ...pages, loadMoreEvents, loadMorePosts, fixtureData: readReady ? fixtureData : {}, fixtureStates: readReady ? fixtureStates : {}, watchFixtureData, eventHistories: readReady ? eventHistories : {}, watchEventHistory, eventNotices: privateReadReady ? eventNotices.filter(notice => notice.recipientId === profile?.id) : [], rightsRequests: privateReadReady ? rightsRequests.filter(request => request.userId === profile?.id) : [], blockedIds: privateReadReady ? blockedIds : [], toggleBlock, markNoticeRead, requestRights, retryEventNotices, postInteractionStates, watchPostInteractions, loadMoreComments, deleteComment, reportComment, searchPeople, events: serviceOpen ? availableEvents : [], posts: serviceOpen ? availablePosts : [], likes, comments, verificationRequests: privateReadReady ? (adminReadReady ? verificationRequests : verificationRequests.filter(request => request.userId === profile?.id)) : [], reports: adminReadReady ? reports : [], hiddenPostIds: privateReadReady ? hiddenPostIds : [],
+    profiles: serviceOpen && peoplePage.mode === mode ? peoplePage.profiles : [], publicProfiles: serviceOpen ? publicCaches[mode] : {}, publicProfileStates: profileStates[mode], followingIds: privateReadReady ? followingIds : [],
     peopleLoading: peoplePage.mode === mode && peoplePage.loading, peopleError: peoplePage.mode === mode ? peoplePage.error : '', peopleHasMore: peoplePage.mode !== mode || peoplePage.hasMore,
     loadMorePeople, watchPublicProfile, retryPublicProfile, toggleFollow, watchPost, linkedPostStates: linkedStates[mode],
     login, loginAdmin, signOut, beginDemo, saveProfile, createEvent, createEventSeries, updateEvent, removeGuest, setRsvp, joinWaitlist, leaveWaitlist, saveMatchResult, scheduleFixture, joinEvent, leaveEvent, addGuest, setEventStatus, generateFixtures, saveScore,

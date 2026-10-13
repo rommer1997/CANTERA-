@@ -61,3 +61,33 @@ Esta publicación no activa Blaze, facturación, Storage para archivos de usuari
 `tests/firebase-hosting.test.ts` arranca en un puerto local temporal la misma capa HTTP utilizada por el emulador de Hosting. Comprueba el fallback de la SPA, la revalidación de HTML/PWA, el caché de archivos versionados y el 404 de assets retirados. Usa archivos de prueba y no consulta ni modifica servicios remotos. No sustituye la comprobación del despliegue, Auth y Firestore reales.
 
 `tests/release-environment.test.ts` comprueba la discrepancia entre flags del proceso y archivos locales, así como el rechazo de actas incompletas, proyecto distinto y activación de demo/medios. Las actas de ensayo se crean únicamente en carpetas temporales aisladas; no se genera una aprobación del proyecto.
+
+## Transición revisable del piloto al núcleo público
+
+`scripts/open-community.cjs` prepara exclusivamente el cambio de `communityConfiguration/runtime` en `gen-lang-client-0853130215/ai-studio-647af55f-499b-43f3-9268-9bf5f62701bb`. **La simulación es el modo predeterminado.** No crea un acta ni publica Hosting, y no modifica facturación, proveedores, Storage, Functions o permisos de administración. Consultar [RELEASE_REVIEW.md](RELEASE_REVIEW.md) para controles y [OPERATING_POLICY.md](OPERATING_POLICY.md) para la propuesta operativa; sus controles deben aceptarse y comprobarse realmente.
+
+Orden de apertura: revisión y acta real vigentes → compilación pública verificada → publicación y comprobación del Hosting exacto → simulación cloud → cambio condicional de runtime → comprobación de acceso público. Antes del cambio de runtime deben estar verificadas identidad/contacto, atención, derechos/recuperación y recorrido entre dos cuentas; no se inventa un acta para ensayar el comando.
+
+Preparar los flags de apertura en el proceso de compilación y en el mismo proceso de la herramienta. Ésta exige `VITE_SERVICE_OPEN=true`, `VITE_ENABLE_PILOT=false`, `VITE_ENABLE_DEMO=false`, `VITE_ENABLE_MEDIA_UPLOADS=false`, `VITE_HOSTING_PROVIDER=firebase`, datos del responsable y `docs/release-approved.json` existente. Invoca `check-release.mjs` antes de iniciar sesión o leer cloud; un acta ausente, caducada, con destino distinto o controles pendientes falla cerrada.
+
+Ejemplo de simulación, una vez cumplidos los controles reales:
+
+```sh
+VITE_SERVICE_OPEN=true VITE_ENABLE_PILOT=false VITE_ENABLE_DEMO=false VITE_ENABLE_MEDIA_UPLOADS=false VITE_HOSTING_PROVIDER=firebase node scripts/open-community.cjs --dry-run
+```
+
+El comando revalida sólo por lectura la base Enterprise exacta, la versión activa de reglas byte a byte frente a `firestore.rules`, **30 índices READY** con definiciones coincidentes y sin overrides efectivos inesperados, `lacantera.web.app` autorizado, proveedor Google habilitado y la cuenta administradora ya existente/verificada. Pagina los índices y overrides; un resultado incompleto, error o carrera no se presenta como éxito. Usa la sesión humana de Firebase CLI seleccionada para esta carpeta y rechaza emuladores, ADC, tokens u overrides de origen OAuth/Identity. No imprime correos, UIDs, secretos, listas de participantes o cuerpos de Auth.
+
+La simulación devuelve cantidades, booleanos y el estado previsto; **no abre el servicio**. Comprobar también el recibo y los archivos de la build pública publicada: la herramienta revisa sus flags locales, pero no demuestra por sí sola que esa build esté en Hosting. Coordinar el operador para que nadie cambie reglas, índices, Auth, entorno o acta entre comprobación y transición.
+
+Sólo después de revisar ese resultado y completar la publicación autorizada puede ejecutarse la acción:
+
+```sh
+VITE_SERVICE_OPEN=true VITE_ENABLE_PILOT=false VITE_ENABLE_DEMO=false VITE_ENABLE_MEDIA_UPLOADS=false VITE_HOSTING_PROVIDER=firebase node scripts/open-community.cjs --apply
+```
+
+`--apply` relee los archivos, entorno y `check-release`; si cambió su huella, bloquea la escritura. Envía **un único** `documents:commit` con `currentDocument.updateTime` de la lectura, `retries:0` y `retryCodes:[]`. Sustituye el documento por `serviceStatus:'open'`, `mediaUploadsEnabled:false` y el `contactEmail` exacto que ya tenía, eliminando `pilotUserIds`; `updatedAt` procede de `REQUEST_TIME` del servidor. No crea runtime ausente ni admite esquemas desconocidos, medios activos o una transición desde `setup`. `open` ya válido sólo devuelve `unchanged` tras completar las comprobaciones.
+
+Después se relee el documento y se exige el esquema público de cuatro campos. Si falla CAS, el transporte o la verificación, no se reintenta ni se relaja la precondición. Una respuesta ambigua puede haber aplicado el cambio: la herramienta intenta una lectura e informa del estado observado, pero falla la acción para revisión del operador. Volver a una simulación de sólo lectura y consultar el recibo antes de decidir una nueva operación.
+
+Las comprobaciones de reglas, índices y Auth y el commit de Firestore no forman una transacción global. Este procedimiento necesita coordinación real del operador. Los tests de la herramienta usan fixtures en memoria y peticiones simuladas; no crean aprobaciones del proyecto ni ejecutan una apertura de producción.

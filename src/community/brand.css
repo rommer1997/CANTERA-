@@ -59,6 +59,8 @@
 .c-mission .c-eyebrow { color: #b5e5c3; }
 .c-mission p:not(.c-eyebrow) { color: #c6c6cb; }
 .c-legal section p { color: #525259; }
+.c-brand-credit { color: var(--c-muted); font-size: 11px; line-height: 1.5; }
+.c-mobile-info .c-brand-credit { margin: 4px 0 16px; }
 .c-profile-links { display: flex; flex-wrap: wrap; gap: 12px 24px; margin: -8px 0 24px; }
 .c-profile-links a { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; font-size: 13px; font-weight: 650; }
 .c-profile-links a:first-child { color: var(--c-green); }

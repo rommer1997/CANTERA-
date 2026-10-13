@@ -14,6 +14,7 @@ function acceptanceHarness(initial = invite()) {
   let cursor = 0, dirty = false, rawCode = code;
   const slots: any[] = [], effects: Array<() => void> = [], cleanups: Array<(() => void) | undefined> = [];
   const watched: string[] = [], retried: string[] = [], accepted: string[] = [], navigated: string[] = [];
+  const timers = new Map<number, () => void>(); let nextTimer = 1;
   const lookups: Array<{ code: string; resolve: (value: any) => void; reject: (error: any) => void }> = [];
   const community: any = {
     mode: 'cloud', profile: { id: 'alice', name: 'Mi cuenta' }, serviceAvailable: true,
@@ -48,7 +49,9 @@ function acceptanceHarness(initial = invite()) {
   const source = readFileSync(new URL('../src/community/ConnectionsPage.tsx', import.meta.url), 'utf8') + '\nexport { InvitationAcceptance };';
   const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
   const exports: any = {};
-  new Function('exports', 'require', 'window', compiled)(exports, (name: string) => modules[name], { setInterval: () => 1, clearInterval() {} });
+  new Function('exports', 'require', 'window', compiled)(exports, (name: string) => modules[name], { setInterval: () => 1, clearInterval() {},
+    setTimeout(callback: () => void, milliseconds: number) { assert.equal(milliseconds, 20000); const id = nextTimer++; timers.set(id, callback); return id; },
+    clearTimeout(id: number) { timers.delete(id); } });
   let tree: any;
   function render() {
     for (let attempt = 0; attempt < 20; attempt++) {
@@ -70,6 +73,7 @@ function acceptanceHarness(initial = invite()) {
     profile(id: string, name: string, state = 'ready') { community.publicProfileStates[id] = state; community.publicProfiles[id] = { id, name }; render(); },
     profileFailure(id: string, state: string) { delete community.publicProfiles[id]; community.publicProfileStates[id] = state; render(); },
     changeCode(value: string) { rawCode = value; render(); },
+    expireReads() { const current = [...timers.entries()]; for (const [id, callback] of current) { timers.delete(id); callback(); } render(); },
     cleanup() { cleanups.forEach(cleanup => cleanup?.()); },
   };
 }
@@ -158,5 +162,32 @@ test('fallo de consulta de invitación tiene un reintento y nunca consulta el pe
     h.button('Volver a comprobar invitación').props.onClick(); h.render();
     assert.equal(h.lookups.length, 2); await h.confirm();
     assert.deepEqual(h.watched, ['bob']);
+  } finally { h.cleanup(); }
+});
+
+test('una lectura que no responde termina con reintento y descarta su resultado tardío', async () => {
+  const h = acceptanceHarness();
+  try {
+    assert.match(h.text(), /Comprobando invitación/); const first = h.lookups[0];
+    h.expireReads(); assert.match(h.text(), /comprobación de la invitación está tardando demasiado/);
+    assert.deepEqual(h.watched, []); h.button('Volver a comprobar invitación').props.onClick(); h.render();
+    assert.equal(h.lookups.length, 2); first.resolve(invite({ ownerId: 'late-owner' })); await h.settle();
+    assert.deepEqual(h.watched, []); assert.match(h.text(), /Comprobando invitación/);
+    await h.confirm(); h.profile('bob', 'Identidad recuperada'); assert.equal(h.button('Aceptar conexión').props.disabled, false);
+  } finally { h.cleanup(); }
+});
+
+test('la identidad que sigue cargando ofrece reintento con un plazo nuevo sin permitir aceptación', async () => {
+  const h = acceptanceHarness();
+  try {
+    await h.confirm(); assert.match(h.text(), /Comprobando quién te invita/);
+    h.expireReads(); assert.match(h.text(), /comprobación del perfil está tardando demasiado/);
+    assert.equal(h.button('Aceptar conexión').props.disabled, true);
+    h.button('Volver a comprobar').props.onClick(); h.render();
+    assert.deepEqual(h.retried, ['bob', 'bob']); assert.match(h.text(), /Comprobando quién te invita/);
+    h.expireReads(); assert.match(h.text(), /comprobación del perfil está tardando demasiado/);
+    h.button('Volver a comprobar').props.onClick(); h.render();
+    h.profile('bob', 'Identidad confirmada'); assert.equal(h.button('Aceptar conexión').props.disabled, false);
+    h.expireReads(); assert.match(h.text(), /Identidad confirmada/); assert.doesNotMatch(h.text(), /tardando demasiado/);
   } finally { h.cleanup(); }
 });

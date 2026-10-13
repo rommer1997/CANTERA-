@@ -1,8 +1,9 @@
 import { initializeApp } from 'firebase/app';
 import { connectAuthEmulator, getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
-import { connectFirestoreEmulator, getFirestore } from 'firebase/firestore';
+import { connectFirestoreEmulator, initializeFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import localConfig from '../firebase-applet-config.json';
+import { firestoreTransport } from './firestoreTransport';
 
 // Public Firebase configuration is compiled by Vite, independently of Hosting.
 const getFirebaseConfig = () => {
@@ -45,7 +46,7 @@ if (!config.apiKey || config.apiKey.includes('TODO')) {
 
 const app = initializeApp(config);
 export const auth = getAuth(app);
-export const db = getFirestore(app, config.databaseId || '(default)');
+export const db = initializeFirestore(app, firestoreTransport(navigator), config.databaseId || '(default)');
 export const storage = getStorage(app);
 if (useLocalEmulators) {
   connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });

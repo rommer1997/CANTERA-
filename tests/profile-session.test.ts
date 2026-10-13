@@ -26,6 +26,9 @@ function providerHarness({ buildOpen = true, pilotBuild = false, existing = new 
   let loginUser: any;
   let pauseNextRead = false, releaseRead: (() => void) | undefined;
   let pageRows: any[] = [], rejectNextDeletion = false;
+  const pausedQueries: Array<(value: any) => void> = [];
+  const queries: any[] = [];
+  let deferNextQuery = false;
   const noUser = () => {};
   const react = {
     createContext: () => ({ Provider: 'provider' }),
@@ -58,13 +61,14 @@ function providerHarness({ buildOpen = true, pilotBuild = false, existing = new 
     collection: (_db: any, ...parts: string[]) => ({ path: parts.join('/') }),
     query: (target: any, ...constraints: any[]) => ({ ...target, constraints }),
     where: (...args: any[]) => args, orderBy: (...args: any[]) => args, limit: (count: number) => count,
+    startAfter: (value: any) => ({ startAfter: value }),
     onSnapshot(target: any, ...args: any[]) {
       const options = typeof args[0] === 'function' ? {} : args.shift();
       const listener = { target, options, next: args[0], error: args[1], stopped: false }; snapshots.push(listener);
       return () => { listener.stopped = true; };
     },
     getDoc: async (target: any) => snapshot(target.path),
-    getDocs: async (target: any) => { const docs = target.path === 'communityPosts' ? pageRows.map(value => snapshot(`communityPosts/${value.id}`, value)) : []; return { docs, size: docs.length }; },
+    getDocs: async (target: any) => { queries.push(target); if (deferNextQuery) { deferNextQuery = false; return new Promise(resolve => { pausedQueries.push(resolve); }); } const docs = target.path === 'communityPosts' ? pageRows.map(value => snapshot(`communityPosts/${value.id}`, value)) : []; return { docs, size: docs.length }; },
     deleteDoc: async (target: any) => { if (rejectNextDeletion) { rejectNextDeletion = false; throw new Error('delete-rejected'); } existing.delete(target.path); emit(target.path, undefined); },
     serverTimestamp: () => serverTime,
     setDoc: async (target: any, value: any) => commit([{ path: target.path, value }]),
@@ -99,14 +103,16 @@ function providerHarness({ buildOpen = true, pilotBuild = false, existing = new 
     }
     throw new Error('Provider no alcanzó un render estable.');
   }
+  function renderBeforeEffects() { dirty = false; cursor = 0; api = exports.CommunityProvider({ children: null }).props.value; return api; }
   async function settle() { for (let attempt = 0; attempt < 5; attempt++) { await new Promise(resolve => setImmediate(resolve)); render(); } return api; }
   render();
   function identity(uid: string, { emailVerified = false, provider = '', admin = false } = {}) {
-    return { uid, displayName: '', emailVerified, getIdTokenResult: async () => ({ claims: { admin, email_verified: emailVerified, firebase: { sign_in_provider: provider } } }) };
+    return { uid, displayName: '', email: `${uid}@example.test`, emailVerified, getIdTokenResult: async () => ({ claims: { admin, email_verified: emailVerified, firebase: { sign_in_provider: provider } } }) };
   }
   return {
-    auth, writes, existing, render, settle,
+    auth, writes, queries, existing, render, settle,
     async identify(uid = 'alpha', options = {}) { const user = identity(uid, options); auth.currentUser = user; await authListener(user); await settle(); },
+    async beginIdentity(uid: string, options = {}) { const user = identity(uid, options); auth.currentUser = user; await authListener(user); return renderBeforeEffects(); },
     async login(uid: string, options = {}) { loginUser = identity(uid, options); await api.login(); await settle(); },
     async runtime(serviceStatus: string, extra = {}) { const value = { serviceStatus, mediaUploadsEnabled: false, contactEmail: '', updatedAt: time, ...extra }; existing.set('communityConfiguration/runtime', value); emit('communityConfiguration/runtime', value); await settle(); },
     emitProfile(uid: string, value: any, pending = false) { emit(`communityProfiles/${uid}`, value, pending); return render(); },
@@ -116,6 +122,9 @@ function providerHarness({ buildOpen = true, pilotBuild = false, existing = new 
     emitPublicProfile(uid: string, value: any) { emit(`communityPublicProfiles/${uid}`, value); return render(); },
     emitPost(id: string, value: any) { emit(`communityPosts/${id}`, value); return render(); },
     emitPosts(values: any[]) { for (const listener of snapshots.filter(item => !item.stopped && item.target.path === 'communityPosts')) listener.next({ docs: values.map(value => snapshot(`communityPosts/${value.id}`, value)), size: values.length, metadata: { fromCache: false } }); return render(); },
+    emitCollection(path: string, values: any[]) { for (const listener of snapshots.filter(item => !item.stopped && item.target.path === path)) listener.next({ docs: values.map(value => snapshot(`${path}/${value.id}`, value)), size: values.length, metadata: { fromCache: false } }); return render(); },
+    emitDocument(path: string, value: any) { emit(path, value); return render(); },
+    renderBeforeEffects, deferQuery() { deferNextQuery = true; }, releaseQuery(path: string, values: any[]) { const docs = values.map(value => snapshot(`${path}/${value.id}`, value)); pausedQueries.shift()?.({ docs, size: docs.length }); },
     page(values: any[]) { pageRows = values; }, failNextDeletion() { rejectNextDeletion = true; },
     activePaths() { return snapshots.filter(item => !item.stopped).map(item => item.target.path); },
     deferRead() { pauseNextRead = true; }, releaseRead() { releaseRead?.(); },
@@ -199,6 +208,78 @@ test('guardar perfil con aceptación nueva tolera proyección local pendiente ha
     await h.settle();
     assert.equal(h.render().profile.acceptedTermsVersion, TERMS_VERSION); assert.equal(h.render().error, '');
     assert.deepEqual(h.writes.slice(1).map(item => item.path), ['communityProfiles/alpha', 'communityPublicProfiles/alpha']);
+  } finally { h.cleanup(); }
+});
+
+test('el primer render de otra identidad oculta perfil y datos privados antes de ejecutar efectos', async () => {
+  const h = providerHarness();
+  try {
+    await h.runtime('open'); const stopPublicHistory = h.render().watchEventHistory('public-event');
+    h.emitCollection('communityEventChanges', [{ id: 'public-event_1', revision: 1, summary: 'Cambio público', createdAt: time }]);
+    assert.equal(h.render().eventHistories['public-event'][0].summary, 'Cambio público'); stopPublicHistory();
+    await h.identify(); await h.runtime('open');
+    h.emitCollection('communityRightsRequests', [{ id: 'alpha_export', userId: 'alpha', kind: 'export', status: 'pending', createdAt: time, reviewedAt: '' }]);
+    h.emitCollection('communityEventNotices', [{ id: 'private-notice', eventId: 'private-event', recipientId: 'alpha', revision: 1, title: 'Convocatoria privada', summary: 'Aviso propio', createdAt: time, readAt: '' }]);
+    h.emitCollection('communityBlocks', [{ id: 'alpha_block', ownerId: 'alpha', blockedId: 'private-peer' }]);
+    h.emitDocument('communityVerifications/alpha', { id: 'alpha', userId: 'alpha', name: 'Mi perfil', organization: 'Persona', evidence: 'Información privada', status: 'pending', createdAt: time, reviewedAt: '' });
+    const original = h.render(), oldListener = h.ownListener()!;
+    assert.equal(original.profile.id, 'alpha'); assert.equal(original.accountEmail, 'alpha@example.test'); assert.equal(original.rightsRequests.length, 1);
+    assert.equal(original.eventNotices.length, 1); assert.equal(original.verificationRequests.length, 1); assert.deepEqual(original.blockedIds, ['private-peer']);
+    h.auth.currentUser = { ...h.auth.currentUser, uid: 'beta' };
+    const beforeAuth = h.renderBeforeEffects();
+    assert.equal(beforeAuth.profile, null); assert.equal(beforeAuth.accountEmail, null); assert.deepEqual(beforeAuth.rightsRequests, []); assert.deepEqual(beforeAuth.eventNotices, []);
+    assert.deepEqual(beforeAuth.verificationRequests, []); assert.deepEqual(beforeAuth.blockedIds, []);
+    const beforeEffects = await h.beginIdentity('beta');
+    assert.equal(beforeEffects.profile, null); assert.deepEqual(beforeEffects.rightsRequests, []); assert.equal(beforeEffects.accountModeration, null);
+    oldListener.next({ id: 'alpha', exists: () => true, data: () => fixture('alpha', { bio: 'Callback anterior' }), metadata: { hasPendingWrites: false } });
+    assert.equal(h.renderBeforeEffects().profile, null);
+    await h.settle(); await h.runtime('open');
+    assert.equal(h.render().profile.id, 'beta'); assert.equal(h.render().accountEmail, 'beta@example.test'); assert.deepEqual(h.render().rightsRequests, []); assert.deepEqual(h.render().eventNotices, []);
+  } finally { h.cleanup(); }
+});
+
+test('una página administrativa pendiente no reincorpora datos privados después de cambiar de cuenta', async () => {
+  const h = providerHarness();
+  try {
+    await h.identify('alpha', { admin: true }); await h.runtime('open');
+    h.emitProfile('alpha', h.existing.get('communityProfiles/alpha')); h.deferQuery();
+    const pending = h.render().loadMoreAdminQueue('rights');
+    await h.beginIdentity('beta'); await h.settle(); await h.runtime('open');
+    h.releaseQuery('communityRightsRequests', [{ id: 'another_export', userId: 'another', kind: 'export', status: 'pending', createdAt: time, reviewedAt: '' }]);
+    await pending; await h.settle();
+    assert.equal(h.render().profile.id, 'beta'); assert.equal(h.render().isAdmin, false); assert.deepEqual(h.render().adminRightsRequests, []);
+    assert.deepEqual(h.render().reports, []); assert.deepEqual(h.render().verificationRequests, []);
+  } finally { h.cleanup(); }
+});
+
+test('volver a una cuenta administradora renueva su paginación y descarta una página de la sesión anterior', async () => {
+  const h = providerHarness();
+  const request = (id: string) => ({ id, userId: id, kind: 'export', status: 'pending', createdAt: time, reviewedAt: '' });
+  try {
+    await h.identify('alpha', { admin: true }); await h.runtime('open');
+    h.emitProfile('alpha', h.existing.get('communityProfiles/alpha'));
+    h.emitCollection('communityRightsRequests', [request('old-cursor')]);
+    h.deferQuery(); const oldPage = h.render().loadMoreAdminQueue('rights');
+    assert.equal(h.render().adminQueueLoading.rights, true);
+    assert.ok(h.queries.at(-1).constraints.some((constraint: any) => constraint?.startAfter?.id === 'old-cursor'));
+
+    await h.identify('beta'); await h.runtime('open');
+    await h.identify('alpha', { admin: true }); await h.runtime('open');
+    h.emitProfile('alpha', h.existing.get('communityProfiles/alpha'));
+    assert.equal(h.render().adminQueueLoading.rights, false);
+    assert.deepEqual(h.render().adminRightsRequests, []);
+    h.deferQuery(); const freshPage = h.render().loadMoreAdminQueue('rights');
+    assert.equal(h.render().adminQueueLoading.rights, true);
+    assert.equal(h.queries.length, 2);
+    assert.ok(!h.queries.at(-1).constraints.some((constraint: any) => constraint?.startAfter));
+
+    h.releaseQuery('communityRightsRequests', [request('stale-page')]); await oldPage; await h.settle();
+    assert.deepEqual(h.render().adminRightsRequests, []);
+    assert.equal(h.render().adminQueueLoading.rights, true);
+    await h.render().loadMoreAdminQueue('rights'); assert.equal(h.queries.length, 2);
+    h.releaseQuery('communityRightsRequests', [request('fresh-page')]); await freshPage; await h.settle();
+    assert.deepEqual(h.render().adminRightsRequests.map((value: any) => value.id), ['fresh-page']);
+    assert.equal(h.render().adminQueueLoading.rights, false);
   } finally { h.cleanup(); }
 });
 
