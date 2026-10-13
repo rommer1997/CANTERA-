@@ -636,21 +636,15 @@ service cloud.firestore {
       allow delete: if owner(resource.data.recipientId) || admin();
     }
     function validPost(data, id) {
-      let prefix = 'community/' + request.auth.uid + '/' + id;
       return data.keys().hasAll(['id', 'authorId', 'authorName', 'kind', 'text', 'title', 'mediaUrl', 'mediaPath', 'createdAt', 'eventId'])
         && data.keys().hasOnly(['id', 'authorId', 'authorName', 'kind', 'text', 'title', 'mediaUrl', 'mediaPath', 'createdAt', 'eventId'])
         && data.id == id && data.authorId == request.auth.uid && data.authorName == actorProfile().name
-        && data.kind == 'achievement' && text(data.text, 1, 2000) && text(data.title, 0, 100)
+        && data.kind in ['post', 'achievement'] && text(data.text, 1, 2000) && text(data.title, 0, 100)
         && date(data.createdAt) && text(data.eventId, 0, 128)
         && (data.eventId == '' || exists(/databases/$(database)/documents/communityEvents/$(data.eventId))
           && eventPublic(get(/databases/$(database)/documents/communityEvents/$(data.eventId)).data))
-        && (
-          data.kind == 'achievement' && text(data.title, 1, 100) && data.mediaUrl == '' && data.mediaPath == ''
-          || data.kind == 'photo' && data.mediaPath in [prefix + '.jpg', prefix + '.png', prefix + '.webp']
-            && text(data.mediaUrl, 1, 2000) && data.mediaUrl.matches('https://firebasestorage[.]googleapis[.]com/.*')
-          || data.kind == 'reel' && data.mediaPath in [prefix + '.mp4', prefix + '.webm']
-            && text(data.mediaUrl, 1, 2000) && data.mediaUrl.matches('https://firebasestorage[.]googleapis[.]com/.*')
-        );
+        && (data.kind == 'post' || text(data.title, 1, 100))
+        && data.mediaUrl == '' && data.mediaPath == '';
     }
     match /communityPosts/{id} {
       allow read: if runtimeAvailable() || pilotReadAllowed() && (owner(resource.data.authorId) || admin());

@@ -13,5 +13,6 @@ firebase-debug.log
 .env*
 !.env.example
 output/private/
+output/design/
 __pycache__/
 *.pyc

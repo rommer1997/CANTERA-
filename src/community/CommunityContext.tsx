@@ -45,7 +45,7 @@ interface CommunityAPI {
   publicProfileStates: Record<string, 'loading' | 'ready' | 'missing' | 'error'>;
   followingIds: string[]; peopleLoading: boolean; peopleError: string; peopleHasMore: boolean;
   linkedPostStates: Record<string, 'loading' | 'ready' | 'missing' | 'error'>; watchPost(id: string): () => void;
-  loadMorePeople(reset?: boolean): Promise<void>; watchPublicProfile(id: string): () => void; toggleFollow(id: string): Promise<void>;
+  loadMorePeople(reset?: boolean): Promise<void>; watchPublicProfile(id: string): () => void; retryPublicProfile(id: string): void; toggleFollow(id: string): Promise<void>;
   login(): Promise<void>; loginAdmin(): Promise<void>; signOut(): Promise<void>; beginDemo(name: string): Promise<void>;
   saveProfile(input: Omit<CommunityProfile, 'id' | 'verification' | 'createdAt'>): Promise<void>;
   createEvent(input: EventInput): Promise<string>; createEventSeries(inputs: EventInput[]): Promise<string[]>; joinEvent(id: string, name: string): Promise<void>; leaveEvent(id: string): Promise<void>;
@@ -175,6 +175,18 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
     let released = false;
     return () => { if (released) return; released = true; const entry = profileWatches.current.get(key); if (!entry) return; entry.count -= 1; if (!entry.count) { entry.stop(); profileWatches.current.delete(key); } };
   }, [mode, serviceOpen]);
+  const retryPublicProfile = useCallback((id: string) => {
+    if (!validProfileId(id) || mode === 'cloud' && !serviceOpen) return;
+    const key = `${mode}:${id}`;
+    const previous = profileWatches.current.get(key);
+    if (!previous) return;
+    const subscribers = previous.count;
+    previous.stop(); profileWatches.current.delete(key);
+    setPublicCaches(value => { const next = { ...value[mode] }; delete next[id]; return { ...value, [mode]: next }; });
+    watchPublicProfile(id);
+    const replacement = profileWatches.current.get(key);
+    if (replacement) replacement.count = subscribers;
+  }, [mode, serviceOpen, watchPublicProfile]);
   useEffect(() => () => { profileWatches.current.forEach(entry => entry.stop()); profileWatches.current.clear(); }, []);
 
   const watchPost = useCallback((id: string) => {
@@ -928,10 +940,13 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
 
   async function createPost(input: PostInput, progress?: (n: number) => void) {
     const user = actor(); const id = newId();
-    if (!['reel', 'photo', 'achievement'].includes(input.kind)) throw new Error('Tipo de publicación inválido.');
-    if (input.kind !== 'achievement' && mode !== 'demo') throw new Error('Las fotos y los reels se habilitarán cuando el patrocinio permita activar el almacenamiento. Puedes compartir un logro escrito.');
+    if (!['post', 'reel', 'photo', 'achievement'].includes(input.kind)) throw new Error('Tipo de publicación inválido.');
+    const mediaPost = input.kind === 'photo' || input.kind === 'reel';
+    if (mediaPost && mode !== 'demo') throw new Error('Las fotos y los reels se habilitarán cuando el patrocinio permita activar el almacenamiento. Puedes compartir una publicación de texto o un logro.');
+    if (!mediaPost && input.file) throw new Error('Las publicaciones de texto no admiten archivos.');
     const text = requireText(input.text, 'Texto', 2000);
-    const title = input.kind === 'achievement' ? requireText(input.title, 'Logro', 100) : input.title.trim().slice(0, 100);
+    const title = input.kind === 'achievement' ? requireText(input.title, 'Logro', 100) : input.title.trim();
+    if (title.length > 100) throw new Error('Título: admite hasta 100 caracteres.');
     if (input.eventId) {
       if (!validProfileId(input.eventId)) throw new Error('Evento asociado inválido.');
       let associated: PlayEvent | null = null;
@@ -944,7 +959,7 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
     }
     let mediaUrl = '', mediaPath = '';
     try {
-      if (input.kind !== 'achievement') {
+      if (mediaPost) {
         const file = input.file;
         if (!file) throw new Error('Selecciona un archivo.');
         const allowed = input.kind === 'reel' ? ['video/mp4', 'video/webm'] : ['image/jpeg', 'image/png', 'image/webp'];
@@ -977,6 +992,12 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
       if (post.mediaPath) { const mediaId = post.mediaPath.startsWith('local:') ? post.mediaPath.slice(6) : id; await deleteLocalMedia(mediaId); mediaCache.current?.drop(mediaId); }
     } else {
       await deleteDoc(doc(db, 'communityPosts', id));
+      // Older pages are snapshots, so a confirmed deletion must also remove
+      // their cached card instead of waiting for the live first page to change.
+      setOlderPosts(previous => previous.filter(item => item.id !== id));
+      setPosts(previous => previous.filter(item => item.id !== id));
+      setLinkedPosts(previous => { const next = { ...previous.cloud }; delete next[id]; return { ...previous, cloud: next }; });
+      setLinkedStates(previous => ({ ...previous, cloud: { ...previous.cloud, [id]: 'missing' } }));
       // Retained interactions become unavailable to others under the prepared rules.
       // Physical cleanup uses the owner's bounded maintenance script until the trigger is funded.
       if (post.mediaPath) {
@@ -1032,7 +1053,7 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
   const value: CommunityAPI = { profile, mode, loading, error, isAdmin, demoEnabled, pilotEnabled, serviceAvailable: serviceOpen, accountModeration, mediaUploadsEnabled: mode === 'demo', runtimeConfig: mode === 'demo' ? { serviceStatus: 'open', mediaUploadsEnabled: true, contactEmail: '', updatedAt: '' } : { ...runtimeConfig, serviceStatus: runtimeConfig.serviceStatus === 'pilot' ? 'pilot' : serviceOpen ? 'open' : runtimeConfig.serviceStatus === 'paused' ? 'paused' : 'setup' }, adminRightsRequests, adminQueueHasMore, adminQueueLoading, loadMoreAdminQueue, suspendAccount, reviewRightsRequest, updateRuntimeStatus, ownEvents: readableOwnEvents, ownEventsHasMore: false, ownEventsLoading: loading, loadMoreOwnEvents, ...pages, loadMoreEvents, loadMorePosts, fixtureData, fixtureStates, watchFixtureData, eventHistories, watchEventHistory, eventNotices, rightsRequests, blockedIds, toggleBlock, markNoticeRead, requestRights, retryEventNotices, postInteractionStates, watchPostInteractions, loadMoreComments, deleteComment, reportComment, searchPeople, events: serviceOpen ? availableEvents : [], posts: serviceOpen ? availablePosts : [], likes, comments, verificationRequests, reports, hiddenPostIds,
     profiles: serviceOpen && peoplePage.mode === mode ? peoplePage.profiles : [], publicProfiles: serviceOpen ? publicCaches[mode] : {}, publicProfileStates: profileStates[mode], followingIds,
     peopleLoading: peoplePage.mode === mode && peoplePage.loading, peopleError: peoplePage.mode === mode ? peoplePage.error : '', peopleHasMore: peoplePage.mode !== mode || peoplePage.hasMore,
-    loadMorePeople, watchPublicProfile, toggleFollow, watchPost, linkedPostStates: linkedStates[mode],
+    loadMorePeople, watchPublicProfile, retryPublicProfile, toggleFollow, watchPost, linkedPostStates: linkedStates[mode],
     login, loginAdmin, signOut, beginDemo, saveProfile, createEvent, createEventSeries, updateEvent, removeGuest, setRsvp, joinWaitlist, leaveWaitlist, saveMatchResult, scheduleFixture, joinEvent, leaveEvent, addGuest, setEventStatus, generateFixtures, saveScore,
     createPost, deletePost, toggleLike, addComment, reportPost, hidePost, requestVerification, reviewVerification, resolveReport };
   return <Context.Provider value={value}>{children}</Context.Provider>;

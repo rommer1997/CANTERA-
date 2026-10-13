@@ -30,7 +30,8 @@ function ConnectionCard({ connection }: { connection: CommunityConnection }) {
 function InvitationAcceptance({ rawCode }: { rawCode: string }) {
   const community = useCommunity(); const api = useInvitations(); const navigate = useNavigate();
   const code = normalizeInvitationCode(rawCode); const returnTo = code ? `/invite/${code}` : '/connect';
-  const scope = `${community.mode}:${community.profile?.id || ''}:${code || ''}:${api.eligible}:${api.emailVerified}:${community.runtimeConfig.serviceStatus}:${community.serviceAvailable}`;
+  const [lookupAttempt, setLookupAttempt] = useState(0);
+  const scope = `${community.mode}:${community.profile?.id || ''}:${code || ''}:${api.eligible}:${api.emailVerified}:${community.runtimeConfig.serviceStatus}:${community.serviceAvailable}:${lookupAttempt}`;
   const latestScope = useRef(scope); latestScope.current = scope;
   const currentApi = useRef(api); currentApi.current = api;
   const mounted = useRef(true);
@@ -47,19 +48,39 @@ function InvitationAcceptance({ rawCode }: { rawCode: string }) {
   }, [scope, code, api.eligible, api.emailVerified, community.runtimeConfig.serviceStatus, community.serviceAvailable]);
   const current = state.scope === scope ? state : { invitation: null, loading: true, error: '' };
   const invitation = current.invitation;
+  const senderScope = `${scope}:${invitation?.ownerId || ''}`;
+  const [senderWatch, setSenderWatch] = useState('');
+  useEffect(() => {
+    setSenderWatch('');
+    if (!invitation?.ownerId) return;
+    community.retryPublicProfile(invitation.ownerId);
+    const stop = community.watchPublicProfile(invitation.ownerId);
+    setSenderWatch(senderScope);
+    return stop;
+  }, [senderScope, community.watchPublicProfile, community.retryPublicProfile]);
+  const senderState = senderWatch !== senderScope ? 'loading' : community.publicProfileStates[invitation?.ownerId || ''] || 'loading';
+  const cachedSender = invitation ? community.publicProfiles[invitation.ownerId] : null;
+  const sender = senderState === 'ready' && cachedSender?.id === invitation?.ownerId && cachedSender.name.trim() ? cachedSender : null;
+  const latestSender = useRef({ scope: senderScope, identified: Boolean(sender) });
+  latestSender.current = { scope: senderScope, identified: Boolean(sender) };
   const remaining = invitation ? invitationSecondsRemaining(invitationExpiresAt(invitation.createdAt), now) : 0;
-  const completed = invitation?.status === 'used';
+  const completed = invitation?.status === 'used' && invitation.usedBy === community.profile?.id;
+  const retry = () => setLookupAttempt(attempt => attempt + 1);
   return <section className="ci-accept c-panel"><div className="ci-accept-icon"><KeyRound size={26} /></div><p className="c-eyebrow">TE HAN INVITADO</p><h1>{invitation?.kind === 'event' ? 'Un encuentro privado te espera' : 'Conecta en LaCantera'}</h1><p>Un código, una persona. Acepta la invitación con tu propia cuenta.</p>{code ? <code className="ci-entry-code">{formatInvitationCode(code)}</code> : null}
     {community.mode === 'demo' ? <p className="ci-demo-note">Invitación de prueba: las cuentas y el código deben pertenecer a este navegador.</p> : null}
     {!community.profile || !api.eligible ? <><p>Primero entra y completa tu perfil. Guardaremos este enlace para que vuelvas a la invitación.</p><Link className="c-button" to={`/profile?returnTo=${encodeURIComponent(returnTo)}`}>Entrar o completar mi cuenta <ArrowRight size={17} /></Link></> : !api.emailVerified ? <p className="c-error" role="alert">Verifica el correo de tu cuenta antes de usar el código.</p> : !community.serviceAvailable ? <p className="c-empty">La comunidad está en preparación o mantenimiento. Conserva el enlace y pide un código nuevo cuando vuelva a abrir.</p> : current.loading ? <p role="status">Comprobando invitación…</p> : invitation ? <>
+      <div className="ci-inviter" aria-label="Quién te invita">
+        {sender ? <><span className="c-avatar" aria-hidden="true">{sender.name.slice(0, 1).toUpperCase()}</span><div><p>{invitation.kind === 'event' ? 'Te invita a un encuentro privado' : 'Quiere conectar contigo'}</p><strong>{sender.name}</strong><Link to={`/people/${encodeURIComponent(sender.id)}`} className="ci-text-button">Ver perfil <ArrowRight size={14} aria-hidden="true" /></Link></div></> : <div><p role={senderState === 'error' ? 'alert' : 'status'}>{senderState === 'loading' ? 'Comprobando quién te invita…' : senderState === 'error' ? 'No pudimos consultar el perfil de quien te invita.' : 'El perfil de quien te invita ya no está disponible.'}</p><p className="c-small">{completed ? 'Puedes abrir el acceso que ya aceptaste con esta cuenta.' : 'Para aceptar necesitamos identificar a quien te invita.'}</p>{senderState !== 'loading' ? <button type="button" className="ci-text-button" disabled={busy} onClick={() => community.retryPublicProfile(invitation.ownerId)}>Volver a comprobar</button> : null}</div>}
+      </div>
       <div className="ci-accept-details">{invitation.kind === 'event' ? <><LockKeyhole size={20} /><p>Al aceptar ocuparás una plaza disponible y podrás ver el lugar, horario y participantes. El encuentro no aparecerá en tu perfil público.</p></> : <><Users size={20} /><p>Al aceptar, la otra persona y tú apareceréis en vuestras conexiones. Podrás ver su perfil y desconectar cuando quieras.</p></>}</div>
       <p className="ci-expiry">{completed ? 'Ya aceptaste este código con tu cuenta.' : remaining ? `Caduca en ${formatInvitationCountdown(remaining)}` : 'Este código ha caducado. Pide uno nuevo.'}</p>
       {invitation.kind === 'event' && !completed ? <label className="ci-entry-input">Nombre de tu inscripción (jugador, grupo o equipo)<input className="c-input" value={participantName} onChange={event => setParticipantName(event.target.value)} maxLength={100} required autoComplete="off" /></label> : null}
-      <button className="c-button" disabled={busy || !remaining && !completed || invitation.kind === 'event' && !participantName.trim()} onClick={() => {
+      <button className="c-button" disabled={busy || !completed && (!remaining || !sender || invitation.kind === 'event' && !participantName.trim())} onClick={() => {
+        if (busy || latestScope.current !== scope || !completed && (!remaining || latestSender.current.scope !== senderScope || !latestSender.current.identified)) return;
         const start = scope; setBusy(true);
         void api.acceptInvitation(code!, invitation.kind === 'event' ? participantName : undefined).then(value => { if (mounted.current && latestScope.current === start) navigate(value.kind === 'event' ? `/play/${value.eventId}` : '/connect?connected=1', { replace: true }); }).catch(err => { if (mounted.current && latestScope.current === start) setState(old => ({ ...old, error: safeInvitationError(err) })); }).finally(() => { if (mounted.current && latestScope.current === start) setBusy(false); });
       }}>{busy ? 'Aceptando…' : completed ? 'Abrir mi acceso' : invitation.kind === 'event' ? 'Aceptar e inscribirme' : 'Aceptar conexión'}<ArrowRight size={17} /></button>
-    </> : null}{current.error ? <p className="c-error" role="alert">{current.error}</p> : null}<Link className="ci-text-button" to="/connect">Introducir otro código</Link>
+    </> : null}{current.error ? <><p className="c-error" role="alert">{current.error}</p>{!invitation ? <button type="button" className="ci-text-button" onClick={retry}>Volver a comprobar invitación</button> : null}</> : null}<Link className="ci-text-button" to="/connect">Introducir otro código</Link>
   </section>;
 }
 

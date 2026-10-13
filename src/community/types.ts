@@ -1,5 +1,5 @@
 export type Level = 'amateur' | 'professional';
-export type PostKind = 'reel' | 'photo' | 'achievement';
+export type PostKind = 'post' | 'reel' | 'photo' | 'achievement';
 export interface CommunityProfile {
   id: string;
   name: string;

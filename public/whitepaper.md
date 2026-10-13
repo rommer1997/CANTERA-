@@ -1,21 +1,21 @@
 # LaCantera
-## Whitepaper del proyecto · Versión 0.9
+## Whitepaper del proyecto · Versión 1.0
 
-**Fecha de edición:** 8 de octubre de 2026
+**Fecha de edición:** 13 de octubre de 2026
 
-Edición con frontend publicado y ampliación de mensajería en validación; apertura de cuentas y medios pendientes.
+Edición del núcleo gratuito desplegado en piloto privado; preparación de apertura pública, con medios pendientes de patrocinio.
 
 Cantera propone organización gratuita de fútbol y una comunidad conectada con la actividad deportiva. La iniciativa tiene orientación sin finalidad lucrativa en esta etapa y busca patrocinio para sostener infraestructura. No acredita una entidad constituida, financiación confirmada, tracción real, auditoría independiente o servicio productivo abierto.
 
-**Situación de esta edición:** implementación local ampliada; pruebas locales/emuladas documentadas; configuración remota cerrada. La web de LaCantera está publicada en https://lacantera.web.app con registro cerrado. La publicación del frontend no acredita el funcionamiento del backend nuevo ni el lanzamiento. Esta edición no declara el producto terminado para clientes ni el alcance multimedia completo.
+**Situación de esta edición:** núcleo en https://lacantera.web.app como piloto privado de dos cuentas. La revisión del 13 de octubre añade publicaciones escritas, derechos y marca verde, con 353 verificaciones locales y backend actualizado. La publicación exacta del frontend y el estado final de índices se acreditan en el recibo de entrega. El registro público permanece cerrado. Recorrido real, soporte y revisión del responsable siguen pendientes; este documento no aprueba el lanzamiento ni los medios.
 
 ## Resumen ejecutivo
 
 El recorrido une persona/equipo, convocatoria, participación, celebración, resultado aportado por el organizador y contenido relacionado. Su primera utilidad es reunir jugadores y coordinar equipos sin una cuota de organización. Que el núcleo sea gratuito no hace gratuitos campo, transporte, arbitraje o equipación externos.
 
-La revisión incluye equipos con plantilla privada y roles, incorporación por aprobación, respuestas y espera ordenada, avisos internos, edición con historial, recurrencia limitada, torneos, calendario y comunidad móvil. Los cruces canónicos de torneos y su integración están sujetos al cierre de validación. Fotos/reels cloud continúan denegados en servidor hasta financiar y comprobar un servicio de medios protegido; la demostración conserva medios locales identificados.
+La revisión incluye equipos con plantilla privada y roles, incorporación por aprobación, respuestas y espera ordenada, avisos internos, edición con historial, recurrencia limitada, torneos, calendario y comunidad móvil. Las reglas y los cruces canónicos de torneos están publicados en el piloto; su recorrido operativo completo debe comprobarse antes de abrir. La ampliación local del 13 de octubre separa publicaciones escritas con título opcional de logros con título obligatorio, manteniendo Comunidad/Siguiendo, interacciones y enlaces reales. Fotos/reels cloud continúan denegados en servidor hasta financiar y comprobar un servicio de medios protegido; la demostración conserva medios locales identificados.
 
-El responsable declarado es Rommer, persona física en Madrid, España, con contacto Rommer@garitocastizo.com. Antes de abrir siguen pendientes la revisión de esos datos y textos por el responsable, el backend actualizado, pruebas entre cuentas/dispositivos, recuperación y atención de derechos. Build y runtime fallan cerrados sin sus condiciones; un documento o un emulador no fabrica la aprobación de esos controles.
+El responsable declarado es Rommer, persona física en Madrid, España, con contacto Rommer@garitocastizo.com. Antes de abrir siguen pendientes la revisión de esos datos y textos por el responsable, el recorrido completo entre cuentas/dispositivos, la operación de recuperación y atención de derechos. Build y runtime fallan cerrados sin sus condiciones; un documento o un emulador no fabrica la aprobación de esos controles.
 
 ## 1. Misión y alcance
 
@@ -42,24 +42,25 @@ Spond ya ofrece una [app gratuita de organización](https://www.spond.com/en-us/
 
 ## 3. Producto presente y límites
 
-| Área | Implementación local | Límite o condición pendiente |
+| Área | Núcleo y ampliación local | Límite o condición pendiente |
 |---|---|---|
-| Cuenta | Google Auth, perfil propio, sesión y aceptación vigente | Dominios autorizados; recorrido entre cuentas reales pendiente; alta real vacía, sin jugador de ejemplo. |
-| Identidad pública | Proyección deportiva, perfiles por enlace y seguimiento | Edad/aceptación privadas; completar migración/reglas y comprobar espejo real. |
+| Cuenta | Google Auth, perfil propio, sesión y aceptación vigente | Dominios y dos perfiles reales comprobados; recorrido completo entre cuentas pendiente; alta real vacía, sin jugador de ejemplo. |
+| Identidad pública | Proyección deportiva, perfiles por enlace y seguimiento | Edad/aceptación privadas; reglas aplicadas e inventario sin migración necesaria; cerrar permisos cruzados reales. |
 | Búsqueda/actividad | Prefijos de nombre/ciudad/país en servidor y páginas por cursor | No búsqueda semántica ni resultados inventados después de una ventana local. |
+| Conexiones e invitaciones | Código de un uso y diez minutos, QR, lector de cámara/imagen y contacto recíproco | Reglas publicadas; completar aceptación, identidad visible y escaneo en teléfono real. |
 | Equipos | Ficha pública, plantilla privada, propietario/responsable/miembro | No acredita representación institucional por sí sola. |
 | Acceso al equipo | Invitaciones con caducidad y solicitudes aprobadas/rechazadas | Un enlace no incorpora automáticamente; operación y privacidad reales por comprobar. |
 | Partidos | Fútbol 5/7/11, 2–64 plazas, condiciones, lugar, zona y aforo | No reserva campo, arbitraje, seguro o pagos. |
 | RSVP/espera | Sí/no/tal vez para inscritos, espera ordenada y promoción con aviso interno | No asistencia certificada, correo/push o garantía de lectura del aviso. |
 | Cambios | Motivo, revisión, historial/ledger y avisos a destinatarios | No resolución independiente de disputas. |
 | Recurrencia | 2–12 eventos semanales/quincenales/mensuales | Cada ocurrencia es independiente; no gestión completa de temporada. |
-| Torneos | Liga/eliminatoria 2–32, pases libres, resultados, tabla y horarios por cruce | Documentos canónicos/reglas e integración en cierre de validación. |
+| Torneos | Liga/eliminatoria 2–32, pases libres, resultados, tabla y horarios por cruce | Documentos canónicos y reglas publicados; recorrido cloud completo en cierre de validación. |
 | Calendario | Archivo `.ics` de evento/cruces programados | No inventa horarios ni sincroniza bidireccionalmente. |
-| Comunidad | Cronología Comunidad/Siguiendo, filtros, enlaces, páginas y visor móvil | Búsqueda del feed sólo en contenido cargado; no algoritmo de talento simulado. |
+| Comunidad | Comunidad/Siguiendo, filtros, enlaces y páginas; ampliación local de texto con título opcional separado de logro | Nuevos tipos escritos y editor móvil validados localmente; backend actualizado y frontend acreditado por recibo; búsqueda sólo en contenido cargado y sin algoritmo simulado. |
 | Interacción | Conteos por post de servidor, comentarios paginados, denuncia, bloqueo y retirada | Conteos no autorizados no se sustituyen por ceros ficticios. |
 | Medios | Archivos locales en demo; código y reglas cierran nuevas cargas cloud | Espera financiación, servicio confiable de inspección/cuotas y limpieza real. |
 | Administración | Verificaciones, reportes y derechos pendientes paginados; suspensión y runtime | Claim seguro y panel comprobados en nube; atención operativa por comprobar. |
-| Derechos | Solicitudes, exportador y supresión conservadora del operador | Retención compartida requiere revisión; pruebas offline no equivalen a supresión real. |
+| Derechos | Solicitudes, exportador y supresión conservadora; ampliación local de baja con actividad | Baja v2 validada en pruebas locales/emulador; operación y revisión pendientes, sin suprimir ninguna de las dos cuentas reales. |
 | Mensajes | Texto privado entre contactos mutuos, paginación y retirada propia | Sin medios, llamadas, cifrado de extremo a extremo o notificaciones push. |
 | Respaldo | Instantánea comunitaria y recuperación limitada al emulador | Excluye Auth/archivos; no son copias programadas ni recuperación completa de producción. |
 | PWA | Instalación admitida y caché versionada del armazón estático | Sin escrituras offline ofrecidas o caché de datos Firebase/medios mediante el SW. |
@@ -92,21 +93,21 @@ La versión vigente de términos es **`2026-10-08`**. Edad/aceptación no forman
 
 Plantillas, solicitudes de equipo, bloqueos, verificación, denuncias y derechos tienen accesos específicos. No deben copiarse datos de otros integrantes a la exportación de una cuenta. La información pública y la administrativa no comparten una colección abierta general.
 
-El formulario permite solicitar exportación o supresión; administración registra su tramitación. El exportador Admin reúne registros propios con cursor y whitelist, elimina campos ajenos/credenciales y puede generar un JSON local privado. No incluye binarios, no cambia datos cloud ni ejecuta baja. La herramienta de supresión congela la cuenta y revoca sesiones antes de esperar la caducidad de tokens; sólo ejecuta un plan revisado y se detiene ante historial compartido o esquema desconocido. La recuperación de respaldo sólo puede escribir en un emulador local. Entrega segura, decisiones de conservación y operación de copias siguen siendo procesos del responsable pendientes de comprobación real.
+El formulario permite solicitar exportación o supresión; administración registra su tramitación. El exportador Admin reúne registros propios con cursor y whitelist, elimina campos ajenos/credenciales y puede generar un JSON local privado. No incluye binarios, no cambia datos cloud ni ejecuta baja. La herramienta de supresión congela la cuenta y revoca sesiones antes de esperar la caducidad de tokens; sólo ejecuta un plan revisado. La versión publicada el 8 de octubre se detenía ante historial compartido. La ampliación local v2 del 13 de octubre incorpora redacción de referencias estructuradas de la persona y archivo privado de mensajes exclusivamente ajenos bajo ID aleatorio sin el UID borrado, exportable por su titular superviviente. Propiedad de equipos, administración, organización activa o esquemas desconocidos mantienen bloqueos explícitos que requieren transferencia/revisión. La validación local comprende actividad compartida y transacciones en Firestore Emulator; no acredita todavía la entrega/atención operativa ni una baja cloud de las dos cuentas reales del piloto. El ensayo de respaldo y el cierre de cada caso se documentan por separado. La recuperación de respaldo sólo puede escribir en un emulador local. Entrega segura, decisiones de conservación y operación de copias siguen siendo procesos del responsable pendientes de comprobación real.
 
 Retirar publicación/comentario, quitar like, dejar de seguir y solicitar derechos no fuerza una nueva aceptación de términos. Crear contenido o nueva participación requiere cuenta activa y condiciones vigentes. Estas distinciones deben seguir presentes en reglas y UI.
 
-Se necesita el nombre legal, contacto atendido, país y forma real de operación del responsable. No se inventan datos de una asociación/fundación ni plazos o garantías que la operación todavía no puede acreditar. La revisión documental por ámbitos y el procedimiento de derechos no se cierran con un texto genérico.
+Se necesita el nombre legal, contacto atendido, país y forma real de operación del responsable. No se inventan datos de una asociación/fundación ni plazos o garantías que la operación todavía no puede acreditar. La [propuesta de operación](docs/OPERATING_POLICY.md) concreta conservación, atención y proveedores para la revisión del responsable. Su existencia no acredita una aprobación ni que el soporte esté atendido. La revisión documental por ámbitos y el procedimiento de derechos no se cierran con un texto genérico.
 
 ## 7. Arquitectura y apertura
 
 React/Vite, HashRouter, Firebase Auth y Firestore nombrado; Storage previsto. Admin SDK sólo en herramientas confiables del operador. La base exacta es `ai-studio-647af55f-499b-43f3-9268-9bf5f62701bb`, región `eur3`.
 
-Las fechas nuevas de creación/trámite se emiten como Timestamp de servidor. La frontera de UI normaliza documentos. La migración de legado conserva instantes ISO, añade prefijos públicos e índice de participantes y respeta `teamId`/historial/orden válido. Usa dry-run predeterminado, relectura en transacción y cursor de 200; datos inválidos se bloquean, sin fabricar una fecha actual. No se ha ejecutado en nube.
+Las fechas nuevas de creación/trámite se emiten como Timestamp de servidor. La frontera de UI normaliza documentos. La migración de legado conserva instantes ISO, añade prefijos públicos e índice de participantes y respeta `teamId`/historial/orden válido. Usa dry-run predeterminado, relectura en transacción y cursor de 200; datos inválidos se bloquean, sin fabricar una fecha actual. El inventario previo al piloto encontró un perfil y ninguna transformación necesaria; no se modificó legado en nube.
 
 La PWA cachea exclusivamente el armazón estático versionado. No incorpora cacheado del service worker de respuestas Firebase o archivos públicos ni garantiza cuentas/escrituras sin red. Un icono instalado no equivale a una app nativa u operación offline completa.
 
-La build abierta exige `check:release`, datos reales y acta reciente de verificaciones reales del proyecto/base. `VITE_SERVICE_OPEN=false` permite preparar builds cerradas. El runtime `setup/open/paused` añade control del servidor; falta/error falla cerrado. No se crea un acta aprobada en desarrollo ni se marcan verificaciones remotas por superar emuladores.
+La build abierta exige `check:release`, datos reales y acta reciente de verificaciones reales del proyecto/base. `VITE_SERVICE_OPEN=false` permite preparar builds cerradas. El runtime `setup/pilot/open/paused` añade control del servidor; falta/error falla cerrado. El piloto requiere una build específica y UIDs Google verificados seleccionados por el operador; no abre el registro público. No se crea un acta aprobada en desarrollo ni se marcan verificaciones remotas por superar emuladores.
 
 Fotos/reels cloud siguen denegados por código y Storage para nuevas cargas del cliente, incluso si cambia una variable local. Financiación futura no abre automáticamente el servicio: requiere un contrato de recepción con inspección/cuotas y permisos revisados.
 
@@ -114,7 +115,7 @@ Fotos/reels cloud siguen denegados por código y Storage para nuevas cargas del 
 
 El operador atiende verificación, denuncias, suspensión, solicitudes de derechos, incidentes y recuperación. Las colas pendientes se paginan. El bloqueo y la retirada de contenido son controles concretos; no representan por sí solos un sistema completo de prevención de abuso o apelación.
 
-Los avisos actuales son internos. Esta edición incorpora código de chat privado entre contactos recíprocos, con acceso condicionado a la conexión y los controles de ambas cuentas; su validación y despliegue se registran por separado. Correo/push, idiomas adicionales, arbitraje de resultados y tutela siguen pendientes. La ampliación debe acompañarse de presupuesto y capacidad de atención.
+Los avisos actuales son internos. El chat privado de texto está desplegado en el piloto entre contactos recíprocos, con acceso condicionado a la conexión y los controles de ambas cuentas. Sus permisos se probaron en emuladores; el recorrido cloud completo entre las dos cuentas queda por cerrar. Correo/push, idiomas adicionales, arbitraje de resultados y tutela siguen pendientes. La ampliación debe acompañarse de presupuesto y capacidad de atención.
 
 `cleanupCommunityPost` prepara una función Gen2 Node 22 en `europe-west1` para nuevos borrados en la base nombrada. Valida ruta, fecha/generación y padre recreado; elimina interacciones en lotes limitados e ignora archivos ya ausentes. Su despliegue financiado y prueba real siguen pendientes. No acredita limpieza histórica, baja global, medios nunca publicados o retirada de copias/retenciones.
 
@@ -130,7 +131,7 @@ Un patrocinador no compra verificación ni influye en denuncias o recibe datos p
 
 El éxito debe observarse en eventos reales y continuidad voluntaria, no en visitantes ficticios o resultados de tests. Inscripción no equivale a asistencia; un estado declarado por el organizador no es prueba independiente de celebración.
 
-Piloto propuesto después de cerrar apertura: grupos adultos durante cuatro semanas, tareas comparables con su herramienta actual y entrevistas. La cantidad final y metas se acuerdan con los grupos realmente disponibles; no hay participantes o resultados confirmados en esta edición.
+El piloto técnico privado ya admite dos cuentas reales del propietario; no se cuenta como adopción, actividad deportiva o grupo inscrito. Después de cerrar los controles de apertura se propone un ensayo de utilidad con grupos adultos durante cuatro semanas, tareas comparables con su herramienta actual y entrevistas. La cantidad final y metas se acuerdan con grupos disponibles; no hay grupos o resultados de adopción confirmados en esta edición.
 
 Criterios propuestos: un partido y un torneo completan convocatoria, gestión y resultado; un equipo aprueba incorporación privada; una espera se promueve con aviso; se atiende una solicitud de derechos; un organizador repite voluntariamente. Medir tiempo/errores de tareas equivalentes sin anticipar un porcentaje de mejora. Acceso ajeno, pérdida de inscripción o derechos no atendibles impiden cerrar el piloto.
 
@@ -180,33 +181,48 @@ La [ejecución CI 37384779319](https://github.com/rommer1997/CANTERA-/actions/ru
 
 La tabla registra resultados históricos de la ejecución del 6 de octubre y no declara terminado el QA de todos los cambios posteriores. El cierre de la revisión requiere consolidar las últimas modificaciones y registrar sus resultados finales. Los tests no constituyen tracción, aprobación de apertura o prueba de medios reales.
 
-### Auditoría remota y puertas abiertas
+### Revisión local y actualización de backend del 13 de octubre
 
-La auditoría inicial del 6 de octubre encontró bloqueo total. El 7 de octubre, con autorización del propietario, se desplegaron las reglas anteriores y 18 índices, se autorizaron los dominios y se publicó LaCantera en Firebase Hosting. El 8 de octubre se confirmó por lectura remota que runtime sigue ausente, la cuenta elegida tiene correo Google verificado y el permiso de administrador comprobado; el acceso al panel de administración ya está comprobado en el navegador y las reglas remotas conservan la versión anterior a las invitaciones privadas. No se ha abierto el servicio. El registro detallado está en [puesta en marcha](docs/RELEASE_2026-10-07.md).
+La revisión pasa TypeScript (`pnpm lint`), build piloto de Firebase, 277 pruebas unitarias y 76 de seguridad emulada: **353 verificaciones locales**, sin sumar otra vez las pruebas históricas de limpieza. Se valida publicación escrita `post` con título opcional, diferenciada de `achievement`, permisos y bajas v2 con actividad compartida. El backend se publicó sólo en la base autorizada. La relectura del 13 de octubre a las 20:00:42 UTC confirmó reglas idénticas y los **30 índices READY**, con definiciones coincidentes. El [recibo de entrega](docs/RELEASE_2026-10-13.md) acredita la publicación exacta del frontend en piloto.
 
-Puertas: comprobación del código publicado y cruces canónicos en nube; responsable/contacto/país y revisión de operación; derechos/recuperación; reglas/índices/migración autorizados; Auth/administrador; dos cuentas reales/otro dispositivo; acta y despliegue. Medios y funciones requieren además financiación y comprobación de servicio real.
+El QA de interfaz local a 320, 390 y 1440 px comprobó publicación sin título, enlace directo, reacción, comentario, recarga, filtros y el título requerido del logro. Este recorrido local no acredita acceso Google o permisos entre las dos cuentas cloud.
+
+La nueva [identidad visual](docs/BRAND.md), indicada por el propietario, combina fondo verde, C blanca angular y balón clásico como punto, con el nombre LaCantera y derivados de instalación. Se retira el punto rojo anterior. El feed móvil usa superficies claras, editor de texto directo, logros diferenciados y vacío compacto con accesos útiles, conservando perfiles, interacciones, moderación y enlaces. Fotos/reels nuevos esperan patrocinio; los filtros multimedia sólo aparecen si están habilitados o hay medios previos. No se añaden perfiles, publicaciones o audiencias de relleno.
+
+Esta validación no confirma instalación/cámara en iPhone/Safari, conexión/evento privado/chat completos entre cuentas reales, atención de correo, identificación publicable, aprobación del responsable o acta de apertura. El backend actualizado no abre por sí solo la comunidad; el frontend y el estado final de los índices se verifican en el recibo de entrega del piloto.
+
+### Última entrega verificada y puertas de apertura
+
+La activación del 8 de octubre publicó `c7d9764ac1ea09116d8465135d36298efbe4d764`. La [CI 37710502909](https://github.com/rommer1997/CANTERA-/actions/runs/37710502909) superó TypeScript, build y **344 pruebas**: 257 locales, 71 de permisos emulados y 16 de limpieza con dobles. Esa evidencia pertenece a esa entrega; los resultados locales del 13 de octubre se registran en el apartado anterior y no se atribuyen a esa CI.
+
+Se comprobaron por lectura remota las reglas del piloto y los 26 índices READY de la base nombrada. Hosting publicó la versión `de7a8e1c52ede866`; sus archivos y hashes se verificaron. Google Auth, los dominios autorizados, la administración del responsable y runtime `pilot` están comprobados. Dos cuentas reales tienen perfil completado personalmente. Las consultas anónimas de contenido comunitario están denegadas en el piloto. No se ha activado facturación, Storage o Functions ni se ha abierto el registro general.
+
+Los snapshots del 6 y 7 de octubre, y la fase inicial del 8 de octubre con runtime ausente, describen momentos anteriores a esta activación. El [estado consolidado](docs/RELEASE_2026-10-13.md) prevalece para entender la situación de esta edición. El piloto aún necesita cerrar conexión, encuentro privado, chat, retirada de permisos y derechos entre cuentas reales, instalación/cámara en otro dispositivo, soporte atendido, revisión del responsable de textos/conservación y operación de recuperación. Una aprobación de CI no sustituye esas tareas ni el acta real de apertura.
+
+La copia de un perfil real previa a la activación se restauró en un emulador vacío y se verificaron sus campos; es un ensayo acotado, no recuperación integral o restauración de producción. Los recibos privados documentan el destino y los hashes de la publicación sin publicar datos de cuentas.
 
 ## 13. Hoja de ruta y control documental
 
-Primero cerrar validación local; después configuración autorizada y piloto de coordinación/texto; abrir sólo con revisión real y operación atendida. El chat de texto se incorpora a la entrega en validación. Medios financiados, tutela, push/correo, idiomas y scouting conservan sus propias condiciones de desarrollo y apertura. Esperar patrocinio no convierte el alcance multimedia en completado.
+La configuración y el piloto del núcleo de coordinación/texto/chat están desplegados. Primero cerrar el recorrido real y las mejoras de esta revisión; abrir sólo con revisión del responsable, operación atendida y acta real vigente. Medios financiados, tutela, push/correo, idiomas y scouting conservan sus propias condiciones de desarrollo y apertura. Esperar patrocinio no convierte el alcance multimedia en completado.
 
 | Versión | Fecha | Registro |
 |---|---|---|
 | 0.6 | 6 de octubre de 2026 | CI histórica de 49 casos y lanzamiento pendiente. |
 | 0.7 | 6 de octubre de 2026 | Comunidad/perfiles/seguimiento y rediseño; 58 casos locales históricos. |
 | 0.8 | 6 de octubre de 2026 | Equipos, espera/avisos, edición/ledger, recurrencia, cruces canónicos en validación, derechos/PWA, paginación y apertura cerrada. Evidencia de trabajo separada de nube. |
-| 0.9 | 8 de octubre de 2026 | Mensajería entre contactos, administración asignada, derechos y respaldo ampliados; validación final y apertura pendientes. |
+| 0.9 | 8 de octubre de 2026 | Mensajería, administración, derechos y respaldo; fase inicial de validación anterior a la activación. |
+| 1.0 | 13 de octubre de 2026 | Piloto consolidado; 353 verificaciones locales de bajas v2 y tipos escritos, nueva marca verde y documentación coherente; backend actualizado, entrega frontend registrada por recibo y apertura pública pendiente. |
 
-La referencia inicial del repositorio es `79591442a6e8938f07b3c1154f1b363af5672cce`; la base social más reciente registrada es `c4880af6bdc107fa3f56ced9d106e82b07943bff`. Esta edición registra la copia de trabajo validada antes de publicar la ampliación. El commit y la ejecución de CI de entrega se consultan en la [propuesta de GitHub](https://github.com/rommer1997/CANTERA-/pull/1).
+La referencia inicial del repositorio es `79591442a6e8938f07b3c1154f1b363af5672cce`; la base social más reciente registrada es `c4880af6bdc107fa3f56ced9d106e82b07943bff`. La última publicación verificada del núcleo es `c7d9764ac1ea09116d8465135d36298efbe4d764`; esta edición no anticipa el resultado de cambios posteriores. El commit y la ejecución de CI de cada entrega se consultan en la [propuesta de GitHub](https://github.com/rommer1997/CANTERA-/pull/1).
 
 La fuente es `WHITEPAPER.md`; `public/whitepaper.md` debe ser idéntica byte a byte. El PDF se exporta por separado después de congelar la fuente. Una revisión documental o un archivo descargable no acredita despliegue, financiación, entidad registrada o cumplimiento internacional.
 
-## 14. Entrega por fases del 8 de octubre
+## 14. Historial de la entrega por fases del 8 de octubre
 
-La sesión amplía el núcleo adulto gratuito. La corrección pública identifica fotos/reels como pendientes y explica la visibilidad privada de los encuentros. La mensajería es de texto entre dos contactos aceptados: no publica el historial, no envía push, no admite adjuntos y no ofrece cifrado de extremo a extremo. Retirar la conexión, bloquear, suspender o pausar corta acceso; reconectar puede recuperar mensajes conservados. El operador dispone de herramientas privilegiadas distintas de las reglas de los clientes.
+Esta sección conserva el alcance de la entrega del 8 de octubre. El estado consolidado de su activación está en la sección 12. La sesión amplió el núcleo adulto gratuito. La corrección pública identifica fotos/reels como pendientes y explica la visibilidad privada de los encuentros. La mensajería es de texto entre dos contactos aceptados: no publica el historial, no envía push, no admite adjuntos y no ofrece cifrado de extremo a extremo. Retirar la conexión, bloquear, suspender o pausar corta acceso; reconectar puede recuperar mensajes conservados. El operador dispone de herramientas privilegiadas distintas de las reglas de los clientes.
 
-La exportación contempla los mensajes propios, sin entregar mensajes de otra persona ni sus identificadores estructurados. La nueva herramienta de supresión requiere un plan privado revisado y bloquea datos compartidos o casos que necesitan una decisión operativa; no se ejecuta sobre cuentas reales por preparar el código. No elimina automáticamente la cuenta al registrar una solicitud.
+La exportación contempla los mensajes propios, sin entregar mensajes de otra persona ni sus identificadores estructurados. En el cierre conservador del 8 de octubre, la herramienta de supresión requería un plan privado revisado y bloqueaba datos compartidos o casos con decisión operativa. La ampliación del 13 de octubre de la sección 6 conserva decisiones explícitas de transferencia/revisión; preparar código no ejecuta una baja real. No elimina automáticamente la cuenta al registrar una solicitud.
 
-La versión pública y la aceptación de condiciones deben coincidir; la versión del cliente es `2026-10-08`. Las pruebas y despliegues de esta sesión se documentan sólo después de realizarlos. La administración real ya está comprobada. La apertura sigue dependiendo del backend actualizado, recorridos entre cuentas, revisión del responsable, derechos y recuperación. El patrocinio de medios sigue pendiente, sin facturación, Storage ni Functions activados.
+La versión pública y la aceptación de condiciones deben coincidir; la versión de aceptación desplegada es `2026-10-08`. La fecha del whitepaper no cambia la aceptación por sí sola. La administración y backend del piloto ya están comprobados; la apertura depende del recorrido completo entre cuentas, revisión del responsable, derechos y recuperación. El patrocinio de medios sigue pendiente, sin facturación, Storage ni Functions activados.
 
-El cierre local del 8 de octubre supera TypeScript, build cerrado y 233 pruebas locales; las reglas nuevas superaron 62 casos emulados. La [entrega por fases](docs/RELEASE_2026-10-08.md) distingue esas comprobaciones del backend remoto y de la apertura a personas reales. La restauración sintética verificó ocho campos en un emulador; el respaldo real tomado antes del acceso administrativo contenía cero documentos comunitarios.
+El snapshot local anterior a la activación del 8 de octubre superó TypeScript, build cerrado y 233 pruebas locales; sus reglas superaron entonces 62 casos emulados. El cierre del piloto amplió ese resultado a 344 casos en CI, como registra la sección 12. La [entrega por fases](docs/RELEASE_2026-10-08.md) distingue esas comprobaciones del backend remoto y de la apertura a personas reales. La restauración sintética verificó ocho campos en un emulador; el primer respaldo real, tomado antes del acceso administrativo, contenía cero documentos comunitarios. La copia posterior previa a la activación sí contenía un perfil y se restauró en emulador; no confundir estos dos snapshots.

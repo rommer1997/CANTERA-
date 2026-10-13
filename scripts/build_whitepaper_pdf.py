@@ -19,6 +19,7 @@ from reportlab.lib import colors
 from reportlab.lib.enums import TA_LEFT
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
+from reportlab.lib.utils import ImageReader
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
@@ -44,13 +45,13 @@ FONT_ROOT = RUNTIME / 'native/libreoffice-headless/libreoffice/LibreOfficeDev.ap
 PAGE_WIDTH, PAGE_HEIGHT = A4
 MARGIN = 48
 CONTENT_WIDTH = PAGE_WIDTH - 2 * MARGIN
-INK = colors.HexColor('#171719')
-FOREST = colors.HexColor('#cf302b')
-DEEP = colors.HexColor('#171719')
-LIME = colors.HexColor('#ff7770')
-MUTED = colors.HexColor('#696970')
-LINE = colors.HexColor('#e4e4e7')
-PALE = colors.HexColor('#f5f5f6')
+INK = colors.HexColor('#152921')
+FOREST = colors.HexColor('#176346')
+DEEP = colors.HexColor('#152921')
+LIME = colors.HexColor('#b8d895')
+MUTED = colors.HexColor('#687468')
+LINE = colors.HexColor('#dbe3d8')
+PALE = colors.HexColor('#f6f8f4')
 WHITE = colors.white
 
 
@@ -97,10 +98,10 @@ class MarkdownRenderer:
                 label, url = link.groups()
                 if url.startswith(('https://', 'http://')):
                     self.external_links[url] = label
-                    result.append(f'<a href="{html.escape(url, quote=True)}" color="#cf302b"><u>{self.inline(label, table=table)}</u></a>')
+                    result.append(f'<a href="{html.escape(url, quote=True)}" color="#176346"><u>{self.inline(label, table=table)}</u></a>')
                 else:
                     self.local_references[url] = label
-                    result.append(f'<font color="#cf302b">{self.inline(label, table=table)}</font>')
+                    result.append(f'<font color="#176346">{self.inline(label, table=table)}</font>')
             elif piece.startswith('**') and piece.endswith('**'):
                 result.append(f'<b>{self.inline(piece[2:-2], table=table)}</b>')
             elif piece.startswith('`') and piece.endswith('`'):
@@ -133,6 +134,7 @@ def styles() -> dict[str, ParagraphStyle]:
         'toc': ParagraphStyle('Contents', parent=body, fontName='CanteraTitle', fontSize=10.1,
                               leading=14.5, spaceBefore=1.8, spaceAfter=0, textColor=INK),
         'note': ParagraphStyle('Note', parent=body, fontSize=8.5, leading=13.5, textColor=MUTED),
+        'local_reference': ParagraphStyle('LocalReference', parent=body, fontSize=8.5, leading=12.5, spaceAfter=5),
         'eyebrow': ParagraphStyle('Eyebrow', parent=body, fontName='CanteraTitleBold', fontSize=8,
                                   leading=12, textColor=FOREST, spaceAfter=10),
         'index_title': ParagraphStyle('IndexTitle', parent=body, fontName='CanteraTitleBold',
@@ -169,12 +171,11 @@ class Cover(Flowable):
             c.circle(x, y, 5, stroke=0, fill=1)
         c.restoreState()
 
+        c.drawImage(ImageReader(str(ROOT / 'public/icon-512.png')), MARGIN, PAGE_HEIGHT - 109,
+                    width=56, height=56, preserveAspectRatio=True, mask='auto')
         c.setFillColor(WHITE)
-        c.setFont('CanteraTitleBold', 42)
-        c.drawString(MARGIN, PAGE_HEIGHT - 87, 'LaCantera')
-        brand_width = pdfmetrics.stringWidth('LaCantera', 'CanteraTitleBold', 42)
-        c.setFillColor(LIME)
-        c.rect(MARGIN + brand_width + 3, PAGE_HEIGHT - 87, 7, 7, stroke=0, fill=1)
+        c.setFont('CanteraTitleBold', 36)
+        c.drawString(MARGIN + 69, PAGE_HEIGHT - 92, 'LaCantera')
         c.setFillColor(colors.HexColor('#ccccd2'))
         c.setFont('CanteraTitleBold', 8.3)
         c.drawString(MARGIN, PAGE_HEIGHT - 137, 'DOCUMENTO DE PROYECTO')
@@ -237,7 +238,9 @@ class WhitepaperDocument(BaseDocTemplate):
         c.saveState()
         c.setFillColor(FOREST)
         c.setFont('CanteraTitleBold', 10)
-        c.drawString(MARGIN, PAGE_HEIGHT - 31, 'LaCantera')
+        c.drawImage(ImageReader(str(ROOT / 'public/icon-192.png')), MARGIN, PAGE_HEIGHT - 36,
+                    width=20, height=20, preserveAspectRatio=True, mask='auto')
+        c.drawString(MARGIN + 27, PAGE_HEIGHT - 31, 'LaCantera')
         c.setFillColor(MUTED)
         c.setFont('CanteraBody', 7.3)
         c.drawRightString(PAGE_WIDTH - MARGIN, PAGE_HEIGHT - 30, f'WHITEPAPER DEL PROYECTO / V{self.version}')
@@ -283,6 +286,7 @@ def make_table(rows: list[list[str]], renderer: MarkdownRenderer, style: dict[st
     if any(len(row) != count for row in rows):
         raise ValueError('Tabla Markdown con distinto número de columnas.')
     first = rows[0][0]
+    row_padding = 7 if first == 'ID' else 9
     if count == 4 and first == 'ID':
         widths = [39, 134, 148, CONTENT_WIDTH - 321]
     elif count == 4:
@@ -311,8 +315,8 @@ def make_table(rows: list[list[str]], renderer: MarkdownRenderer, style: dict[st
         ('RIGHTPADDING', (0, 0), (-1, -1), 9),
         ('TOPPADDING', (0, 0), (-1, 0), 10),
         ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
-        ('TOPPADDING', (0, 1), (-1, -1), 9),
-        ('BOTTOMPADDING', (0, 1), (-1, -1), 9),
+        ('TOPPADDING', (0, 1), (-1, -1), row_padding),
+        ('BOTTOMPADDING', (0, 1), (-1, -1), row_padding),
     ]))
     return table
 
@@ -412,12 +416,12 @@ def build(source: Path, output: Path, publish: bool, expected_sha: str | None) -
                   Paragraph(f'<font name="CanteraMono" size="8.0">{source_sha}</font>', style['body']),
                   Spacer(1, 7), Paragraph('Fuentes enlazadas en el texto', style['h3'])])
     for url, label in renderer.external_links.items():
-        story.append(Paragraph(f'<a href="{html.escape(url, quote=True)}" color="#cf302b"><u>{renderer.inline(label)}</u></a><br/><font size="8" color="#696970">{html.escape(url)}</font>', style['body']))
+        story.append(Paragraph(f'<a href="{html.escape(url, quote=True)}" color="#176346"><u>{renderer.inline(label)}</u></a><br/><font size="8" color="#687468">{html.escape(url)}</font>', style['body']))
     if renderer.local_references:
         story.extend([Paragraph('Documentación de esta entrega', style['h3']),
                       Paragraph('Las referencias a archivos locales designan documentos del proyecto. Su publicación web deberá acompañar la versión de código a la que se refieren.', style['note'])])
         for path, label in renderer.local_references.items():
-            story.append(Paragraph(f'<b>{html.escape(label)}</b><br/><font name="CanteraMono" size="8">{html.escape(path)}</font>', style['body']))
+            story.append(Paragraph(f'<b>{html.escape(label)}</b><br/><font name="CanteraMono" size="8">{html.escape(path)}</font>', style['local_reference']))
     document.multiBuild(story, canvasmaker=NumberedCanvas)
     reader = PdfReader(output)
     extracted = '\n'.join(page.extract_text() or '' for page in reader.pages)

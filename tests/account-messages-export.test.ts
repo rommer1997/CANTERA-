@@ -35,3 +35,12 @@ test('rechaza mensajes de otra ruta, participantes ajenos, IDs malformados y reg
   ]);
   assert.equal(result.counts.communityMessages, 1);
 });
+
+test('el titular superviviente exporta sólo su texto archivado sin ruta ni identidad de la cuenta retirada', () => {
+  const archive = `archive_${'1'.repeat(32)}`;
+  const result = exportMessages([message('own', archive), message('other', archive, 'another'), message('bad', 'archive_invalid')]);
+  assert.equal(result.counts.communityMessages, 1);
+  assert.equal(result.collections.communityMessages[0].text, 'Mensaje propio own');
+  assert.equal(result.collections.communityMessages[0].senderId, 'self');
+  assert.ok(!JSON.stringify(result).includes(archive));
+});

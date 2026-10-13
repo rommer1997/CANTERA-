@@ -56,6 +56,12 @@
 .ci-accept > p { color: var(--c-muted); }
 .ci-accept-icon { display: inline-grid; place-items: center; width: 56px; height: 56px; border-radius: 16px; background: var(--c-soft); color: var(--c-green); margin-bottom: 12px; }
 .ci-entry-code { display: block; padding: 16px 8px; background: var(--c-bg); border-radius: 12px; font-size: 20px; letter-spacing: .05em; font-weight: 750; margin: 22px 0; }
+.ci-inviter { display: flex; align-items: flex-start; gap: 12px; text-align: left; background: var(--c-bg); border-radius: 12px; padding: 16px; margin: 20px 0; }
+.ci-inviter .c-avatar { flex-shrink: 0; }
+.ci-inviter > div { min-width: 0; }
+.ci-inviter p { color: var(--c-muted); font-size: 13px; margin: 0 0 5px; }
+.ci-inviter strong { display: block; font-size: 18px; overflow-wrap: anywhere; }
+.ci-inviter .ci-text-button { display: inline-flex; align-items: center; gap: 5px; margin-top: 5px; }
 .ci-accept-details { text-align: left; display: flex; align-items: flex-start; gap: 12px; border: 1px solid var(--c-line); border-radius: 12px; padding: 16px; margin: 20px 0; }
 .ci-accept-details svg { flex-shrink: 0; color: var(--c-green); }
 .ci-accept-details p { margin: 0; color: var(--c-muted); font-size: 13px; }

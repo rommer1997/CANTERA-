@@ -156,11 +156,11 @@ function publicMediaUrl(value: string, mediaPath: string): boolean {
 export function normalizePost(value: unknown, documentId?: string, mode: 'cloud' | 'demo' = 'cloud'): CommunityPost | null {
   value = dates(value);
   if (!object(value) || !documentIdentity(value, documentId) || !id(value.authorId) || !text(value.authorName, 1, 100)
-    || !enumValue(value.kind, ['reel', 'photo', 'achievement'] as const) || !text(value.text, 1, 2000)
+    || !enumValue(value.kind, ['post', 'reel', 'photo', 'achievement'] as const) || !text(value.text, 1, 2000)
     || !text(value.title, 0, 100) || !text(value.mediaUrl, 0, 2000) || !text(value.mediaPath, 0, 400)
     || !date(value.createdAt) || !(value.eventId === '' || id(value.eventId))) return null;
-  if (value.kind === 'achievement') {
-    if (!text(value.title, 1, 100) || value.mediaUrl !== '' || value.mediaPath !== '') return null;
+  if (value.kind === 'post' || value.kind === 'achievement') {
+    if (value.kind === 'achievement' && !text(value.title, 1, 100) || value.mediaUrl !== '' || value.mediaPath !== '') return null;
   } else if (mode === 'demo') {
     if (value.mediaPath !== `local:${value.id}` || value.mediaUrl !== '' && !value.mediaUrl.startsWith('blob:')) return null;
   } else {

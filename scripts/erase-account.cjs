@@ -66,7 +66,7 @@ async function main() {
     const options = parseErasureArguments(process.argv.slice(2));
     if (options.help) { console.log(usage); return; }
     if (Number(process.versions.node.split('.')[0]) < 24) throw new Error('node-24-required');
-    const { assertErasureUid, collectErasureSource, buildErasurePlan, assertReviewedPlan, applyErasurePlan } = await import('./account-erasure.mjs');
+    const { assertErasureUid, collectErasureSource, buildErasurePlan, assertReviewedPlan, applyErasurePlan, erasureRoutes } = await import('./account-erasure.mjs');
     const { accountQueryPolicies } = await import('./account-export.ts');
     const { PROJECT_ID, DATABASE_ID } = await import('../functions/config.mjs');
     assertErasureUid(options.uid);
@@ -102,7 +102,8 @@ async function main() {
     const { getAuth } = requireFunctions('firebase-admin/auth');
     app = adminApp.initializeApp({ projectId: PROJECT_ID, credential: adminApp.applicationDefault() });
     const db = getFirestore(app, DATABASE_ID), auth = getAuth(app);
-    const collectFresh = () => collectErasureSource({ db, auth, uid: options.uid, projectId: PROJECT_ID, databaseId: DATABASE_ID, FieldPath, collectAccountSource, policies: accountQueryPolicies });
+    const routes = erasureRoutes(plan);
+    const collectFresh = () => collectErasureSource({ db, auth, uid: options.uid, projectId: PROJECT_ID, databaseId: DATABASE_ID, FieldPath, collectAccountSource, policies: accountQueryPolicies, routes });
     stage = options.apply ? 'apply' : 'read-only-plan';
     if (!options.apply) {
       plan = buildErasurePlan(await collectFresh());

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, CalendarDays, ChevronRight, MapPin, Play, Plus, Trophy, Users } from 'lucide-react';
+import { ArrowRight, CalendarDays, ChevronRight, MapPin, MessageCircle, Play, Plus, Trophy, Users } from 'lucide-react';
 import { useCommunity, usePublicProfile } from './CommunityContext';
 import { canReadEvent, isPublicEvent } from './eventPrivacy';
 import type { CommunityPost, PlayEvent } from './types';
@@ -17,7 +17,7 @@ function AgendaRow({ event }: { event: PlayEvent }) {
 
 function RecentPost({ post }: { post: CommunityPost }) {
   const author = usePublicProfile(post.authorId === 'example-community' ? '' : post.authorId);
-  return <Link to={`/feed?post=${encodeURIComponent(post.id)}`} className="c-mobile-story"><div className={`c-mobile-story-icon ${post.kind}`}>{post.kind === 'photo' && post.mediaUrl ? <img src={post.mediaUrl} alt="" loading="lazy" /> : post.kind === 'reel' ? <Play size={23} aria-hidden="true" /> : <Trophy size={23} aria-hidden="true" />}</div><div><span>{author?.name || post.authorName} · {post.kind === 'achievement' ? 'Logro' : post.kind === 'reel' ? 'Reel' : 'Foto'}</span><h3>{post.title || post.text}</h3>{post.title ? <p>{post.text}</p> : null}</div><ChevronRight size={18} aria-hidden="true" /></Link>;
+  return <Link to={`/feed?post=${encodeURIComponent(post.id)}`} className="c-mobile-story"><div className={`c-mobile-story-icon ${post.kind}`}>{post.kind === 'photo' && post.mediaUrl ? <img src={post.mediaUrl} alt="" loading="lazy" /> : post.kind === 'reel' ? <Play size={23} aria-hidden="true" /> : post.kind === 'post' ? <MessageCircle size={23} aria-hidden="true" /> : <Trophy size={23} aria-hidden="true" />}</div><div><span>{author?.name || post.authorName} · {post.kind === 'achievement' ? 'Logro' : post.kind === 'reel' ? 'Reel' : post.kind === 'photo' ? 'Foto' : 'Publicación'}</span><h3>{post.title || post.text}</h3>{post.title ? <p>{post.text}</p> : null}</div><ChevronRight size={18} aria-hidden="true" /></Link>;
 }
 
 export function MobileHome() {

@@ -4,6 +4,8 @@ import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 import * as normalization from '../src/community/normalization.ts';
 import * as pilotAccess from '../src/community/pilotAccess.ts';
+import * as eventPrivacy from '../src/community/eventPrivacy.ts';
+import { requireText } from '../src/community/logic.ts';
 import { TERMS_VERSION } from '../src/community/policy.ts';
 
 const date = '2026-10-08T12:00:00.000Z';
@@ -23,6 +25,7 @@ function providerHarness({ buildOpen = true, pilotBuild = false, existing = new 
   let authListener: (user: any) => Promise<void>;
   let loginUser: any;
   let pauseNextRead = false, releaseRead: (() => void) | undefined;
+  let pageRows: any[] = [], rejectNextDeletion = false;
   const noUser = () => {};
   const react = {
     createContext: () => ({ Provider: 'provider' }),
@@ -61,7 +64,10 @@ function providerHarness({ buildOpen = true, pilotBuild = false, existing = new 
       return () => { listener.stopped = true; };
     },
     getDoc: async (target: any) => snapshot(target.path),
+    getDocs: async (target: any) => { const docs = target.path === 'communityPosts' ? pageRows.map(value => snapshot(`communityPosts/${value.id}`, value)) : []; return { docs, size: docs.length }; },
+    deleteDoc: async (target: any) => { if (rejectNextDeletion) { rejectNextDeletion = false; throw new Error('delete-rejected'); } existing.delete(target.path); emit(target.path, undefined); },
     serverTimestamp: () => serverTime,
+    setDoc: async (target: any, value: any) => commit([{ path: target.path, value }]),
     async runTransaction(_db: any, callback: any) {
       const items: Array<{ path: string; value: any }> = [];
       const result = await callback({ async get(target: any) { if (pauseNextRead) { pauseNextRead = false; await new Promise<void>(resolve => { releaseRead = resolve; }); } return snapshot(target.path); }, set(target: any, value: any) { items.push({ path: target.path, value }); } });
@@ -78,7 +84,7 @@ function providerHarness({ buildOpen = true, pilotBuild = false, existing = new 
     '../store/useAppStore': { useAppStore: (selector: any) => selector({ setUser: noUser }) },
     './local': {}, './localMediaCache': {}, './coalescedRefresh': {}, './invitationDemo': {},
     './legal': { legalReady: true, operator: { email: 'support@example.test' } }, './fixtureRecords': {}, './deliveryBatches': {},
-    './policy': { TERMS_VERSION }, './pilotAccess.ts': pilotAccess, './eventPrivacy': { canReadEvent: () => true, isPublicEvent: () => true }, './logic': { requireText: (value: string) => value.trim() }, './normalization': normalization,
+    './policy': { TERMS_VERSION }, './pilotAccess.ts': pilotAccess, './eventPrivacy': eventPrivacy, './logic': { requireText }, './normalization': normalization,
   };
   const source = readFileSync(new URL('../src/community/CommunityContext.tsx', import.meta.url), 'utf8').replaceAll('import.meta.env.DEV', 'false').replaceAll('import.meta.env.VITE_ENABLE_DEMO', "'false'").replaceAll('import.meta.env.VITE_ENABLE_MEDIA_UPLOADS', "'false'").replaceAll('import.meta.env.VITE_ENABLE_PILOT', pilotBuild ? "'true'" : "'false'").replaceAll('import.meta.env.VITE_SERVICE_OPEN', buildOpen ? "'true'" : "'false'");
   const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
@@ -106,6 +112,11 @@ function providerHarness({ buildOpen = true, pilotBuild = false, existing = new 
     emitProfile(uid: string, value: any, pending = false) { emit(`communityProfiles/${uid}`, value, pending); return render(); },
     failProfile(uid: string, error: Error) { snapshots.slice().reverse().find(item => !item.stopped && item.target.path === `communityProfiles/${uid}`)!.error(error); return render(); },
     ownListener(uid = 'alpha') { return snapshots.slice().reverse().find(item => !item.stopped && item.target.path === `communityProfiles/${uid}`); },
+    publicListener(uid = 'beta') { return snapshots.slice().reverse().find(item => !item.stopped && item.target.path === `communityPublicProfiles/${uid}`); },
+    emitPublicProfile(uid: string, value: any) { emit(`communityPublicProfiles/${uid}`, value); return render(); },
+    emitPost(id: string, value: any) { emit(`communityPosts/${id}`, value); return render(); },
+    emitPosts(values: any[]) { for (const listener of snapshots.filter(item => !item.stopped && item.target.path === 'communityPosts')) listener.next({ docs: values.map(value => snapshot(`communityPosts/${value.id}`, value)), size: values.length, metadata: { fromCache: false } }); return render(); },
+    page(values: any[]) { pageRows = values; }, failNextDeletion() { rejectNextDeletion = true; },
     activePaths() { return snapshots.filter(item => !item.stopped).map(item => item.target.path); },
     deferRead() { pauseNextRead = true; }, releaseRead() { releaseRead?.(); },
     cleanup() { cleanups.forEach(cleanup => cleanup?.()); },
@@ -255,4 +266,120 @@ test('entrar con Google sin autorización cierra la sesión y no crea perfil aun
     assert.equal(h.auth.currentUser, null); assert.equal(h.writes.length, 0);
     assert.equal(h.render().serviceAvailable, false);
   } finally { h.cleanup(); }
+});
+
+test('reintentar un perfil compartido vacía la caché, revoca callbacks antiguos y conserva los dos suscriptores', async () => {
+  const h = providerHarness();
+  try {
+    await h.runtime('open');
+    const first = h.render().watchPublicProfile('beta');
+    const second = h.render().watchPublicProfile('beta');
+    const old = h.publicListener('beta')!;
+    h.emitPublicProfile('beta', fixture('beta', { name: 'Nombre anterior' }));
+    assert.equal(h.render().publicProfiles.beta.name, 'Nombre anterior');
+    h.render().retryPublicProfile('beta');
+    const current = h.publicListener('beta')!;
+    assert.notEqual(current, old); assert.equal(old.stopped, true);
+    assert.equal(h.render().publicProfiles.beta, undefined);
+    assert.equal(h.render().publicProfileStates.beta, 'loading');
+    old.next({ id: 'beta', exists: () => true, data: () => fixture('beta', { name: 'Callback viejo' }) });
+    old.error(new Error('Error viejo'));
+    assert.equal(h.render().publicProfiles.beta, undefined);
+    assert.equal(h.render().publicProfileStates.beta, 'loading');
+    h.emitPublicProfile('beta', fixture('beta', { name: 'Nombre confirmado' }));
+    assert.equal(h.render().publicProfiles.beta.name, 'Nombre confirmado');
+    first(); assert.equal(current.stopped, false);
+    second(); assert.equal(current.stopped, true);
+    first(); second(); assert.equal(h.publicListener('beta'), undefined);
+  } finally { h.cleanup(); }
+});
+
+test('un listener de perfil fallido se puede renovar sin duplicar consultas y sin conservar el dato anterior', async () => {
+  const h = providerHarness();
+  try {
+    await h.runtime('open'); const release = h.render().watchPublicProfile('beta');
+    const old = h.publicListener('beta')!;
+    old.error(new Error('network-error'));
+    assert.equal(h.render().publicProfileStates.beta, 'error');
+    h.render().retryPublicProfile('beta');
+    const fresh = h.publicListener('beta')!;
+    assert.notEqual(fresh, old);
+    assert.equal(h.activePaths().filter(path => path === 'communityPublicProfiles/beta').length, 1);
+    h.emitPublicProfile('beta', fixture('beta', { name: 'Perfil recuperado' }));
+    assert.equal(h.render().publicProfileStates.beta, 'ready');
+    assert.equal(h.render().publicProfiles.beta.name, 'Perfil recuperado');
+    release(); assert.equal(fresh.stopped, true);
+  } finally { h.cleanup(); }
+});
+
+test('reintentar un perfil sin suscriptores o con el servicio cerrado no crea listeners persistentes', async () => {
+  const h = providerHarness();
+  try {
+    await h.runtime('open'); h.render().retryPublicProfile('beta');
+    assert.equal(h.publicListener('beta'), undefined);
+    const release = h.render().watchPublicProfile('beta'); const current = h.publicListener('beta')!;
+    await h.runtime('paused'); h.render().retryPublicProfile('beta');
+    assert.equal(h.publicListener('beta'), current);
+    release(); assert.equal(current.stopped, true);
+    h.render().retryPublicProfile('../other'); assert.equal(h.activePaths().some(path => path.includes('../other')), false);
+  } finally { h.cleanup(); }
+});
+
+test('createPost guarda texto sin título ni medios y conserva validaciones de logros, archivos y términos', async () => {
+  const h = providerHarness();
+  try {
+    await h.identify(); await h.runtime('open');
+    const completed = fixture('alpha', { name: 'Mi cuenta', adultConfirmed: true, city: 'Madrid', country: 'España', acceptedTermsVersion: TERMS_VERSION, acceptedTermsAt: time });
+    const api = h.emitProfile('alpha', completed);
+    const input = { kind: 'post' as const, text: ' Mi publicación de texto ', title: '', eventId: '' };
+    const id = await api.createPost(input); await h.settle();
+    const record = h.writes.find(write => write.path === `communityPosts/${id}`)!;
+    assert.equal(record.value.kind, 'post'); assert.equal(record.value.text, 'Mi publicación de texto');
+    assert.equal(record.value.title, ''); assert.equal(record.value.mediaPath, ''); assert.equal(record.value.mediaUrl, '');
+    assert.equal(record.value.authorId, 'alpha'); assert.equal(record.value.authorName, 'Mi cuenta');
+    await assert.rejects(api.createPost({ ...input, text: '' }), /Texto/);
+    await assert.rejects(api.createPost({ ...input, text: 'x'.repeat(2001) }), /Texto/);
+    await assert.rejects(api.createPost({ ...input, title: 'x'.repeat(101) }), /Título/);
+    await assert.rejects(api.createPost({ ...input, kind: 'achievement' }), /Logro/);
+    await assert.rejects(api.createPost({ ...input, file: { type: 'image/png', size: 1 } }), /no admiten archivos/);
+    for (const kind of ['photo', 'reel']) await assert.rejects(api.createPost({ ...input, kind }), /patrocinio/);
+    assert.equal(h.writes.filter(write => write.path.startsWith('communityPosts/')).length, 1);
+    h.emitProfile('alpha', { ...completed, acceptedTermsVersion: '2026-10-07' });
+    await assert.rejects(h.render().createPost(input), /términos actuales/);
+  } finally { h.cleanup(); }
+});
+
+test('createPost de texto impide enlazar un encuentro privado igual que un logro', async () => {
+  const h = providerHarness();
+  try {
+    await h.identify(); await h.runtime('open');
+    const api = h.emitProfile('alpha', fixture('alpha', { adultConfirmed: true, city: 'Madrid', country: 'España', acceptedTermsVersion: TERMS_VERSION, acceptedTermsAt: time }));
+    const startAt = new Date(Date.now() + 86_400_000).toISOString();
+    const event = { id: 'private', ownerId: 'alpha', ownerName: 'Mi perfil', title: 'Prueba privada', visibility: 'private', type: 'match', format: '7', level: 'amateur', city: 'Madrid', country: 'España', timeZone: 'Europe/Madrid', venue: 'Campo', startAt, capacity: 4, entry: 'players', description: '', status: 'open', tournamentFormat: 'league', participants: {}, fixtures: [], createdAt: time };
+    h.existing.set('communityEvents/private', event);
+    await assert.rejects(api.createPost({ kind: 'post', text: 'Texto público', title: '', eventId: 'private' }), /sólo puedes asociar un encuentro público/);
+    assert.equal(h.writes.some(write => write.path.startsWith('communityPosts/')), false);
+  } finally { h.cleanup(); }
+});
+
+test('borrar un post de texto de una página antigua retira su tarjeta y enlace sólo después de confirmar Firebase', async () => {
+  const h = providerHarness(); let stop: (() => void) | undefined;
+  try {
+    await h.identify(); await h.runtime('open');
+    const api = h.emitProfile('alpha', fixture('alpha', { adultConfirmed: true, city: 'Madrid', country: 'España', acceptedTermsVersion: TERMS_VERSION, acceptedTermsAt: time }));
+    const older = { id: 'older', authorId: 'alpha', authorName: 'Mi perfil', kind: 'post', title: '', text: 'Publicación de una página anterior', mediaUrl: '', mediaPath: '', createdAt: time, eventId: '' };
+    const latest = { ...older, id: 'latest', text: 'La publicación reciente permanece' };
+    h.existing.set('communityPosts/older', older); h.page([older]);
+    await api.loadMorePosts(true); h.emitPosts([latest]);
+    stop = h.render().watchPost('older'); h.emitPost('older', older);
+    assert.deepEqual(h.render().posts.map((item: any) => item.id).sort(), ['latest', 'older']);
+    assert.equal(h.render().linkedPostStates.older, 'ready');
+    h.failNextDeletion(); await assert.rejects(h.render().deletePost('older'), /delete-rejected/);
+    assert.ok(h.render().posts.some((item: any) => item.id === 'older'));
+    assert.equal(h.render().linkedPostStates.older, 'ready');
+    await h.render().deletePost('older'); h.render();
+    assert.deepEqual(h.render().posts.map((item: any) => item.id), ['latest']);
+    assert.equal(h.render().linkedPostStates.older, 'missing');
+    assert.equal(h.existing.has('communityPosts/older'), false);
+  } finally { stop?.(); h.cleanup(); }
 });

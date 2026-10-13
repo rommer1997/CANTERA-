@@ -1,5 +1,6 @@
 import React from 'react';
 import { cn } from '../lib/utils';
+import BrandMark from './BrandMark';
 
 interface LogoProps {
   className?: string;
@@ -8,16 +9,16 @@ interface LogoProps {
 
 export default function Logo({ className, size = 'md' }: LogoProps) {
   const sizeClasses = {
-    sm: 'text-lg tracking-[0.2em]',
-    md: 'text-xl tracking-[0.3em]',
-    lg: 'text-2xl tracking-[0.4em]',
-    xl: 'text-3xl md:text-5xl tracking-[0.4em] md:tracking-[0.5em]'
+    sm: 'text-lg',
+    md: 'text-xl',
+    lg: 'text-2xl',
+    xl: 'text-3xl md:text-5xl'
   };
 
   return (
-    <div className={cn("font-bold select-none flex items-baseline", sizeClasses[size], className)}>
+    <div className={cn("font-bold select-none flex items-center gap-2 tracking-tight", sizeClasses[size], className)}>
+      <BrandMark className="rounded-lg shrink-0" />
       <span className="text-charcoal dark:text-white transition-colors duration-300">LaCantera</span>
-      <span className="text-red-600 ml-0.5 md:ml-1">.</span>
     </div>
   );
 }

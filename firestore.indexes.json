@@ -374,6 +374,42 @@
           "order": "ASCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "communityFixtures",
+      "queryScope": "COLLECTION",
+      "density": "DENSE",
+      "fields": [
+        { "fieldPath": "ownerId", "order": "ASCENDING" },
+        { "fieldPath": "__name__", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "communityEventChanges",
+      "queryScope": "COLLECTION",
+      "density": "DENSE",
+      "fields": [
+        { "fieldPath": "audienceIds", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "__name__", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "communityEventDeliveries",
+      "queryScope": "COLLECTION",
+      "density": "DENSE",
+      "fields": [
+        { "fieldPath": "recipientId", "order": "ASCENDING" },
+        { "fieldPath": "__name__", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "communityConversations",
+      "queryScope": "COLLECTION",
+      "density": "DENSE",
+      "fields": [
+        { "fieldPath": "participantIds", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "__name__", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

@@ -37,6 +37,9 @@ jobs:
           distribution: temurin
           java-version: '21'
 
+      - name: Instalar herramientas del operador para las pruebas de derechos
+        run: pnpm --dir functions --ignore-workspace install --frozen-lockfile --ignore-scripts
+
       - name: Comprobar TypeScript
         run: pnpm lint
 

@@ -1,12 +1,13 @@
 // Operator-only, bounded erasure of the current schema. This module has no
-// credentials and can be tested offline. Shared sporting history is a blocker.
-import { createHash } from 'node:crypto';
+// credentials and can be tested offline. Unknown shared schemas still block.
+import { createHash, randomUUID } from 'node:crypto';
+import { ARCHIVE_ID, ANONYMOUS_ID, knownOwnedSchema, knownSharedSchema, eventReferencesUid, sharedAfter, archiveAfter } from './account-erasure-shared.mjs';
 
 export class ErasurePolicyError extends Error {
   constructor(code) { super(code); this.code = `erasure/${code}`; }
 }
 
-export const ERASURE_FORMAT = 1;
+export const ERASURE_FORMAT = 2;
 export const ERASURE_PAGE_SIZE = 100;
 export const ERASURE_MAX_OPERATIONS = 5000;
 export const ERASURE_TOKEN_GRACE_MS = 65 * 60 * 1000;
@@ -29,6 +30,11 @@ export function assertErasureUid(uid) {
 function validId(value) { return typeof value === 'string' && value.length > 0 && value.length <= 1500 && !/[/\\\u0000-\u001f\u007f]/.test(value) && !['.', '..'].includes(value); }
 function canonical(value) {
   if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  // Firestore update timestamps can differ below a millisecond. Converting
+  // them to Date/ISO would collapse distinct snapshots and weaken CAS.
+  const seconds = value.seconds ?? value._seconds, nanoseconds = value.nanoseconds ?? value._nanoseconds;
+  if (typeof value.toDate === 'function' && Number.isInteger(seconds) && Number.isInteger(nanoseconds)
+    && nanoseconds >= 0 && nanoseconds < 1_000_000_000) return `@firestore-timestamp(${seconds},${nanoseconds})`;
   if (typeof value.toDate === 'function') return JSON.stringify(value.toDate().toISOString());
   if (value instanceof Date) return JSON.stringify(value.toISOString());
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
@@ -49,13 +55,13 @@ function checkedRecord(row) {
   return row;
 }
 const dedupe = rows => [...new Map(rows.map(row => [recordPath(checkedRecord(row)), row])).values()];
-export async function erasureReadAll(query, documentIdField) {
+export async function erasureReadAll(query, documentIdField, onRecord) {
   const result = []; let cursor;
   const ordered = query.orderBy(documentIdField);
   while (true) {
     const page = await (cursor ? ordered.startAfter(cursor) : ordered).limit(ERASURE_PAGE_SIZE).get();
     if (!Array.isArray(page.docs) || page.docs.length > ERASURE_PAGE_SIZE) throw new ErasurePolicyError('invalid-page');
-    result.push(...page.docs.map(snapshotRecord));
+    for (const document of page.docs) { const row = snapshotRecord(document); if (onRecord) onRecord(row); result.push(row); }
     if (result.length > ERASURE_MAX_OPERATIONS) throw new ErasurePolicyError('review-volume-exceeded');
     if (page.docs.length < ERASURE_PAGE_SIZE) return result;
     cursor = page.docs.at(-1);
@@ -63,27 +69,86 @@ export async function erasureReadAll(query, documentIdField) {
 }
 
 /** All queries are restricted to the UID, its exact subtree, or a reviewed post. */
-export async function collectErasureSource({ db, auth, uid, projectId, databaseId, FieldPath, collectAccountSource, policies }) {
+export async function collectErasureSource({ db, auth, uid, projectId, databaseId, FieldPath, collectAccountSource, policies, routes = {} }) {
   assertErasureUid(uid);
-  const source = await collectAccountSource({ db, auth, uid, projectId, databaseId, FieldPath, policies });
-  const read = query => erasureReadAll(query, FieldPath.documentId());
-  const extras = { ownConnections: [], mirrors: [], incomingFollows: [], incomingBlocks: [], postInteractions: [], fixtureReferences: [], conversations: [], messages: [], unknownCollections: [], unknownSubcollections: [] };
-  const [ownConnections, mirrors, incomingFollows, incomingBlocks, home, away, conversations, messages, roots] = await Promise.all([
+  // One deduplicated budget across account queries, mirrors, every message
+  // subtree and destination. A large set cannot multiply the per-query cap.
+  const seen = new Set();
+  const account = row => {
+    const path = checkedRecord(row).path;
+    seen.add(`document:${path}`);
+    if (seen.size > ERASURE_MAX_OPERATIONS) throw new ErasurePolicyError('review-volume-exceeded');
+    return row;
+  };
+  const referenceBudget = (path, children) => {
+    if (!Array.isArray(children) || children.length > ERASURE_MAX_OPERATIONS) throw new ErasurePolicyError('review-volume-exceeded');
+    for (const child of children) {
+      seen.add(`collection:${path}/${child.id}`);
+      if (seen.size > ERASURE_MAX_OPERATIONS) throw new ErasurePolicyError('review-volume-exceeded');
+    }
+  };
+  const source = await collectAccountSource({ db, auth, uid, projectId, databaseId, FieldPath, policies, maximumRecords: ERASURE_MAX_OPERATIONS, onRecord: account });
+  for (const row of [...['privateProfile', 'publicProfile', 'moderation', 'legacyProfile'].map(key => source[key]).filter(Boolean),
+    ...Object.values(source.collections || {}).flat(), ...(source.events || []), ...(source.fixtureRecords || []), ...(source.teams || []), ...(source.legacyLikes || [])]) account(row);
+  const runtime = await db.doc('communityConfiguration/runtime').get();
+  source.runtime = runtime.exists ? account(snapshotRecord(runtime)) : null;
+  const read = query => erasureReadAll(query, FieldPath.documentId(), account);
+  const extras = { ownConnections: [], mirrors: [], incomingFollows: [], incomingBlocks: [], postInteractions: [], fixtureReferences: [], conversations: [], messages: [], conversationMessages: [], sharedCoordination: [], archiveTargets: [], archiveExpected: routes.archiveExpected || {}, archiveIds: { ...(routes.archiveIds || {}) }, anonymousIds: { ...(routes.anonymousIds || {}) }, unknownCollections: [], unknownSubcollections: [] };
+  const [ownConnections, mirrors, incomingFollows, incomingBlocks, home, away, fixtureOwners, audiences, deliveries, conversations, messages, roots] = await Promise.all([
     read(db.collection('communityConnections').doc(uid).collection('members')),
     read(db.collectionGroup('members').where('peerId', '==', uid)),
     read(db.collection('communityFollows').where('followingId', '==', uid)),
     read(db.collection('communityBlocks').where('blockedId', '==', uid)),
     read(db.collection('communityFixtures').where('homeId', '==', uid)),
     read(db.collection('communityFixtures').where('awayId', '==', uid)),
+    read(db.collection('communityFixtures').where('ownerId', '==', uid)),
+    read(db.collection('communityEventChanges').where('audienceIds', 'array-contains', uid)),
+    read(db.collection('communityEventDeliveries').where('recipientId', '==', uid)),
     read(db.collection('communityConversations').where('participantIds', 'array-contains', uid)),
     read(db.collectionGroup('messages').where('senderId', '==', uid)),
     db.listCollections(),
   ]);
   extras.ownConnections = ownConnections;
+  referenceBudget('', roots);
   // Do not confuse a future unrelated "members"/"messages" group with these schemas.
   extras.mirrors = mirrors.filter(row => row.path.split('/').length === 4 && row.path.split('/')[0] === 'communityConnections' && row.path.split('/')[2] === 'members');
   extras.messages = messages.filter(row => row.path.split('/').length === 4 && row.path.split('/')[0] === 'communityConversations' && row.path.split('/')[2] === 'messages');
-  Object.assign(extras, { incomingFollows, incomingBlocks, fixtureReferences: dedupe([...home, ...away]), conversations });
+  Object.assign(extras, { incomingFollows, incomingBlocks, fixtureReferences: dedupe([...home, ...away, ...fixtureOwners]), conversations, sharedCoordination: dedupe([...audiences, ...deliveries]) });
+  // Exact parent lookups recover canonical fixture ownership and historical
+  // audience references even after the requester left the event itself.
+  const linkedEventIds = new Set([...extras.fixtureReferences, ...extras.sharedCoordination].map(row => row.data.eventId));
+  for (const id of linkedEventIds) {
+    if (!validId(id)) throw new ErasurePolicyError('invalid-linked-event');
+    if (!(source.events || []).some(row => row.id === id)) {
+      const document = await db.doc(`communityEvents/${id}`).get();
+      if (!document.exists) throw new ErasurePolicyError('shared-event-parent-missing');
+      (source.events ||= []).push(account(snapshotRecord(document)));
+    }
+  }
+  for (const row of source.events || []) extras.anonymousIds[row.id] ||= `removed_${randomUUID().replaceAll('-', '')}`;
+  // The random destination is persisted in the reviewed plan, never derived
+  // from an account ID. On resume only those exact original subtrees are read.
+  const conversationIds = new Set([...conversations.map(row => row.id), ...Object.keys(extras.archiveIds)]);
+  for (const id of conversationIds) {
+    if (!validId(id)) throw new ErasurePolicyError('invalid-conversation');
+    if (!conversations.some(row => row.id === id)) {
+      const document = await db.doc(`communityConversations/${id}`).get();
+      if (document.exists) extras.conversations.push(account(snapshotRecord(document)));
+    }
+    extras.conversationMessages.push(...await read(db.collection('communityConversations').doc(id).collection('messages')));
+    if (!ARCHIVE_ID.test(id)) extras.archiveIds[id] ||= `archive_${randomUUID().replaceAll('-', '')}`;
+    const children = await db.doc(`communityConversations/${id}`).listCollections();
+    referenceBudget(`communityConversations/${id}`, children);
+    for (const child of children) if (child.id !== 'messages') extras.unknownSubcollections.push(`communityConversations/${id}/${child.id}`);
+  }
+  for (const archiveId of new Set(Object.values(extras.archiveIds))) {
+    if (!ARCHIVE_ID.test(archiveId)) throw new ErasurePolicyError('invalid-archive-destination');
+    const reference = db.doc(`communityConversations/${archiveId}`), destination = await reference.get();
+    if (destination.exists) extras.archiveTargets.push(account(snapshotRecord(destination)));
+    extras.archiveTargets.push(...await read(db.collection('communityConversations').doc(archiveId).collection('messages')));
+    const children = await reference.listCollections(); referenceBudget(reference.path, children);
+    for (const child of children) if (child.id !== 'messages') extras.unknownSubcollections.push(`${reference.path}/${child.id}`);
+  }
   extras.unknownCollections = roots.map(ref => ref.id).filter(name => !knownCollections.has(name));
   for (const row of source.collections?.communityPosts || []) {
     for (const collection of ['communityLikes', 'communityComments']) extras.postInteractions.push(...await read(db.collection(collection).where('postId', '==', row.id)));
@@ -91,10 +156,12 @@ export async function collectErasureSource({ db, auth, uid, projectId, databaseI
   // Firestore does not recursively delete subcollections. Unknown descendants
   // below account-owned records must be reviewed instead of silently orphaned.
   const own = [...directCollections.map(name => `${name}/${uid}`), ...Object.entries(source.collections || {}).flatMap(([name, rows]) => Object.hasOwn(personalPolicies, name) ? rows.map(row => `${name}/${row.id}`) : []),
-    ...(source.legacyLikes || []).map(row => row.path), ...ownConnections.map(row => row.path), ...extras.messages.map(row => row.path),
-    ...(source.collections?.communityEventAdmissions || []).map(row => row.path), ...(source.collections?.communityInvitations || []).filter(row => row.data.ownerId === uid).map(row => row.path)];
+    ...(source.legacyLikes || []).map(row => row.path), ...ownConnections.map(row => row.path), ...dedupe([...extras.messages, ...extras.conversationMessages, ...extras.archiveTargets.filter(row => row.path.split('/').length === 4)]).map(row => row.path),
+    ...(source.collections?.communityEventAdmissions || []).map(row => row.path), ...(source.collections?.communityInvitations || []).filter(row => row.data.ownerId === uid).map(row => row.path),
+    ...[...(source.events || []), ...(source.fixtureRecords || []), ...extras.fixtureReferences, ...extras.sharedCoordination, ...incomingFollows, ...incomingBlocks].map(row => row.path)];
   for (const path of [...new Set(own)]) {
     const children = await db.doc(path).listCollections();
+    referenceBudget(path, children);
     for (const child of children) if (!(path === `users/${uid}` && child.id === 'likes')) extras.unknownSubcollections.push(`${path}/${child.id}`);
   }
   return { ...source, erasure: extras };
@@ -106,43 +173,102 @@ export function buildErasurePlan(source) {
   if (!source.projectId || !source.databaseId || source.databaseId === '(default)') throw new ErasurePolicyError('named-database-required');
   if (source.auth && source.auth.uid !== source.uid) throw new ErasurePolicyError('identity-mismatch');
   const uid = source.uid, extra = source.erasure || {}, blockers = new Set(), operations = new Map();
-  const add = (row, kind = 'delete') => {
+  const add = (row, kind = 'delete', details = {}) => {
     checkedRecord(row);
-    const operation = { path: row.path, kind, before: erasureHash(row.data) };
+    const operation = { path: row.path, kind, before: erasureHash(row.data), ...details };
     if (operations.has(row.path) && canonical(operations.get(row.path)) !== canonical(operation)) throw new ErasurePolicyError('inconsistent-source');
     operations.set(row.path, operation);
   };
+  const redact = (row, kind, anonymousId) => {
+    // Current random content IDs have no account identity. Legacy/custom IDs
+    // that embed it require an explicit relocation plan for their references.
+    if (row.path.includes(uid)) { blockers.add('identifying-shared-document-path-review'); return; }
+    add(row, kind, { after: erasureHash(sharedAfter(kind, row.data, uid, anonymousId)), ...(anonymousId ? { anonymousId, ...(kind !== 'redact-event' ? { eventId: row.data.eventId } : {}) } : {}) });
+  };
+  const schema = (row, collection) => { if (!knownSharedSchema(collection, row.data)) { blockers.add('unknown-shared-schema-review'); return false; } return true; };
+  const eventRows = dedupe(source.events || []), eventMap = new Map(eventRows.map(row => [row.id, row]));
+  const anonymous = eventId => {
+    const id = extra.anonymousIds?.[eventId];
+    if (!ANONYMOUS_ID.test(id || '')) throw new ErasurePolicyError('anonymous-event-id-required');
+    return id;
+  };
   if (admin(source.auth)) blockers.add('administrator-transfer-required');
-  if ((source.events || []).length) blockers.add('event-ownership-participation-or-history-review');
   if ((source.teams || []).some(row => row.data.ownerId === uid)) blockers.add('team-ownership-transfer-or-closure-required');
-  if ((extra.fixtureReferences || []).length) blockers.add('shared-results-review');
-  if ((extra.conversations || []).length) blockers.add('shared-conversation-identifiers-review');
-  if ((extra.incomingFollows || []).length) blockers.add('incoming-follow-records-review');
-  if ((extra.incomingBlocks || []).length) blockers.add('third-party-block-records-review');
   if ((extra.unknownCollections || []).length) blockers.add('unknown-root-schema-review');
   if ((extra.unknownSubcollections || []).length) blockers.add('unknown-owned-descendants-review');
-  for (const name of ['communityEventChanges', 'communityEventPromotions', 'communityEventDeliveries']) if ((source.collections?.[name] || []).length) blockers.add('shared-coordination-records-review');
+  for (const row of extra.archiveTargets || []) {
+    if (extra.archiveExpected?.[row.path] !== erasureHash(row.data)) blockers.add('archive-destination-collision-review');
+  }
+  if (source.runtime?.data?.pilotUserIds?.includes(uid)) {
+    if (schema(source.runtime, 'communityConfiguration')) redact(source.runtime, 'redact-pilot-roster');
+  }
+  for (const row of eventRows) {
+    if (row.path !== `communityEvents/${row.id}` || !schema(row, 'communityEvents')) continue;
+    if (row.data.ownerId === uid && !['completed', 'cancelled'].includes(row.data.status)) { blockers.add('active-event-ownership-transfer-required'); continue; }
+    if (eventReferencesUid(row.data, uid)) {
+      const anonymousId = anonymous(row.id);
+      if (Object.hasOwn(row.data.participants, uid) && Object.hasOwn(row.data.participants, anonymousId)) { blockers.add('anonymous-participant-collision-review'); continue; }
+      redact(row, 'redact-event', anonymousId);
+    }
+  }
+  for (const row of dedupe([...(extra.fixtureReferences || []), ...(source.fixtureRecords || [])])) {
+    if (row.data.ownerId !== uid && row.data.homeId !== uid && row.data.awayId !== uid) continue;
+    if (row.path !== `communityFixtures/${row.id}` || !schema(row, 'communityFixtures')) continue;
+    const event = eventMap.get(row.data.eventId);
+    if (!event || !schema(event, 'communityEvents')) { blockers.add('shared-fixture-parent-review'); continue; }
+    if (event.data.ownerId === uid && !['completed', 'cancelled'].includes(event.data.status)) { blockers.add('active-event-ownership-transfer-required'); continue; }
+    redact(row, 'redact-fixture', anonymous(row.data.eventId));
+  }
+  for (const row of dedupe([...(extra.sharedCoordination || []), ...['communityEventChanges', 'communityEventPromotions', 'communityEventDeliveries'].flatMap(name => source.collections?.[name] || [])])) {
+    const name = row.path.split('/')[0];
+    if (row.path !== `${name}/${row.id}` || !schema(row, name)) continue;
+    if (name === 'communityEventChanges') {
+      if (row.data.ownerId !== uid && !row.data.audienceIds.includes(uid)) continue;
+      const event = eventMap.get(row.data.eventId);
+      if (!event) { blockers.add('shared-change-parent-review'); continue; }
+      if (event.data.ownerId === uid && !['completed', 'cancelled'].includes(event.data.status)) { blockers.add('active-event-ownership-transfer-required'); continue; }
+      redact(row, 'redact-event-change', anonymous(row.data.eventId));
+    } else if (name === 'communityEventPromotions') {
+      if (row.data.recipientId === uid) add(row, 'delete-personal-coordination');
+      else if (row.data.authorId === uid) redact(row, 'redact-promotion-author');
+    } else if (name === 'communityEventDeliveries') {
+      if (row.data.recipientId === uid) add(row, 'delete-personal-coordination');
+      else if (row.data.actorId === uid) redact(row, 'redact-delivery-actor');
+    }
+  }
+  for (const [name, field, rows] of [['communityFollows', 'followingId', extra.incomingFollows || []], ['communityBlocks', 'blockedId', extra.incomingBlocks || []]]) {
+    for (const row of rows) {
+      if (row.path !== `${name}/${row.id}` || row.data[field] !== uid) throw new ErasurePolicyError('foreign-relationship');
+      if (schema(row, name)) add(row, 'delete-incoming-relationship');
+    }
+  }
   for (const [name, ownerField] of Object.entries(personalPolicies)) {
     for (const row of source.collections?.[name] || []) {
       checkedRecord(row);
       if (row.path !== `${name}/${row.id}` || row.data[ownerField] !== uid) throw new ErasurePolicyError('foreign-record');
+      if (!knownOwnedSchema(name, row.data)) { blockers.add('unknown-owned-schema-review'); continue; }
       if (name === 'communityTeamMembers' && ['owner', 'manager'].includes(row.data.role)) blockers.add('team-management-transfer-required');
       if (name === 'communityPosts' && (row.data.mediaPath || row.data.mediaUrl)) blockers.add('media-removal-review');
-      add(row);
+      if (name === 'communityPosts' && (extra.postInteractions || []).some(interaction => interaction.data.postId === row.id && interaction.data.authorId !== uid && interaction.path.startsWith('communityComments/'))) {
+        if (schema(row, name)) redact(row, 'redact-post-author');
+      } else add(row);
     }
   }
   for (const row of extra.postInteractions || []) {
     checkedRecord(row);
     const name = row.path.split('/')[0], field = name === 'communityLikes' ? 'userId' : name === 'communityComments' ? 'authorId' : null;
     if (!field || row.path !== `${name}/${row.id}` || !(source.collections?.communityPosts || []).some(post => post.id === row.data.postId)) throw new ErasurePolicyError('invalid-post-interaction');
-    if (row.data[field] !== uid) blockers.add('third-party-post-interactions-review');
-    else add(row);
+    // Comments authored by somebody else survive on the withdrawn post shell.
+    // Their likes are only references to the withdrawn content, and can go.
+    if (name === 'communityLikes' && row.data[field] !== uid) { if (schema(row, name)) add(row, 'delete-withdrawn-post-like', { postId: row.data.postId }); }
+    else if (row.data[field] === uid) add(row);
   }
   for (const row of source.collections?.communityInvitations || []) {
     checkedRecord(row);
     if (row.path !== `communityInvitations/${row.id}` || !/^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{16}$/.test(row.id)) throw new ErasurePolicyError('invalid-invitation');
+    if (!knownOwnedSchema('communityInvitations', row.data)) { blockers.add('unknown-owned-schema-review'); continue; }
     if (row.data.ownerId === uid) add(row);
-    else if (row.data.usedBy === uid && row.data.status === 'used') add(row, 'redact-invitation-consumer');
+    else if (row.data.usedBy === uid && row.data.status === 'used') redact(row, 'redact-invitation-consumer');
     else throw new ErasurePolicyError('foreign-invitation');
   }
   const connections = dedupe([...(source.collections?.communityConnections || []), ...(extra.ownConnections || []), ...(extra.mirrors || [])]);
@@ -150,6 +276,7 @@ export function buildErasurePlan(source) {
     checkedRecord(row);
     const parts = row.path.split('/'), [collection, owner, members, peer] = parts;
     if (parts.length !== 4 || collection !== 'communityConnections' || members !== 'members' || row.data.ownerId !== owner || row.data.peerId !== peer || owner === peer || owner !== uid && peer !== uid) throw new ErasurePolicyError('invalid-connection');
+    if (!knownOwnedSchema(collection, row.data)) { blockers.add('unknown-owned-schema-review'); continue; }
     add(row);
     // Read and validate both ends even if one side was already deleted before
     // planning. A same-path document with other identities must never be erased.
@@ -159,6 +286,7 @@ export function buildErasurePlan(source) {
   for (const row of source.collections?.communityEventAdmissions || []) {
     checkedRecord(row); const parts = row.path.split('/');
     if (parts.length !== 4 || parts[0] !== 'communityEventAdmissions' || parts[2] !== 'members' || parts[3] !== uid || row.data.userId !== uid || row.data.eventId !== parts[1]) throw new ErasurePolicyError('invalid-admission');
+    if (!knownOwnedSchema('communityEventAdmissions', row.data)) { blockers.add('unknown-owned-schema-review'); continue; }
     add(row);
   }
   for (const row of dedupe([...(source.collections?.communityMessages || []), ...(extra.messages || [])])) {
@@ -166,9 +294,34 @@ export function buildErasurePlan(source) {
     if (parts.length !== 4 || parts[0] !== 'communityConversations' || parts[2] !== 'messages' || row.data.senderId !== uid) throw new ErasurePolicyError('foreign-message');
     add(row);
   }
+  for (const conversation of extra.conversations || []) {
+    if (conversation.path !== `communityConversations/${conversation.id}` || !schema(conversation, 'communityConversations')) continue;
+    const messages = (extra.conversationMessages || []).filter(row => row.path.split('/')[1] === conversation.id);
+    if (conversation.data.archived === true) {
+      if (!ARCHIVE_ID.test(conversation.id) || conversation.data.id !== conversation.id || canonical(conversation.data.participantIds) !== canonical([uid])) { blockers.add('unknown-shared-schema-review'); continue; }
+      for (const message of messages) { if (!schema(message, 'messages') || message.data.senderId !== uid) { blockers.add('archive-ownership-review'); continue; } add(message); }
+      add(conversation, 'delete-own-archive'); continue;
+    }
+    const pair = conversation.id.split(':');
+    if (pair.length !== 2 || pair[0] >= pair[1] || !pair.every(id => /^[A-Za-z0-9_-]{1,128}$/.test(id)) || conversation.data.id !== conversation.id
+      || canonical(conversation.data.participantIds) !== canonical(pair) || !pair.includes(uid)) { blockers.add('unknown-shared-schema-review'); continue; }
+    const archiveId = extra.archiveIds?.[conversation.id];
+    if (!ARCHIVE_ID.test(archiveId || '')) throw new ErasurePolicyError('random-archive-id-required');
+    const archiveData = archiveAfter(conversation.data, archiveId, uid);
+    for (const message of messages) {
+      if (!schema(message, 'messages') || message.data.id !== message.id || !pair.includes(message.data.senderId)) { blockers.add('unknown-shared-schema-review'); continue; }
+      if (message.data.senderId === uid) add(message);
+      else add(message, 'archive-third-party-message', { targetPath: `communityConversations/${archiveId}/messages/${message.id}`, targetRootAfter: erasureHash(archiveData), after: erasureHash(message.data), conversationBefore: erasureHash(conversation.data) });
+    }
+    add(conversation, 'archive-conversation', { targetPath: `communityConversations/${archiveId}`, after: erasureHash(archiveData) });
+  }
+  for (const message of extra.conversationMessages || []) {
+    if (!(extra.conversations || []).some(conversation => conversation.id === message.path.split('/')[1]) && message.data.senderId !== uid) blockers.add('orphan-shared-message-review');
+  }
   for (const [key, name, field] of [['privateProfile', 'communityProfiles', 'id'], ['publicProfile', 'communityPublicProfiles', 'id'], ['moderation', 'communityAccountModeration', 'id'], ['legacyProfile', 'users', 'uid']]) {
     const row = source[key]; if (!row) continue;
     if (row.id !== uid || row.path !== `${name}/${uid}` || Object.hasOwn(row.data, field) && row.data[field] !== uid) throw new ErasurePolicyError('foreign-profile');
+    if (!knownOwnedSchema(name, row.data)) { blockers.add('unknown-owned-schema-review'); continue; }
     if (name === 'communityProfiles' && (row.data.photoURL || row.data.avatarPath)) blockers.add('profile-media-review');
     add(row);
   }
@@ -179,11 +332,12 @@ export function buildErasurePlan(source) {
   }
   if (operations.size > ERASURE_MAX_OPERATIONS) throw new ErasurePolicyError('review-volume-exceeded');
   const late = path => ['communityProfiles/', 'communityPublicProfiles/', 'communityAccountModeration/', 'users/'].some(prefix => path.startsWith(prefix)) && path.split('/').length === 2;
+  const phase = op => late(op.path) ? 3 : ['archive-conversation', 'delete-own-archive'].includes(op.kind) ? 2 : 1;
   const orderKey = path => connectionKey(path) ? `communityConnections/${connectionKey(path)}/${path}` : path;
   const value = { format: ERASURE_FORMAT, uid, projectId: source.projectId, databaseId: source.databaseId,
     identityHash: identityHash(source.auth), blockers: [...blockers].sort(),
-    operations: [...operations.values()].sort((a, b) => Number(late(a.path)) - Number(late(b.path)) || orderKey(a.path).localeCompare(orderKey(b.path))),
-    scope: 'known-schema-only-shared-history-and-media-require-review' };
+    operations: [...operations.values()].sort((a, b) => phase(a) - phase(b) || orderKey(a.path).localeCompare(orderKey(b.path))),
+    scope: 'known-schema-account-removal-shared-redaction-private-archives' };
   return { ...value, digest: erasureHash(value) };
 }
 
@@ -191,17 +345,20 @@ export function assertReviewedPlan(plan, { uid, projectId, databaseId, confirm }
   assertErasureUid(uid);
   if (!plan || plan.format !== ERASURE_FORMAT || plan.uid !== uid || plan.projectId !== projectId || plan.databaseId !== databaseId
     || !/^[a-f0-9]{64}$/.test(confirm || '') || plan.digest !== confirm || !Array.isArray(plan.operations) || !Array.isArray(plan.blockers)
-    || plan.operations.length > ERASURE_MAX_OPERATIONS || plan.scope !== 'known-schema-only-shared-history-and-media-require-review') throw new ErasurePolicyError('reviewed-plan-mismatch');
+    || plan.operations.length > ERASURE_MAX_OPERATIONS || plan.scope !== 'known-schema-account-removal-shared-redaction-private-archives') throw new ErasurePolicyError('reviewed-plan-mismatch');
   const { digest, ...payload } = plan;
   if (erasureHash(payload) !== digest) throw new ErasurePolicyError('plan-integrity-failed');
   if (plan.blockers.length) throw new ErasurePolicyError('plan-blocked');
   const paths = new Set();
   for (const operation of plan.operations) {
     if (!operation || typeof operation.path !== 'string' || paths.has(operation.path)
-      || !['delete', 'delete-missing-mirror', 'redact-invitation-consumer'].includes(operation.kind)
+      || !['delete', 'delete-missing-mirror', 'redact-invitation-consumer', 'redact-post-author', 'redact-event', 'redact-fixture', 'redact-event-change', 'redact-promotion-author', 'redact-delivery-actor', 'redact-pilot-roster', 'delete-incoming-relationship', 'delete-personal-coordination', 'delete-withdrawn-post-like', 'archive-third-party-message', 'archive-conversation', 'delete-own-archive'].includes(operation.kind)
       || operation.before !== null && !/^[a-f0-9]{64}$/.test(operation.before || '')
       || operation.before === null && operation.kind !== 'delete-missing-mirror') throw new ErasurePolicyError('invalid-operation');
     paths.add(operation.path);
+    if (operation.kind.startsWith('redact-') || operation.kind.startsWith('archive-')) {
+      if (!/^[a-f0-9]{64}$/.test(operation.after || '')) throw new ErasurePolicyError('invalid-after-hash');
+    }
     assertOperationScope(operation, uid);
   }
   // Both contact halves must occupy a single contiguous group, so one bounded
@@ -217,13 +374,31 @@ export function assertReviewedPlan(plan, { uid, projectId, databaseId, confirm }
   return plan;
 }
 
+export function erasureRoutes(plan) {
+  const routes = { archiveIds: {}, anonymousIds: {}, archiveExpected: {} };
+  for (const operation of plan?.operations || []) {
+    if (operation.kind === 'archive-conversation') routes.archiveIds[operation.path.split('/')[1]] = operation.targetPath.split('/')[1];
+    if (operation.kind.startsWith('archive-')) routes.archiveExpected[operation.targetPath] = operation.after;
+    if (operation.anonymousId) {
+      // Fixture and change actions store their event link explicitly so a
+      // resumed read uses the same random sporting alias as its parent.
+      const eventId = operation.kind === 'redact-event' ? operation.path.split('/')[1] : operation.eventId;
+      if (eventId) routes.anonymousIds[eventId] = operation.anonymousId;
+    }
+  }
+  return routes;
+}
+
 function assertOperationScope(operation, uid, data) {
   const parts = operation.path.split('/');
   if (parts.some(part => !validId(part))) throw new ErasurePolicyError('invalid-operation-path');
   const [collection, id, child, childId] = parts;
   let allowed = false;
   if (parts.length === 2 && Object.hasOwn(personalPolicies, collection)) {
-    allowed = operation.kind === 'delete' && (!data || data[personalPolicies[collection]] === uid);
+    allowed = operation.kind === 'delete' && (!data || data[personalPolicies[collection]] === uid)
+      || collection === 'communityPosts' && operation.kind === 'redact-post-author' && (!data || data.authorId === uid && knownSharedSchema(collection, data))
+      || ['communityFollows', 'communityBlocks'].includes(collection) && operation.kind === 'delete-incoming-relationship' && (!data || data[collection === 'communityFollows' ? 'followingId' : 'blockedId'] === uid && knownSharedSchema(collection, data))
+      || collection === 'communityLikes' && operation.kind === 'delete-withdrawn-post-like' && validId(operation.postId) && (!data || data.postId === operation.postId && knownSharedSchema(collection, data));
   } else if (parts.length === 2 && directCollections.includes(collection)) {
     const identityField = collection === 'users' ? 'uid' : 'id';
     allowed = id === uid && operation.kind === 'delete' && (!data || !Object.hasOwn(data, identityField) || data[identityField] === uid);
@@ -237,7 +412,31 @@ function assertOperationScope(operation, uid, data) {
   } else if (parts.length === 4 && collection === 'communityEventAdmissions' && child === 'members') {
     allowed = childId === uid && operation.kind === 'delete' && (!data || data.userId === uid && data.eventId === id);
   } else if (parts.length === 4 && collection === 'communityConversations' && child === 'messages') {
-    allowed = operation.kind === 'delete' && (!data || data.senderId === uid);
+    allowed = operation.kind === 'delete' && (!data || data.senderId === uid)
+      || operation.kind === 'archive-third-party-message' && operation.targetPath?.split('/').length === 4
+        && operation.targetPath.split('/')[0] === collection && ARCHIVE_ID.test(operation.targetPath.split('/')[1])
+        && operation.targetPath.split('/')[2] === 'messages' && operation.targetPath.split('/')[3] === childId
+        && /^[a-f0-9]{64}$/.test(operation.targetRootAfter || '') && /^[a-f0-9]{64}$/.test(operation.conversationBefore || '')
+        && (!data || data.senderId !== uid && knownSharedSchema('messages', data));
+  } else if (parts.length === 2 && collection === 'communityConversations') {
+    allowed = operation.kind === 'archive-conversation' && operation.targetPath?.split('/').length === 2
+      && operation.targetPath.split('/')[0] === collection && ARCHIVE_ID.test(operation.targetPath.split('/')[1])
+      && (!data || data.archived !== true && knownSharedSchema(collection, data) && data.participantIds.includes(uid))
+      || operation.kind === 'delete-own-archive' && ARCHIVE_ID.test(id)
+        && (!data || data.archived === true && knownSharedSchema(collection, data) && canonical(data.participantIds) === canonical([uid]));
+  } else if (parts.length === 2 && collection === 'communityConfiguration') {
+    allowed = id === 'runtime' && operation.kind === 'redact-pilot-roster' && (!data || data.serviceStatus !== 'open' && knownSharedSchema(collection, data) && data.pilotUserIds.includes(uid));
+  } else if (parts.length === 2 && ['communityEvents', 'communityFixtures', 'communityEventChanges', 'communityEventPromotions', 'communityEventDeliveries'].includes(collection)) {
+    const kind = { communityEvents: 'redact-event', communityFixtures: 'redact-fixture', communityEventChanges: 'redact-event-change', communityEventPromotions: 'redact-promotion-author', communityEventDeliveries: 'redact-delivery-actor' }[collection];
+    if (['communityEventPromotions', 'communityEventDeliveries'].includes(collection) && operation.kind === 'delete-personal-coordination') allowed = !data || data.recipientId === uid && knownSharedSchema(collection, data);
+    else if (operation.kind === kind) {
+      allowed = (!['communityEvents', 'communityFixtures', 'communityEventChanges'].includes(collection) || ANONYMOUS_ID.test(operation.anonymousId || '')) && (!data || knownSharedSchema(collection, data) && (
+        collection === 'communityEvents' && eventReferencesUid(data, uid)
+        || collection === 'communityFixtures' && [data.ownerId, data.homeId, data.awayId].includes(uid)
+        || collection === 'communityEventChanges' && (data.ownerId === uid || data.audienceIds.includes(uid))
+        || collection === 'communityEventPromotions' && data.authorId === uid
+        || collection === 'communityEventDeliveries' && data.actorId === uid));
+    }
   } else if (parts.length === 4 && collection === 'users' && child === 'likes') allowed = id === uid && operation.kind === 'delete';
   if (!allowed) throw new ErasurePolicyError('operation-outside-account-scope');
 }
@@ -280,7 +479,7 @@ export async function applyErasurePlan({ db, auth, plan, collectFresh, journal, 
     if (!allowed.has(operation.path)) throw new ErasurePolicyError('new-reference-requires-plan');
     const original = allowed.get(operation.path);
     if (operation.before === null) continue; // absent contact half after a committed pair
-    if (original.before !== operation.before || original.kind !== operation.kind) throw new ErasurePolicyError('planned-document-changed');
+    if (canonical(original) !== canonical(operation)) throw new ErasurePolicyError('planned-document-changed');
   }
   await db.runTransaction(async tx => requireRuntimeClosed(await tx.get(runtimeRef)));
   let identity = await authUser();
@@ -312,16 +511,56 @@ export async function applyErasurePlan({ db, auth, plan, collectFresh, journal, 
     const counts = await db.runTransaction(async tx => {
       const runtime = await tx.get(runtimeRef); requireRuntimeClosed(runtime);
       const documents = await Promise.all(batch.map(operation => tx.get(db.doc(operation.path))));
+      const extraPaths = [...new Set(batch.flatMap(operation => operation.kind === 'archive-third-party-message'
+        ? [operation.targetPath, operation.targetPath.split('/').slice(0, 2).join('/'), operation.path.split('/').slice(0, 2).join('/')]
+        : operation.kind === 'archive-conversation' ? [operation.targetPath] : operation.kind === 'delete-withdrawn-post-like' ? [`communityPosts/${operation.postId}`] : []))];
+      const extras = new Map(await Promise.all(extraPaths.map(async path => [path, await tx.get(db.doc(path))])));
       let deleted = 0, redacted = 0;
       for (let index = 0; index < batch.length; index++) {
         const operation = batch[index], document = documents[index];
-        if (!document.exists) continue; // committed batch + lost local cursor is safe to replay
+        if (operation.kind === 'archive-third-party-message') {
+          const target = extras.get(operation.targetPath), targetRoot = extras.get(operation.targetPath.split('/').slice(0, 2).join('/'));
+          if (!document.exists) {
+            if (!target.exists || erasureHash(target.data()) !== operation.after || !targetRoot.exists || erasureHash(targetRoot.data()) !== operation.targetRootAfter) throw new ErasurePolicyError('archive-copy-not-confirmed');
+            continue;
+          }
+          const sourceRoot = extras.get(operation.path.split('/').slice(0, 2).join('/'));
+          if (!sourceRoot.exists || erasureHash(sourceRoot.data()) !== operation.conversationBefore || erasureHash(document.data()) !== operation.before) throw new ErasurePolicyError('transaction-document-changed');
+          assertOperationScope(operation, plan.uid, document.data());
+          if (!sourceRoot.data().participantIds.includes(document.data().senderId)) throw new ErasurePolicyError('archive-foreign-sender');
+          const archiveId = operation.targetPath.split('/')[1], rootData = archiveAfter(sourceRoot.data(), archiveId, plan.uid);
+          if (erasureHash(rootData) !== operation.targetRootAfter || targetRoot.exists && erasureHash(targetRoot.data()) !== operation.targetRootAfter || target.exists && erasureHash(target.data()) !== operation.after) throw new ErasurePolicyError('archive-destination-collision');
+          if (!targetRoot.exists) tx.set(targetRoot.ref, rootData);
+          if (!target.exists) tx.set(target.ref, document.data());
+          tx.delete(document.ref); deleted++; continue;
+        }
+        if (!document.exists) {
+          if (operation.kind === 'archive-conversation') {
+            const target = extras.get(operation.targetPath);
+            if (!target.exists || erasureHash(target.data()) !== operation.after) throw new ErasurePolicyError('archive-copy-not-confirmed');
+          }
+          continue; // committed batch + lost local cursor is safe to replay
+        }
         const data = document.data();
-        if (operation.kind === 'redact-invitation-consumer' && data.usedBy === '' && data.usedAt === '' && data.status === 'used') continue;
+        if (operation.kind.startsWith('redact-') && erasureHash(data) === operation.after) continue;
         if (operation.before === null || erasureHash(data) !== operation.before) throw new ErasurePolicyError('transaction-document-changed');
         assertOperationScope(operation, plan.uid, data);
-        if (operation.kind === 'redact-invitation-consumer') { tx.update(document.ref, { usedBy: '', usedAt: '' }); redacted++; }
-        else if (operation.kind === 'delete') { tx.delete(document.ref); deleted++; }
+        if (operation.kind.startsWith('redact-')) {
+          const after = sharedAfter(operation.kind, data, plan.uid, operation.anonymousId);
+          if (erasureHash(after) !== operation.after) throw new ErasurePolicyError('transformation-mismatch');
+          tx.set(document.ref, after); redacted++;
+        } else if (operation.kind === 'archive-conversation') {
+          const target = extras.get(operation.targetPath), after = archiveAfter(data, operation.targetPath.split('/')[1], plan.uid);
+          if (erasureHash(after) !== operation.after || target.exists && erasureHash(target.data()) !== operation.after) throw new ErasurePolicyError('archive-destination-collision');
+          if (!target.exists) tx.set(target.ref, after);
+          tx.delete(document.ref); deleted++;
+        } else if (['delete', 'delete-incoming-relationship', 'delete-personal-coordination', 'delete-own-archive', 'delete-withdrawn-post-like'].includes(operation.kind)) {
+          if (operation.kind === 'delete-withdrawn-post-like') {
+            const post = extras.get(`communityPosts/${operation.postId}`);
+            if (post.exists && post.data().authorId !== plan.uid && post.data().authorId !== '') throw new ErasurePolicyError('withdrawn-post-changed');
+          }
+          tx.delete(document.ref); deleted++;
+        }
         else throw new ErasurePolicyError('unexpected-operation');
       }
       return { deleted, redacted };
@@ -342,17 +581,26 @@ export async function applyErasurePlan({ db, auth, plan, collectFresh, journal, 
     await db.runTransaction(async tx => {
       requireRuntimeClosed(await tx.get(runtimeRef));
       const documents = await Promise.all(batch.map(operation => tx.get(db.doc(operation.path))));
+      const targets = new Map(await Promise.all(batch.filter(operation => operation.kind.startsWith('archive-')).map(async operation => [operation.path, await tx.get(db.doc(operation.targetPath))])));
       for (let index = 0; index < batch.length; index++) {
       const operation = batch[index], current = documents[index];
-      if (!current.exists) continue;
+      if (!current.exists) {
+        if (operation.kind.startsWith('archive-')) {
+          const target = targets.get(operation.path);
+          if (!target.exists || erasureHash(target.data()) !== operation.after) throw new ErasurePolicyError('archive-copy-not-confirmed');
+        }
+        continue;
+      }
       const data = current.data();
-      if (operation.kind !== 'redact-invitation-consumer' || data.status !== 'used' || data.usedBy !== '' || data.usedAt !== '') throw new ErasurePolicyError('residue-requires-review');
+      if (!operation.kind.startsWith('redact-') || erasureHash(data) !== operation.after) throw new ErasurePolicyError('residue-requires-review');
       }
     });
     batches++;
     journal = { ...journal, phase: 'verifying', verificationCursor: journal.verificationCursor + batch.length }; await saveJournal(journal);
   }
   if (journal.verificationCursor < plan.operations.length) return { phase: 'bounded-verification', completeKnownScope: false, batches, deleted: journal.deleted, redacted: journal.redacted };
+  const finalResidue = buildErasurePlan(await collectFresh());
+  if (finalResidue.blockers.length || finalResidue.operations.some(operation => operation.before !== null)) throw new ErasurePolicyError('residue-requires-review');
   journal = { ...journal, phase: 'auth-pending' }; await saveJournal(journal);
   await checkIdentity();
   if (await authUser()) await auth.deleteUser(plan.uid);

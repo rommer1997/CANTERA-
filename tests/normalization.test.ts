@@ -9,6 +9,20 @@ const basePost = { id: 'post', authorId: 'alice', authorName: 'Alice', kind: 'ac
 const baseProfile = { id: 'alice', name: 'Alice', bio: '', city: '', country: '', position: '', team: '', level: 'amateur', adultConfirmed: false, verification: 'unverified', entityType: 'individual', createdAt, acceptedTermsVersion: '', acceptedTermsAt: '' };
 const fixture = { id: 'r1-1', round: 1, homeId: 'alice', awayId: 'bob', homeScore: null, awayScore: null };
 
+test('publicaciones de texto admiten título opcional y mantienen texto, autor y referencia sin medios', () => {
+  for (const mode of ['cloud', 'demo'] as const) {
+    const plain = { ...basePost, kind: 'post', title: '' };
+    assert.equal(normalizePost(plain, 'post', mode)?.kind, 'post');
+    assert.equal(normalizePost({ ...plain, title: 'Nuestro entrenamiento', eventId: 'event' }, 'post', mode)?.eventId, 'event');
+    assert.equal(normalizePost({ ...plain, title: 'x'.repeat(100), text: 'x'.repeat(2000) }, 'post', mode)?.text.length, 2000);
+    for (const changes of [{ text: '' }, { text: 'x'.repeat(2001) }, { title: 'x'.repeat(101) }, { mediaPath: 'local:post' }, { mediaPath: 'community/alice/post.jpg' }, { mediaUrl: 'https://example.test/media.jpg' }, { eventId: '../private' }]) {
+      assert.equal(normalizePost({ ...plain, ...changes }, 'post', mode), null);
+    }
+  }
+  assert.equal(normalizePost({ ...basePost, title: '' }), null);
+  assert.equal(normalizePost(basePost)?.kind, 'achievement');
+});
+
 test('eventos normales y calendarios con pases libres se conservan', () => {
   assert.equal(normalizeEvent(baseEvent, 'event')?.title, 'Partido');
   assert.equal(normalizeEvent({ ...baseEvent, status: 'closed', fixtures: [{ ...fixture, homeScore: 2, awayScore: 1 }] })?.fixtures[0].homeScore, 2);

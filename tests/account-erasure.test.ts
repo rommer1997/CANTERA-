@@ -6,16 +6,19 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { execFileSync } from 'node:child_process';
+import { Timestamp } from 'firebase/firestore';
 import { applyErasurePlan, assertReviewedPlan, buildErasurePlan, collectErasureSource, erasureHash, erasureReadAll, ERASURE_TOKEN_GRACE_MS } from '../scripts/account-erasure.mjs';
 const require = createRequire(import.meta.url);
 const cli = require('../scripts/erase-account.cjs');
-const uid = 'self.with.dot', peer = 'peer', projectId = 'demo-cantera', databaseId = 'named-test';
+const uid = 'self_with_dot', peer = 'peer', projectId = 'demo-cantera', databaseId = 'named-test';
 const code = '2222333344445555', incoming = '6666777788889999';
 const clone = (value: any) => JSON.parse(JSON.stringify(value));
 const row = (recordPath: string, data: Record<string, unknown>) => ({ id: recordPath.split('/').at(-1)!, path: recordPath, data });
 
 function harness(initial: Record<string, Record<string, any>> = {}, identity: any = { uid, email: 'private@example.invalid', metadata: { creationTime: '2025-01-01T00:00:00Z' }, providerData: [], customClaims: {} }) {
   const records = new Map<string, any>(Object.entries(clone(initial))), revisions = new Map<string, number>();
+  const archiveIds = Object.fromEntries(Object.keys(initial).filter(recordPath => recordPath.startsWith('communityConversations/') && recordPath.split('/').length === 2 && !recordPath.split('/')[1].startsWith('archive_')).map((recordPath, index) => [recordPath.split('/')[1], `archive_${String(index + 1).padStart(32, '0')}`]));
+  const anonymousIds = Object.fromEntries(Object.keys(initial).filter(recordPath => recordPath.startsWith('communityEvents/') && recordPath.split('/').length === 2).map((recordPath, index) => [recordPath.split('/')[1], `removed_${String(index + 1).padStart(32, '0')}`]));
   let time = Date.parse('2026-10-08T10:00:00.000Z'), authIdentity = identity && clone(identity), journal: any;
   const events: any[] = [], transactions: string[][] = [];
   let beforeCommit: (() => void) | undefined;
@@ -30,11 +33,12 @@ function harness(initial: Record<string, Record<string, any>> = {}, identity: an
           get: async (ref: { path: string }) => { reads.set(ref.path, revisions.get(ref.path) || 0); return snapshot(ref.path); },
           delete: (ref: { path: string }) => writes.push({ kind: 'delete', path: ref.path }),
           update: (ref: { path: string }, data: any) => writes.push({ kind: 'update', path: ref.path, data }),
+          set: (ref: { path: string }, data: any) => writes.push({ kind: 'set', path: ref.path, data }),
         });
         if (beforeCommit) { const hook = beforeCommit; beforeCommit = undefined; hook(); }
         if ([...reads].some(([recordPath, revision]) => (revisions.get(recordPath) || 0) !== revision)) continue;
         for (const write of writes) {
-          if (write.kind === 'delete') records.delete(write.path); else records.set(write.path, { ...records.get(write.path), ...clone(write.data) });
+          if (write.kind === 'delete') records.delete(write.path); else if (write.kind === 'set') records.set(write.path, clone(write.data)); else records.set(write.path, { ...records.get(write.path), ...clone(write.data) });
           revisions.set(write.path, (revisions.get(write.path) || 0) + 1); events.push(write);
         }
         transactions.push(writes.map(write => write.path));
@@ -59,16 +63,19 @@ function harness(initial: Record<string, Record<string, any>> = {}, identity: an
     collections.communityEventAdmissions = all.filter(record => record.path.startsWith('communityEventAdmissions/') && record.path.split('/').length === 4 && record.data.userId === uid);
     const direct = (name: string) => all.find(record => record.path === `${name}/${uid}`) || null;
     const ownPosts = new Set(collections.communityPosts.map((record: any) => record.id));
-    return { uid, projectId, databaseId, auth: authIdentity && clone(authIdentity), privateProfile: direct('communityProfiles'), publicProfile: direct('communityPublicProfiles'), moderation: direct('communityAccountModeration'), legacyProfile: direct('users'),
+    return { uid, projectId, databaseId, auth: authIdentity && clone(authIdentity), runtime: all.find(record => record.path === 'communityConfiguration/runtime') || null, privateProfile: direct('communityProfiles'), publicProfile: direct('communityPublicProfiles'), moderation: direct('communityAccountModeration'), legacyProfile: direct('users'),
       collections, legacyLikes: all.filter(record => record.path.startsWith(`users/${uid}/likes/`)),
-      events: all.filter(record => record.path.startsWith('communityEvents/') && (record.data.ownerId === uid || (record.data.participantIds as any[])?.includes(uid) || Object.hasOwn((record.data.participants || {}) as object, uid) || Object.hasOwn((record.data.waitlist || {}) as object, uid) || Object.hasOwn((record.data.rsvps || {}) as object, uid))),
+      events: all.filter(record => record.path.startsWith('communityEvents/') && (record.data.ownerId === uid || (record.data.participantIds as any[])?.includes(uid) || Object.hasOwn((record.data.participants || {}) as object, uid) || Object.hasOwn((record.data.waitlist || {}) as object, uid) || Object.hasOwn((record.data.rsvps || {}) as object, uid) || all.some(reference => reference.data.eventId === record.id && ([reference.data.ownerId, reference.data.homeId, reference.data.awayId, reference.data.recipientId].includes(uid) || Array.isArray(reference.data.audienceIds) && reference.data.audienceIds.includes(uid))))),
       teams: all.filter(record => record.path.startsWith('communityTeams/') && record.data.ownerId === uid),
       erasure: { ownConnections: all.filter(record => record.path.startsWith(`communityConnections/${uid}/members/`)), mirrors: all.filter(record => record.path.startsWith('communityConnections/') && record.data.peerId === uid),
         incomingFollows: all.filter(record => record.path.startsWith('communityFollows/') && record.data.followingId === uid), incomingBlocks: all.filter(record => record.path.startsWith('communityBlocks/') && record.data.blockedId === uid),
         postInteractions: all.filter(record => ['communityLikes', 'communityComments'].includes(record.path.split('/')[0]) && ownPosts.has(record.data.postId)),
         fixtureReferences: all.filter(record => record.path.startsWith('communityFixtures/') && (record.data.homeId === uid || record.data.awayId === uid)),
         conversations: all.filter(record => record.path.startsWith('communityConversations/') && record.path.split('/').length === 2 && (record.data.participantIds as any[])?.includes(uid)),
-        messages: all.filter(record => record.path.startsWith('communityConversations/') && record.path.split('/').length === 4 && record.data.senderId === uid), unknownCollections: [], unknownSubcollections: [] } };
+        messages: all.filter(record => record.path.startsWith('communityConversations/') && record.path.split('/').length === 4 && record.data.senderId === uid),
+        conversationMessages: all.filter(record => record.path.startsWith('communityConversations/') && record.path.split('/').length === 4 && (Object.hasOwn(archiveIds, record.path.split('/')[1]) || all.some(parent => parent.path === record.path.split('/').slice(0, 2).join('/') && Array.isArray(parent.data.participantIds) && parent.data.participantIds.includes(uid)))),
+        sharedCoordination: all.filter(record => ['communityEventChanges', 'communityEventPromotions', 'communityEventDeliveries'].includes(record.path.split('/')[0]) && (Array.isArray(record.data.audienceIds) && record.data.audienceIds.includes(uid) || record.data.recipientId === uid)),
+        archiveIds, anonymousIds, unknownCollections: [], unknownSubcollections: [] } };
   };
   const run = async (plan: any, options: any = {}) => applyErasurePlan({ db, auth, plan, collectFresh: async () => source(), journal, saveJournal: async (next: any) => { journal = clone(next); }, now: () => time, ...options });
   return { records, events, transactions, db, auth, source, run, put, advance: (ms = ERASURE_TOKEN_GRACE_MS) => { time += ms; },
@@ -88,7 +95,15 @@ test('plan determinista privado: sólo UID/rutas/huellas; identifica bloqueos si
   for (const option of [{ uid: 'other' }, { projectId: 'other' }, { databaseId: '(default)' }, { confirm: 'a'.repeat(64) }]) assert.throws(() => assertReviewedPlan(plan, { uid, projectId, databaseId, confirm: plan.digest, ...option }));
 });
 
-test('administración, organización, historia, medios, conversación y datos desconocidos bloquean antes de cualquier escritura', async () => {
+test('huellas CAS conservan todos los nanosegundos Firestore y distinguen Timestamp de cadenas ISO', () => {
+  const first = new Timestamp(1791453600, 123456000), changed = new Timestamp(1791453600, 123400000);
+  assert.equal(first.toDate().toISOString(), changed.toDate().toISOString());
+  assert.notEqual(erasureHash({ createdAt: first }), erasureHash({ createdAt: changed }));
+  assert.notEqual(erasureHash({ createdAt: first }), erasureHash({ createdAt: first.toDate().toISOString() }));
+  assert.equal(erasureHash({ createdAt: first }), erasureHash({ createdAt: new Timestamp(first.seconds, first.nanoseconds) }));
+});
+
+test('administración, propietarios, medios y esquemas compartidos desconocidos siguen bloqueando antes de escribir', async () => {
   const h = harness({
     'communityEvents/owned': { ownerId: uid, participants: { other: 'Otra persona' } }, 'communityTeams/owned': { ownerId: uid },
     'communityFixtures/final': { homeId: uid, awayId: peer }, 'communityPosts/media': { authorId: uid, mediaPath: 'uploads/private' },
@@ -97,7 +112,7 @@ test('administración, organización, historia, medios, conversación y datos de
   h.setIdentity({ customClaims: { admin: true } });
   const source = h.source(); source.erasure.unknownCollections = ['futureSchema'];
   const plan = buildErasurePlan(source);
-  for (const blocker of ['administrator-transfer-required', 'event-ownership-participation-or-history-review', 'team-ownership-transfer-or-closure-required', 'shared-results-review', 'media-removal-review', 'shared-conversation-identifiers-review', 'incoming-follow-records-review', 'third-party-block-records-review', 'unknown-root-schema-review']) assert.ok(plan.blockers.includes(blocker));
+  for (const blocker of ['administrator-transfer-required', 'team-ownership-transfer-or-closure-required', 'media-removal-review', 'unknown-shared-schema-review', 'unknown-root-schema-review']) assert.ok(plan.blockers.includes(blocker));
   await assert.rejects(() => h.run(plan), /plan-blocked/); assert.deepEqual(h.events, []);
 });
 
@@ -213,7 +228,7 @@ test('plan forjado no admite padre de otra cuenta, otro mensaje, otro campo de p
   for (const recordPath of ['communityPosts/other', 'communityConversations/shared/messages/other']) {
     const plan = { ...base, operations: [{ path: recordPath, kind: 'delete', before: erasureHash(h.records.get(recordPath)) }] };
     const { digest: _, ...value } = plan; plan.digest = erasureHash(value);
-    const journal = { format: 1, planDigest: plan.digest, phase: 'deleting', cursor: 0, verificationCursor: 0, frozenAt: 0, revokedAt: 0, deleted: 0, redacted: 0 };
+    const journal = { format: 2, planDigest: plan.digest, phase: 'deleting', cursor: 0, verificationCursor: 0, frozenAt: 0, revokedAt: 0, deleted: 0, redacted: 0 };
     h.setIdentity({ disabled: true, tokensValidAfterTime: new Date(0).toISOString() });
     await assert.rejects(() => h.run(plan, { journal }), /outside-account-scope/);
     assert.ok(h.records.has(recordPath));
@@ -227,6 +242,28 @@ test('paginación conserva más de cien registros y no descarga una colección s
   const result = await erasureReadAll(query(), '__name__'); assert.equal(result.length, 205); assert.deepEqual(reads, [100, 100, 100]);
 });
 
+test('presupuesto global deduplicado aborta varios subárboles aunque cada consulta quede por debajo de 5000', async () => {
+  const pairs = ['first', 'second'].map(peerId => [peerId, uid].sort().join(':'));
+  const data = pairs.flatMap((pair, index) => [row(`communityConversations/${pair}`, { id: pair, participantIds: pair.split(':'), createdAt: 'old' }),
+    ...Array.from({ length: 2600 }, (_, message) => row(`communityConversations/${pair}/messages/${String(message).padStart(20, '0')}`, { id: String(message).padStart(20, '0'), senderId: index ? 'second' : 'first', text: 'Texto privado', createdAt: 'old' }))]);
+  let fetched = 0;
+  const reference = (recordPath: string): any => ({ path: recordPath, id: recordPath.split('/').at(-1), collection: (name: string) => query(`${recordPath}/${name}`), listCollections: async () => data.some(record => record.path.startsWith(`${recordPath}/`)) ? [{ id: 'messages' }] : [], get: async () => ({ ref: reference(recordPath), id: recordPath.split('/').at(-1), exists: data.some(record => record.path === recordPath), data: () => data.find(record => record.path === recordPath)?.data }) });
+  const query = (scope: string, conditions: any[] = [], after = '', maximum = Infinity): any => ({
+    doc: (id: string) => reference(`${scope}/${id}`), where: (field: string, op: string, value: string) => query(scope, [...conditions, { field, op, value }], after, maximum),
+    orderBy: () => query(scope, conditions, after, maximum), startAfter: (document: any) => query(scope, conditions, document.ref.path, maximum), limit: (next: number) => query(scope, conditions, after, next),
+    get: async () => {
+      const documents = data.filter(record => scope.startsWith('**/') ? record.path.split('/').at(-2) === scope.slice(3) : record.path.slice(0, record.path.lastIndexOf('/')) === scope)
+        .filter(record => conditions.every(({ field, op, value }) => op === '==' ? record.data[field] === value : Array.isArray(record.data[field]) && (record.data[field] as any[]).includes(value)))
+        .sort((a, b) => a.path.localeCompare(b.path)).filter(record => !after || record.path > after).slice(0, maximum);
+      fetched += documents.length;
+      return { docs: documents.map(record => ({ id: record.id, ref: reference(record.path), data: () => record.data })) };
+    },
+  });
+  const db: any = { collection: query, collectionGroup: (name: string) => query(`**/${name}`), doc: reference, listCollections: async () => [{ id: 'communityConversations' }] };
+  await assert.rejects(() => collectErasureSource({ db, auth: {}, uid, projectId, databaseId, FieldPath: { documentId: () => '__name__' }, policies: {}, collectAccountSource: async () => ({ uid, projectId, databaseId, collections: {}, events: [], teams: [], legacyLikes: [] }) }), /review-volume-exceeded/);
+  assert.ok(fetched <= 5102); assert.ok(fetched < data.length);
+});
+
 test('colector detecta espejos huérfanos, filtra grupos por ruta exacta y revisa descendientes sin barrer cuentas ajenas', async () => {
   const data = [
     row(`communityConnections/${peer}/members/${uid}`, { ownerId: peer, peerId: uid, inviteId: code }),
@@ -238,7 +275,7 @@ test('colector detecta espejos huérfanos, filtra grupos por ruta exacta y revis
   ];
   const reads: { scope: string; conditions: any[] }[] = [];
   const children = async (recordPath: string) => [...new Set(data.filter(record => record.path.startsWith(`${recordPath}/`) && record.path.split('/').length >= recordPath.split('/').length + 2).map(record => record.path.slice(recordPath.length + 1).split('/')[0]))].map(id => ({ id }));
-  const reference = (recordPath: string): any => ({ path: recordPath, id: recordPath.split('/').at(-1), collection: (name: string) => query(`${recordPath}/${name}`), listCollections: () => children(recordPath) });
+  const reference = (recordPath: string): any => ({ path: recordPath, id: recordPath.split('/').at(-1), collection: (name: string) => query(`${recordPath}/${name}`), listCollections: () => children(recordPath), get: async () => ({ id: recordPath.split('/').at(-1), ref: reference(recordPath), exists: data.some(record => record.path === recordPath), data: () => data.find(record => record.path === recordPath)?.data }) });
   const query = (scope: string, conditions: any[] = [], after = '', maximum = Infinity): any => ({
     doc: (id: string) => reference(`${scope}/${id}`),
     where: (field: string, op: string, value: string) => query(scope, [...conditions, { field, op, value }], after, maximum),
@@ -256,7 +293,7 @@ test('colector detecta espejos huérfanos, filtra grupos por ruta exacta y revis
   const source = await collectErasureSource({ db, auth: {}, uid, projectId, databaseId, FieldPath: { documentId: () => '__name__' }, policies: {}, collectAccountSource: async () => ({ uid, projectId, databaseId, auth: null, collections: { communityPosts: [data.find(record => record.path === 'communityPosts/own')] }, teams: [], events: [], legacyLikes: [] }) });
   assert.equal(source.erasure.mirrors.length, 1); assert.equal(source.erasure.messages.length, 1);
   assert.deepEqual(source.erasure.unknownSubcollections, ['communityPosts/own/audit']);
-  const plan = buildErasurePlan(source); assert.ok(plan.blockers.includes('third-party-post-interactions-review')); assert.ok(plan.blockers.includes('unknown-owned-descendants-review'));
+  const plan = buildErasurePlan(source); assert.ok(plan.operations.some(operation => operation.kind === 'redact-post-author')); assert.ok(plan.blockers.includes('unknown-owned-descendants-review'));
   assert.ok(!plan.operations.some(operation => operation.path.includes('irrelevant')));
   for (const read of reads) {
     if (read.scope === `communityConnections/${uid}/members`) assert.equal(read.conditions.length, 0);
@@ -286,4 +323,98 @@ test('CLI exige plan/huella/diario y conserva archivos privados sin enlaces ni s
     assert.throws(() => cli.replacePrivateJson(root, path.join(root, 'public/leak.json'), {}));
     fs.chmodSync(target, 0o644); assert.throws(() => cli.readPrivateJson(root, target), /permissions/);
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+const actualEvent = (id: string, overrides: Record<string, unknown> = {}) => ({ id, ownerId: peer, ownerName: 'Organización superviviente', title: 'Encuentro privado de prueba', type: 'tournament', format: '7', level: 'amateur', city: 'Madrid', country: 'España', timeZone: 'Europe/Madrid', venue: 'Campo de prueba', startAt: '2026-10-07T10:00:00Z', startAtMs: Date.parse('2026-10-07T10:00:00Z'), capacity: 4, entry: 'players', description: 'Descripción del organizador', status: 'completed', tournamentFormat: 'league', participants: { [uid]: 'NOMBRE_SOLICITANTE', [peer]: 'Participante superviviente' }, participantIds: [uid, peer], fixtures: [], fixtureIds: ['game'], rsvps: { [uid]: 'yes', [peer]: 'yes' }, waitlist: {}, waitlistOrder: [], createdAt: '2026-10-06T10:00:00Z', ...overrides });
+
+test('retira identidad estructurada compartida y conserva marcadores, comentarios y mensajes ajenos en archivo sin vínculo', async () => {
+  const conversationId = [uid, peer].sort().join(':');
+  const h = harness({
+    'communityConfiguration/runtime': { serviceStatus: 'pilot', mediaUploadsEnabled: false, contactEmail: '', updatedAt: 'old', pilotUserIds: [uid, peer] },
+    [`communityProfiles/${uid}`]: { id: uid, name: 'NOMBRE_SOLICITANTE' },
+    'communityEvents/history': actualEvent('history', { ownerId: uid, ownerName: 'NOMBRE_SOLICITANTE', fixtures: [{ id: 'old', round: 1, homeId: uid, awayId: peer, homeScore: 3, awayScore: 2 }] }),
+    'communityEvents/future': actualEvent('future', { status: 'open', startAt: '2026-11-01T10:00:00Z', fixtures: [], fixtureIds: [], waitlist: { [uid]: { name: 'NOMBRE_SOLICITANTE', joinedAt: 'old' }, another: { name: 'Siguiente', joinedAt: 'new' } }, waitlistOrder: [uid, 'another'] }),
+    'communityFixtures/history_game': { id: 'game', eventId: 'history', ownerId: uid, round: 1, homeId: uid, awayId: peer, homeScore: 3, awayScore: 2, kickoffAt: '', timeZone: '', venue: '', createdAt: 'old', updatedAt: 'old' },
+    'communityEventChanges/history_1': { id: 'history_1', eventId: 'history', ownerId: uid, revision: 1, summary: 'Resumen ajeno', title: 'Título ajeno', createdAt: 'old', audienceIds: [uid, peer] },
+    'communityEventPromotions/proof': { eventId: 'history', authorId: uid, recipientId: peer, title: 'Título ajeno', summary: 'Has conseguido una plaza al liberarse un puesto.', createdAt: 'old' },
+    'communityEventDeliveries/inbox': { eventId: 'history', actorId: uid, recipientId: peer, createdAt: 'old' },
+    'communityEventDeliveries/own-inbox': { eventId: 'history', actorId: peer, recipientId: uid, createdAt: 'old' },
+    'communityFollows/inbound': { followerId: peer, followingId: uid, createdAt: 'old' },
+    'communityBlocks/inbound': { ownerId: peer, blockedId: uid, createdAt: 'old' },
+    'communityPosts/post': { id: 'post', authorId: uid, authorName: 'NOMBRE_SOLICITANTE', kind: 'achievement', text: 'Texto retirado', title: 'Título retirado', mediaUrl: '', mediaPath: '', eventId: '', createdAt: 'old' },
+    'communityComments/other': { id: 'other', authorId: peer, authorName: 'Otra persona', postId: 'post', text: 'Mi comentario permanece' },
+    'communityLikes/other': { userId: peer, postId: 'post', createdAt: 'old' },
+    [`communityConversations/${conversationId}`]: { id: conversationId, participantIds: [uid, peer].sort(), createdAt: 'old' },
+    [`communityConversations/${conversationId}/messages/own`]: { id: 'own', senderId: uid, text: 'Retirar este texto', createdAt: 'old' },
+    [`communityConversations/${conversationId}/messages/other`]: { id: 'other', senderId: peer, text: 'Mi mensaje privado permanece', createdAt: 'old' },
+  });
+  const plan = buildErasurePlan(h.source()); assert.deepEqual(plan.blockers, []);
+  assert.ok(!JSON.stringify(plan).includes('NOMBRE_SOLICITANTE'));
+  await h.run(plan); h.advance(); let result;
+  for (let index = 0; index < 50; index++) { result = await h.run(plan, { maxBatches: 1, batchSize: 2 }); if (result.completeKnownScope) break; }
+  assert.equal(result?.completeKnownScope, true); assert.equal(h.identity, null);
+  const history = h.records.get('communityEvents/history'); const fixture = h.records.get('communityFixtures/history_game');
+  assert.equal(history.ownerName, 'Cuenta eliminada'); assert.match(history.ownerId, /^removed_[a-f0-9]{32}$/);
+  assert.equal(history.participants[fixture.homeId], 'Cuenta eliminada');
+  assert.equal(fixture.homeScore, 3); assert.equal(fixture.awayScore, 2);
+  assert.equal(h.records.get('communityComments/other').text, 'Mi comentario permanece');
+  assert.equal(h.records.get('communityPosts/post').authorId, '');
+  assert.deepEqual(h.records.get('communityEvents/future').waitlistOrder, ['another']);
+  assert.deepEqual(h.records.get('communityConfiguration/runtime').pilotUserIds, [peer]);
+  const archiveOperation = plan.operations.find(operation => operation.kind === 'archive-conversation')!;
+  const archive = h.records.get(archiveOperation.targetPath);
+  assert.deepEqual(archive.participantIds, [peer]); assert.equal(archive.archived, true);
+  assert.equal(h.records.get(`${archiveOperation.targetPath}/messages/other`).text, 'Mi mensaje privado permanece');
+  assert.ok(![...h.records].some(([recordPath, data]) => recordPath.includes(uid) || JSON.stringify(data).includes(uid) || JSON.stringify(data).includes('NOMBRE_SOLICITANTE')));
+  assert.equal((await h.run(plan)).phase, 'completed');
+});
+
+test('archivo privado reanuda copia y borrado tras perder el diario, y aborta colisiones o carreras sin perder texto ajeno', async () => {
+  const conversationId = [uid, peer].sort().join(':');
+  const initial = { [`communityConversations/${conversationId}`]: { id: conversationId, participantIds: [uid, peer].sort(), createdAt: 'old' }, [`communityConversations/${conversationId}/messages/other`]: { id: 'other', senderId: peer, text: 'Mi texto privado', createdAt: 'old' } };
+  for (const mode of ['lost-journal', 'collision', 'source-race', 'target-race']) {
+    const h = harness(initial); const plan = buildErasurePlan(h.source()); await h.run(plan); h.advance(); const checkpoint = clone(h.journal);
+    const archive = plan.operations.find(operation => operation.kind === 'archive-conversation')!.targetPath;
+    if (mode === 'lost-journal') {
+      await assert.rejects(() => h.run(plan, { maxBatches: 1, batchSize: 1, saveJournal: async () => { throw new Error('disk-after-copy'); } }), /disk-after-copy/);
+      const result = await h.run(plan, { journal: checkpoint }); assert.equal(result.phase, 'completed');
+      assert.equal(h.records.get(`${archive}/messages/other`).text, 'Mi texto privado');
+    } else {
+      if (mode === 'collision') h.put(`${archive}/messages/other`, { id: 'other', senderId: 'unrelated', text: 'Texto protegido de otra cuenta', createdAt: 'old' });
+      else {
+        const original = h.db.runTransaction; let calls = 0;
+        h.db.runTransaction = async (callback: any) => { calls++; if (calls === 2) h.race(() => h.put(mode === 'source-race' ? `communityConversations/${conversationId}/messages/other` : `${archive}/messages/other`, { id: 'other', senderId: peer, text: 'Nuevo texto', createdAt: 'old' })); return original(callback); };
+      }
+      await assert.rejects(() => h.run(plan), /changed|collision/); assert.ok(h.identity);
+      assert.ok(h.records.has(`communityConversations/${conversationId}/messages/other`));
+    }
+  }
+});
+
+test('la baja posterior del titular superviviente elimina sus mensajes y su archivo privado', async () => {
+  const archive = `archive_${'f'.repeat(32)}`;
+  const h = harness({ [`communityConversations/${archive}`]: { id: archive, participantIds: [uid], archived: true, createdAt: 'old' }, [`communityConversations/${archive}/messages/own`]: { id: 'own', senderId: uid, text: 'Mi texto archivado', createdAt: 'old' } });
+  const plan = buildErasurePlan(h.source()); assert.deepEqual(plan.blockers, []);
+  assert.ok(plan.operations.some(operation => operation.kind === 'delete-own-archive'));
+  await h.run(plan); h.advance(); assert.equal((await h.run(plan)).phase, 'completed'); assert.equal(h.records.size, 0);
+});
+
+test('organización activa, archivo de propietario ajeno y campos nuevos nunca se transforman silenciosamente', () => {
+  const active = harness({ 'communityEvents/active': actualEvent('active', { ownerId: uid, status: 'open' }) });
+  assert.ok(buildErasurePlan(active.source()).blockers.includes('active-event-ownership-transfer-required'));
+  const futureSchema = harness({ 'communityEvents/history': actualEvent('history', { futureField: { ownerId: uid } }) });
+  assert.ok(buildErasurePlan(futureSchema.source()).blockers.includes('unknown-shared-schema-review'));
+  const archive = `archive_${'e'.repeat(32)}`;
+  const mixed = harness({ [`communityConversations/${archive}`]: { id: archive, participantIds: [uid], archived: true, createdAt: 'old' }, [`communityConversations/${archive}/messages/foreign`]: { id: 'foreign', senderId: peer, text: 'Ajeno', createdAt: 'old' } });
+  assert.ok(buildErasurePlan(mixed.source()).blockers.includes('archive-ownership-review'));
+  for (const overrides of [
+    { participantIds: [uid, peer, 'charlie'] }, { participantIds: [uid, uid] }, { participantIds: 'unexpected' },
+    { waitlist: { charlie: { name: 'Charlie', joinedAt: 'old' } }, waitlistOrder: [] },
+    { waitlist: {}, waitlistOrder: ['charlie'] }, { waitlist: {}, waitlistOrder: 'unexpected' },
+  ]) {
+    const inconsistent = harness({ 'communityEvents/history': actualEvent('history', overrides) });
+    const plan = buildErasurePlan(inconsistent.source()); assert.ok(plan.blockers.includes('unknown-shared-schema-review'));
+    assert.ok(!plan.operations.some(operation => operation.kind === 'redact-event'));
+    assert.deepEqual(inconsistent.records.get('communityEvents/history'), actualEvent('history', overrides));
+  }
 });

@@ -1,13 +1,13 @@
 /* Shared identity. Community screens use the same neutral surface and accent. */
 .c-app {
-  --c-ink: #1b1b1f;
-  --c-green: #c53a32;
-  --c-muted: #6b6b70;
-  --c-line: #e2e2de;
-  --c-bg: #f6f6f4;
-  --c-surface: #eeeeeb;
-  --c-soft: #f9eeeb;
-  --c-accent-hover: #ad2f29;
+  --c-ink: #152921;
+  --c-green: #176346;
+  --c-muted: #66736a;
+  --c-line: #dfe6de;
+  --c-bg: #f6f8f4;
+  --c-surface: #eef3ed;
+  --c-soft: #e7f3e8;
+  --c-accent-hover: #104b32;
   font-family: 'Manrope Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: 15px;
   line-height: 1.6;
@@ -19,8 +19,8 @@
 .c-profile-fields { min-width: 0; border: 0; margin: 0; padding: 0; }
 .c-app h1, .c-app h2, .c-app h3 { color: inherit; font-weight: 750; letter-spacing: -.035em; }
 .c-header { max-width: none; height: 76px; padding: 0 max(28px, calc((100vw - 1240px) / 2)); gap: 28px; background: #fff; position: sticky; top: 0; z-index: 20; }
-.c-brand { font-family: 'Arial Black', -apple-system, BlinkMacSystemFont, sans-serif; font-size: 29px; font-weight: 900; letter-spacing: -1.8px; white-space: nowrap; flex-shrink: 0; }
-.c-brand span { display: inline-block; color: transparent; font-size: 0; width: 7px; height: 7px; margin-left: 2px; background: var(--c-green); }
+.c-brand { display: inline-flex; align-items: center; gap: 9px; font-family: 'Manrope Variable', -apple-system, BlinkMacSystemFont, sans-serif; font-size: 25px; font-weight: 800; letter-spacing: -1px; white-space: nowrap; flex-shrink: 0; }
+.c-brand-mark { width: 36px; height: 36px; flex-shrink: 0; border-radius: 9px; }
 .c-nav { gap: 6px; }
 .c-nav a { font-size: 13px; font-weight: 650; color: var(--c-muted); padding: 10px 16px; border-radius: 9px; transition: background .16s, color .16s; }
 .c-nav a:hover { color: var(--c-ink); background: var(--c-surface); }
@@ -56,7 +56,7 @@
 .c-pillar > svg:first-child, .c-event-spaces { color: var(--c-green); }
 .c-invitation { background: var(--c-surface); border-radius: 8px; }
 .c-mission { background: var(--c-ink); border-radius: 5px; }
-.c-mission .c-eyebrow { color: #ff9994; }
+.c-mission .c-eyebrow { color: #b5e5c3; }
 .c-mission p:not(.c-eyebrow) { color: #c6c6cb; }
 .c-legal section p { color: #525259; }
 .c-profile-links { display: flex; flex-wrap: wrap; gap: 12px 24px; margin: -8px 0 24px; }
@@ -84,7 +84,8 @@
 @media (max-width: 700px) {
   .c-profile .c-section-head h1 { font-size: 28px; }
   .c-header { height: calc(64px + env(safe-area-inset-top, 0px)); padding: env(safe-area-inset-top, 0px) 18px 0; background: #fffffffa; gap: 14px; }
-  .c-brand { font-size: 27px; }
+  .c-brand { font-size: 23px; gap: 7px; }
+  .c-brand-mark { width: 32px; height: 32px; border-radius: 8px; }
   .c-header-tools { gap: 7px; }
   .c-header .c-account { margin-left: 0; border: 0; background: transparent; }
   .c-header .c-avatar { width: 34px; height: 34px; }

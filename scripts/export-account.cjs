@@ -84,15 +84,21 @@ function writePrivateJson(root, requested, payload) {
   return target;
 }
 
-async function collectAccountSource({ db, auth, uid, projectId, databaseId, FieldPath, policies }) {
+async function collectAccountSource({ db, auth, uid, projectId, databaseId, FieldPath, policies, maximumRecords = Infinity, onRecord }) {
+  if (maximumRecords !== Infinity && (!Number.isInteger(maximumRecords) || maximumRecords < 1)) throw new Error('invalid-collection-budget');
   const startedAt = new Date().toISOString();
-  const record = document => ({ id: document.id, data: document.data(), ...(typeof document.ref?.path === 'string' ? { path: document.ref.path } : {}) });
+  const record = document => {
+    const value = { id: document.id, data: document.data(), ...(typeof document.ref?.path === 'string' ? { path: document.ref.path } : {}) };
+    if (onRecord) onRecord(value);
+    return value;
+  };
   const readAll = async (query, rangeField) => {
     const ordered = rangeField ? query.orderBy(rangeField).orderBy(FieldPath.documentId()) : query.orderBy(FieldPath.documentId());
     const rows = []; let cursor;
     while (true) {
       const page = await (cursor ? ordered.startAfter(cursor) : ordered).limit(200).get();
       rows.push(...page.docs.map(record));
+      if (rows.length > maximumRecords) throw Object.assign(new Error('collection-review-volume-exceeded'), { code: 'erasure/review-volume-exceeded' });
       if (page.size < 200) break;
       cursor = page.docs.at(-1);
     }

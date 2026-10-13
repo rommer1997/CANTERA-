@@ -100,8 +100,9 @@ function privateRecordBelongs(record: ExportRecord, collection: ExportCollection
     const path = record.path.split('/');
     const participants = (path[1] || '').split(':');
     return path.length === 4 && path[0] === 'communityConversations' && path[2] === 'messages' && path[3] === record.id
-      && participants.length === 2 && participants[0] !== participants[1] && participants.includes(uid)
-      && participants.every(id => /^[a-zA-Z0-9_-]{1,128}$/.test(id));
+      && (/^archive_[a-f0-9]{32}$/.test(path[1])
+        || participants.length === 2 && participants[0] !== participants[1] && participants.includes(uid)
+          && participants.every(id => /^[a-zA-Z0-9_-]{1,128}$/.test(id)));
   }
   return false;
 }

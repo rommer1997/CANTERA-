@@ -277,6 +277,50 @@ describe('Partidos, permisos de organizador y aforo atómico', { concurrency: fa
 });
 
 describe('Publicaciones e interacciones', { concurrency: false }, () => {
+  test('post de texto admite título opcional y rechaza medios, suplantación y campos fuera del contrato', async () => {
+    const alice = db('alice');
+    await assertSucceeds(setDoc(doc(alice, 'communityPosts/plain'), post('plain', { kind: 'post', title: '' })));
+    await assertSucceeds(setDoc(doc(alice, 'communityPosts/titled'), post('titled', { kind: 'post', title: 'Nuestro entrenamiento', text: 'x'.repeat(2000) })));
+    assert.equal((await assertSucceeds(getDoc(doc(db(), 'communityPosts/plain')))).data().title, '');
+    for (const [id, changes] of Object.entries({
+      empty: { text: '' }, oversized: { text: 'x'.repeat(2001) }, title: { title: 'x'.repeat(101) },
+      author: { authorId: 'bob' }, name: { authorName: 'bob' }, extra: { promoted: true },
+      file: { mediaPath: 'community/alice/file.jpg' }, url: { mediaUrl: 'https://firebasestorage.googleapis.com/media' },
+      photo: { kind: 'photo', mediaPath: 'community/alice/photo.jpg', mediaUrl: 'https://firebasestorage.googleapis.com/media' },
+      reel: { kind: 'reel', mediaPath: 'community/alice/reel.mp4', mediaUrl: 'https://firebasestorage.googleapis.com/media' },
+    })) await assertFails(setDoc(doc(alice, 'communityPosts', id), post(id, { kind: 'post', title: '', ...changes })));
+    await assertFails(updateDoc(doc(alice, 'communityPosts/plain'), { title: 'Editado' }));
+    await assertFails(deleteDoc(doc(db('bob'), 'communityPosts/plain')));
+    await assertSucceeds(deleteDoc(doc(alice, 'communityPosts/plain')));
+  });
+
+  test('post escrito conserva términos actuales, mayoría de edad, mantenimiento y acceso limitado al piloto', async () => {
+    await seed('communityProfiles/outdated', profile('outdated', { acceptedTermsVersion: '2026-10-07' }));
+    for (const uid of ['inactive', 'minor', 'outdated']) await assertFails(setDoc(doc(db(uid), 'communityPosts', `by-${uid}`), post(`by-${uid}`, { kind: 'post', title: '', authorId: uid, authorName: uid })));
+    await assertFails(setDoc(doc(db(), 'communityPosts/visitor'), post('visitor', { kind: 'post', title: '' })));
+    for (const status of ['setup', 'paused']) {
+      await seed('communityConfiguration/runtime', { serviceStatus: status, mediaUploadsEnabled: false, contactEmail: '', updatedAt: stamp() });
+      await assertFails(setDoc(doc(db('alice'), 'communityPosts', `closed-${status}`), post(`closed-${status}`, { kind: 'post', title: '' })));
+    }
+    await env.withSecurityRulesDisabled(ctx => deleteDoc(doc(ctx.firestore(), 'communityConfiguration/runtime')));
+    await assertFails(setDoc(doc(db('alice'), 'communityPosts/absent'), post('absent', { kind: 'post', title: '' })));
+    await seed('communityConfiguration/runtime', { serviceStatus: 'pilot', pilotUserIds: ['alice', 'bob'], mediaUploadsEnabled: false, contactEmail: '', updatedAt: stamp() });
+    const google = uid => env.authenticatedContext(uid, { email_verified: true, firebase: { sign_in_provider: 'google.com' } }).firestore();
+    await assertSucceeds(setDoc(doc(google('alice'), 'communityPosts/pilot-text'), post('pilot-text', { kind: 'post', title: '' })));
+    for (const uid of ['carol', 'admin']) await assertFails(setDoc(doc(google(uid), 'communityPosts', `outsider-${uid}`), post(`outsider-${uid}`, { kind: 'post', title: '', authorId: uid, authorName: uid })));
+    await assertFails(setDoc(doc(db('alice'), 'communityPosts/unverified'), post('unverified', { kind: 'post', title: '' })));
+    await env.withSecurityRulesDisabled(async ctx => assert.equal((await getDoc(doc(ctx.firestore(), 'communityConfiguration/runtime'))).data().serviceStatus, 'pilot'));
+  });
+
+  test('asociar un post escrito conserva la restricción a encuentros públicos existentes', async () => {
+    await seed('communityEvents/public', event('public', { visibility: 'public' }));
+    await seed('communityEvents/private', event('private', { visibility: 'private' }));
+    const alice = db('alice');
+    await assertSucceeds(setDoc(doc(alice, 'communityPosts/public-post'), post('public-post', { kind: 'post', title: '', eventId: 'public' })));
+    await assertFails(setDoc(doc(alice, 'communityPosts/private-post'), post('private-post', { kind: 'post', title: '', eventId: 'private' })));
+    await assertFails(setDoc(doc(alice, 'communityPosts/missing-post'), post('missing-post', { kind: 'post', title: '', eventId: 'missing' })));
+  });
+
   test('publicación propia válida, autor inmutable y medios con ruta propia', async () => {
     const alice = db('alice');
     await assertSucceeds(setDoc(doc(alice, 'communityPosts/valid'), post('valid')));
