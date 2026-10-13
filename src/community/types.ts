@@ -50,6 +50,7 @@ export interface PlayEvent {
   ownerName: string;
   title: string;
   visibility?: 'public' | 'private';
+  coverId?: 'day' | 'night' | 'tournament';
   type: 'match' | 'tournament';
   format: '5' | '7' | '11';
   level: Level;

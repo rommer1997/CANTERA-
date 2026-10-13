@@ -505,6 +505,32 @@ describe('Storage: pausa de cargas exigida por el servidor', { concurrency: fals
 });
 
 describe('Gestión segura de convocatorias y derechos', { concurrency: false }, () => {
+  test('portada genérica permite crear y editar sólo al organizador, con historial, manteniendo RSVP', async () => {
+    const alice = db('alice'); const target = doc(alice, 'communityEvents/cover');
+    await assertSucceeds(setDoc(target, event('cover', { coverId: 'day' })));
+    await assertFails(updateDoc(target, { coverId: 'night' }));
+    await assertSucceeds(ownerUpdate(target, { coverId: 'night' }, 'Nueva portada genérica.'));
+    assert.equal((await getDoc(target)).data().coverId, 'night');
+    await assertFails(ownerUpdate(doc(db('bob'), 'communityEvents/cover'), { coverId: 'tournament' }));
+    const bobTarget = doc(db('bob'), 'communityEvents/cover');
+    await assertFails(updateDoc(bobTarget, { participants: { bob: 'bob' }, participantIds: ['bob'], coverId: 'tournament' }));
+    await assertSucceeds(updateDoc(bobTarget, { participants: { bob: 'bob' }, participantIds: ['bob'], rsvps: { bob: 'yes' } }));
+    await assertSucceeds(updateDoc(bobTarget, { rsvps: { bob: 'maybe' } }));
+    assert.equal((await getDoc(target)).data().coverId, 'night');
+  });
+  test('portadas rechazan URL, datos incrustados y campos arbitrarios incluso para el dueño', async () => {
+    const alice = db('alice');
+    for (const [index, coverId] of ['https://example.test/photo.jpg', 'data:image/png;base64,AAAA', '../day', '', null].entries()) {
+      await assertFails(setDoc(doc(alice, `communityEvents/invalid-cover-${index}`), event(`invalid-cover-${index}`, { coverId })));
+    }
+    await assertFails(setDoc(doc(alice, 'communityEvents/remote-cover'), event('remote-cover', { coverUrl: 'https://example.test/photo.jpg' })));
+    await seed('communityEvents/legacy-cover', event('legacy-cover'));
+    const target = doc(alice, 'communityEvents/legacy-cover');
+    await assertSucceeds(ownerUpdate(target, { coverId: 'tournament' }));
+    await assertFails(ownerUpdate(target, { coverId: 'https://example.test/photo.jpg' }));
+    await assertFails(ownerUpdate(target, { coverUrl: 'https://example.test/photo.jpg' }));
+    assert.equal((await getDoc(target)).data().coverId, 'tournament');
+  });
   test('edición de fecha/campo requiere historial inmutable y dueño; aforo no baja de inscritos', async () => {
     await seed('communityEvents/edit', event('edit', { participants: { alice: 'alice', bob: 'bob' } }));
     const target = doc(db('alice'), 'communityEvents/edit');

@@ -15,10 +15,11 @@ const confirmed = { city: 'Å', country: 'Noruega', adultConfirmed: true, accept
 // No Google identity, consent or cloud record is created by this harness.
 function profileHarness(initial: any, returnTo = '') {
   let cursor = 0, dirty = false, componentKey: string | undefined;
+  let routeParams = new URLSearchParams({ returnTo });
   let slots: any[] = [], effects: Array<() => void> = [], cleanups: Array<(() => void) | undefined> = [];
   const saves: any[] = [], navigated: string[] = [];
   const api: any = { profile: initial, mode: 'cloud', isAdmin: false, serviceAvailable: true, pilotEnabled: false, demoEnabled: false,
-    runtimeConfig: { serviceStatus: 'open' }, verificationRequests: [], ownEvents: [], rightsRequests: [],
+    runtimeConfig: { serviceStatus: 'open' }, verificationRequests: [], ownEvents: [], rightsRequests: [], followingIds: [],
     async saveProfile(input: any) { saves.push(input); }, async login() {}, async signOut() {}, async requestVerification() {}, async requestRights() {} };
   const navigate = (path: string) => navigated.push(path);
   const react = {
@@ -38,7 +39,8 @@ function profileHarness(initial: any, returnTo = '') {
   };
   const jsx = (type: any, props: any, key: any) => ({ type, props, key });
   const modules: Record<string, any> = { react, 'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
-    'react-router-dom': { Link: 'Link', useNavigate: () => navigate, useSearchParams: () => [new URLSearchParams({ returnTo })] },
+    'react-router-dom': { Link: 'Link', useNavigate: () => navigate, useSearchParams: () => [routeParams] },
+    '../components/BrandMark': { default: 'BrandMark' },
     'lucide-react': {}, './CommunityContext': { useCommunity: () => api, TERMS_VERSION, friendlyError: (error: Error) => error.message },
     './TeamsContext': { useTeams: () => ({ ownTeams: [] }) }, './teamLogic': { safeReturnTo }, './GeographyFields': { CountryInput: 'CountryInput' },
     './geography': { canonicalCountry }, './legal': { legalReady: true, operator: { email: 'support@example.test' } } };
@@ -71,8 +73,30 @@ function profileHarness(initial: any, returnTo = '') {
       assert.ok(input, `Falta entrada: ${value}`); return input; },
     async settle() { for (let attempt = 0; attempt < 3; attempt++) { await new Promise(resolve => setImmediate(resolve)); render(); } },
     changeProfile(value: any) { api.profile = value; render(); },
+    followLink(target: string) { routeParams = new URL(target, 'https://cantera.example').searchParams; render(); },
     cleanup() { cleanups.forEach(cleanup => cleanup?.()); } };
 }
+
+test('alternar registro e inicio conserva el enlace de invitación sin crear perfil ni aceptación antes de entrar', () => {
+  for (const destination of ['/connect?code=23456789ABCDEFGH', '/teams/join/invitation-token', '/play?create=1&type=tournament']) {
+    const h = profileHarness(null, destination);
+    try {
+      assert.match(h.text(), /Únete a la comunidad/);
+      assert.ok(h.nodes().some(node => node.type === 'BrandMark'));
+      const login = h.nodes().find(node => node.type === 'Link' && node.props.children === 'Inicia sesión');
+      assert.ok(login); assert.equal(new URL(login.props.to, 'https://cantera.example').searchParams.get('returnTo'), destination);
+      h.followLink(login.props.to); assert.match(h.text(), /Bienvenido de vuelta/);
+      const registration = h.nodes().find(node => node.type === 'Link' && node.props.children === 'Únete gratis');
+      assert.ok(registration); assert.equal(new URL(registration.props.to, 'https://cantera.example').searchParams.get('returnTo'), destination);
+      h.followLink(registration.props.to); assert.match(h.text(), /Únete a la comunidad/);
+      assert.equal(h.api.profile, null); assert.deepEqual(h.saves, []); assert.deepEqual(h.navigated, []);
+      h.changeProfile(fixture(confirmed));
+      assert.deepEqual(h.navigated, [destination]); assert.deepEqual(h.saves, []);
+      assert.equal(h.api.profile.acceptedTermsVersion, TERMS_VERSION);
+      assert.equal(h.api.profile.acceptedTermsAt, confirmed.acceptedTermsAt);
+    } finally { h.cleanup(); }
+  }
+});
 
 test('ciudad de un carácter reconoce el perfil completo y vuelve a la invitación sin reaceptar ni guardar', () => {
   const h = profileHarness(fixture(confirmed), '/invite/23456789ABCDEFGH');

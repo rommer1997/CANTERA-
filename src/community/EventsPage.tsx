@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowDownToLine, ArrowLeft, ArrowRight, CalendarDays, Check, ChevronRight, Clock3, Flag, LockKeyhole, MapPin, Plus, Search, Share2, ShieldCheck, SlidersHorizontal, Trophy, Users, X } from 'lucide-react';
+import { ArrowDownToLine, ArrowLeft, ArrowRight, CalendarDays, Check, ChevronRight, Clock3, Flag, Image, LockKeyhole, MapPin, Plus, Search, Share2, ShieldCheck, SlidersHorizontal, Trophy, Users, X } from 'lucide-react';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useCommunity } from './CommunityContext';
@@ -11,6 +11,9 @@ import { buildEventCalendar, expandEventSeries, isoToZonedDateTime, standings, v
 import { normalizeEvent } from './normalization';
 import { canReadEvent, eventVisibility, isPublicEvent } from './eventPrivacy';
 import { EventInviteButton } from './InvitationDialog';
+import EventCover from './EventCover';
+import { eventCover, eventCovers, type EventCoverId } from './eventCovers';
+import { matchesEventDate, type EventDateFilter } from './eventBrowsing';
 import type { EventInput, Fixture, PlayEvent, Rsvp } from './types';
 import './events.css';
 
@@ -57,6 +60,7 @@ function CreateEvent({ onClose, initialType, initialTeam = '', current }: { onCl
   const [capacity, setCapacity] = useState(current ? String(current.capacity) : initialType === 'tournament' ? '8' : '14');
   const [tournamentFormat, setTournamentFormat] = useState<EventInput['tournamentFormat']>(current?.tournamentFormat || 'league');
   const [description, setDescription] = useState(current?.description || '');
+  const [coverId, setCoverId] = useState<EventCoverId>(() => eventCover(current || { type: initialType }).id);
   const [teamId, setTeamId] = useState(current?.teamId || initialTeam);
   const [changeReason, setChangeReason] = useState('');
   const [repeating, setRepeating] = useState(false);
@@ -70,10 +74,10 @@ function CreateEvent({ onClose, initialType, initialTeam = '', current }: { onCl
   const preview = useMemo(() => {
     if (!repeating) return { dates: [] as string[], error: '' };
     try {
-      const input: EventInput = { title: title.trim() || 'Encuentro', visibility, type, entry, format, level, country: country.trim() || 'País', timeZone, city: city.trim() || 'Ciudad', venue: venue.trim() || 'Lugar', startAt: zonedDateTimeToIso(startAt, timeZone, occurrence), capacity: Number(capacity), tournamentFormat, description: description.trim(), ...(teamId ? { teamId } : {}) };
+      const input: EventInput = { title: title.trim() || 'Encuentro', visibility, coverId, type, entry, format, level, country: country.trim() || 'País', timeZone, city: city.trim() || 'Ciudad', venue: venue.trim() || 'Lugar', startAt: zonedDateTimeToIso(startAt, timeZone, occurrence), capacity: Number(capacity), tournamentFormat, description: description.trim(), ...(teamId ? { teamId } : {}) };
       return { dates: expandEventSeries(input, frequency, Number(repeatCount)).map(item => item.startAt), error: '' };
     } catch (error) { return { dates: [], error: errorMessage(error) }; }
-  }, [repeating, frequency, repeatCount, startAt, timeZone, occurrence, title, visibility, type, entry, format, level, country, city, venue, capacity, tournamentFormat, description, teamId]);
+  }, [repeating, frequency, repeatCount, startAt, timeZone, occurrence, title, visibility, coverId, type, entry, format, level, country, city, venue, capacity, tournamentFormat, description, teamId]);
   const modalRef = useRef<HTMLDialogElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
@@ -128,7 +132,7 @@ function CreateEvent({ onClose, initialType, initialTeam = '', current }: { onCl
     if (!current && teamId && !managedTeams.some(team => team.id === teamId)) { setError('Sólo puedes publicar para un equipo activo que gestionas. Elige Personal o uno de tus equipos.'); return; }
     setSaving(true);
     try {
-      const input: EventInput = { title: title.trim(), visibility, type, entry, format, level, country: canonicalCountry(country), timeZone, city: city.trim().normalize('NFKC').replace(/\s+/g, ' '), venue: venue.trim(), startAt: parsedDate.toISOString(), capacity: parsedCapacity, tournamentFormat, description: description.trim(), ...(teamId ? { teamId } : {}) };
+      const input: EventInput = { title: title.trim(), visibility, coverId, type, entry, format, level, country: canonicalCountry(country), timeZone, city: city.trim().normalize('NFKC').replace(/\s+/g, ' '), venue: venue.trim(), startAt: parsedDate.toISOString(), capacity: parsedCapacity, tournamentFormat, description: description.trim(), ...(teamId ? { teamId } : {}) };
       if (current) {
         await updateEvent(current.id, validateEventEdit(current, input, changeReason), changeReason.trim());
         onClose(); return;
@@ -145,6 +149,7 @@ function CreateEvent({ onClose, initialType, initialTeam = '', current }: { onCl
       <p className="ce-form-intro">{current ? 'Explica el cambio para que las personas inscritas puedan revisar la convocatoria. Los cambios quedan visibles en el historial.' : 'Publicar, invitar y gestionar inscripciones en LaCantera es gratis. Acordad directamente cualquier coste del campo.'}</p>
       <form className="ce-form" onSubmit={submit}>
         <label className="ce-field ce-full">Nombre del encuentro<input ref={titleInputRef} autoFocus aria-label="Nombre del encuentro" className="c-input" maxLength={100} placeholder="Por ejemplo: Partido del domingo" value={title} onChange={event => setTitle(event.target.value)} required minLength={3} /></label>
+        <fieldset className="ce-choice-field ce-cover-field ce-full"><legend><Image size={16} aria-hidden="true" />Portada del encuentro</legend><div className="ce-cover-options">{eventCovers.map(cover => <button type="button" key={cover.id} className="ce-cover-option" disabled={saving} aria-pressed={coverId === cover.id} onClick={() => setCoverId(cover.id)}><img src={cover.image} alt="" width="360" height="240" loading="lazy" decoding="async" /><span>{cover.label}{coverId === cover.id && <Check size={16} aria-hidden="true" />}</span></button>)}</div><p className="ce-helper">Elige una imagen genérica gratuita. Podrás cambiarla desde Editar encuentro. Las fotos propias estarán disponibles cuando se active el almacenamiento de imágenes.</p></fieldset>
         <fieldset className="ce-choice-field ce-full"><legend>Privacidad del encuentro</legend><div className="ce-type-choices">{(['public', 'private'] as const).map(value => <button type="button" key={value} disabled={!!current || saving} className={`ce-type-choice ${visibility === value ? 'active' : ''}`} aria-pressed={visibility === value} onClick={() => setVisibility(value)}>{value === 'private' ? <LockKeyhole size={23} /> : <Users size={23} />}<span>{value === 'private' ? 'Privado' : 'Público'}<small>{value === 'private' ? 'Sólo la organización y las cuentas inscritas acceden. Invita con un código.' : 'Visible en Explorar y en tu perfil público.'}</small></span>{visibility === value && <Check size={17} />}</button>)}</div><p className="ce-helper">{current ? 'La privacidad se fija al crear el encuentro para proteger a sus participantes.' : 'La privacidad no se podrá cambiar después de crear el encuentro.'}</p></fieldset>
         <fieldset className="ce-choice-field ce-full"><legend>Tipo de encuentro</legend><div className="ce-type-choices">{(['match', 'tournament'] as const).map(value => <button type="button" key={value} disabled={registered || formatLocked || saving} className={`ce-type-choice ${type === value ? 'active' : ''}`} aria-pressed={type === value} onClick={() => { setType(value); setEntry(value === 'tournament' ? 'teams' : 'players'); setCapacity(value === 'tournament' ? '8' : '14'); }}>{value === 'match' ? <Flag size={23} /> : <Trophy size={23} />}<span>{value === 'match' ? 'Partido' : 'Torneo'}<small>{value === 'match' ? 'Convocatoria para jugadores o equipos.' : 'Liga o eliminatoria, hasta 32 inscripciones.'}</small></span>{type === value && <Check size={17} />}</button>)}</div>{registered && <p className="ce-helper">Las inscripciones existentes fijan el tipo de encuentro y de inscripción.</p>}</fieldset>
         {(managedTeams.length > 0 || teamId) && <label className="ce-field ce-full">Organizar como<select aria-label="Organizar como" className="c-input" value={teamId} disabled={!!current || saving} onChange={event => setTeamId(event.target.value)}><option value="">Personal</option>{managedTeams.map(team => <option key={team.id} value={team.id}>{team.name}</option>)}{teamId && !managedTeams.some(team => team.id === teamId) && <option value={teamId}>Equipo organizador</option>}</select><small className="ce-optional">La cuenta que publica es responsable de gestionar este encuentro.</small></label>}
@@ -161,7 +166,7 @@ function CreateEvent({ onClose, initialType, initialTeam = '', current }: { onCl
         <label className="ce-field">Inscripción por<select aria-label="Inscripción por" className="c-input" value={entry} disabled={registered || formatLocked} onChange={event => { setEntry(event.target.value as EventInput['entry']); setCapacity(event.target.value === 'teams' ? '8' : '14'); }}><option value="players">Jugador individual</option><option value="teams">Equipo o grupo</option></select></label>
         <label className="ce-field">Aforo de {entry === 'teams' ? 'equipos' : 'jugadores'}<input aria-label={`Aforo de ${entry === 'teams' ? 'equipos' : 'jugadores'}`} className="c-input" type="number" min={2} max={maxCapacity} step={1} value={capacity} onChange={event => setCapacity(event.target.value)} required /></label>
         {type === 'tournament' && <label className="ce-field">Sistema del torneo<select aria-label="Sistema del torneo" className="c-input" value={tournamentFormat} disabled={formatLocked} onChange={event => setTournamentFormat(event.target.value as EventInput['tournamentFormat'])}><option value="league">Liga: todos contra todos</option><option value="knockout">Eliminatoria directa</option></select></label>}
-        {type === 'tournament' && <p className="ce-helper ce-full">En esta beta, los torneos admiten de 2 a 32 participantes. Los partidos admiten hasta 64 inscripciones.</p>}
+        {type === 'tournament' && <p className="ce-helper ce-full">Los torneos admiten de 2 a 32 participantes. Los partidos admiten hasta 64 inscripciones.</p>}
         <label className="ce-field ce-full">Información para participantes <span className="ce-optional">Opcional</span><textarea aria-label="Información para participantes" className="c-input" rows={3} maxLength={2000} placeholder="Qué llevar, reglas del encuentro, cómo llegar y costes del campo si los hay…" value={description} onChange={event => setDescription(event.target.value)} /></label>
         {current ? <label className="ce-field ce-full">Motivo del cambio<textarea aria-label="Motivo del cambio" className="c-input" rows={2} maxLength={500} required value={changeReason} onChange={event => setChangeReason(event.target.value)} placeholder="Explica qué ha cambiado y por qué." /><small className="ce-optional">Se publica en el historial y se avisa dentro de LaCantera a las cuentas inscritas.</small></label> : <section className="ce-series ce-full"><label className="ce-checkbox"><input type="checkbox" checked={repeating} onChange={event => setRepeating(event.target.checked)} />Repetir este encuentro</label>{repeating && <><div className="ce-series-fields"><label className="ce-field">Frecuencia<select aria-label="Frecuencia" className="c-input" value={frequency} onChange={event => setFrequency(event.target.value as EventRecurrence)}><option value="weekly">Cada semana</option><option value="biweekly">Cada dos semanas</option><option value="monthly">Cada mes</option></select></label><label className="ce-field">Número de encuentros<input aria-label="Número de encuentros" className="c-input" type="number" min={2} max={12} step={1} required value={repeatCount} onChange={event => setRepeatCount(event.target.value)} /></label></div><p className="ce-helper">De 2 a 12 convocatorias independientes. Cada una tiene sus propias inscripciones y cambios. Se conserva la hora local del campo; si el día no existe en un mes se usa su último día.</p>{preview.error ? <p className="c-error" role="status">{preview.error}</p> : <ol className="ce-series-preview">{preview.dates.map(date => <li key={date}>{formatDate(date, timeZone)} · {formatTime(date, timeZone)}</li>)}</ol>}</>}</section>}
         {error && <p className="c-error ce-full" role="alert">{error}</p>}
@@ -175,17 +180,14 @@ function EventCard({ event }: { event: PlayEvent }) {
   const { profile } = useCommunity();
   const count = Object.keys(event.participants).length;
   const percentage = Math.min(100, (count / event.capacity) * 100);
-  const date = new Date(event.startAt);
-  const day = new Intl.DateTimeFormat('es', { day: 'numeric', timeZone: event.timeZone }).format(date);
-  const month = new Intl.DateTimeFormat('es', { month: 'short', timeZone: event.timeZone }).format(date).replace('.', '');
   const isOwner = profile?.id === event.ownerId;
   const privateEvent = !isPublicEvent(event);
   const hasJoined = !!profile && Object.hasOwn(event.participants, profile.id);
   const inWaitlist = !!profile && Object.hasOwn(event.waitlist || {}, profile.id);
   return <Link className={`ce-event-card ${event.status === 'cancelled' ? 'ce-cancelled' : ''}`} to={`/play/${event.id}`}>
-    <time className="ce-card-date" dateTime={event.startAt} aria-label={`${formatDate(event.startAt, event.timeZone)}, ${formatTime(event.startAt, event.timeZone)}`}><strong>{day}</strong><span>{month}</span><small>{formatTime(event.startAt, event.timeZone)}</small></time>
-    <div className="ce-card-body"><div className="ce-card-meta"><span>{event.type === 'tournament' ? 'Torneo' : 'Partido'} · Fútbol {event.format}</span><span>{levelLabel(event.level)}</span>{privateEvent && <span><LockKeyhole size={13} aria-hidden="true" />Privado</span>}{event.type === 'tournament' && <span>{event.tournamentFormat === 'league' ? 'Liga' : 'Eliminatoria'}</span>}</div><h3>{event.title}</h3><p><MapPin size={15} aria-hidden="true" /><span>{event.city}, {event.country} · {event.venue}</span></p><div className="ce-card-footer"><span>{isOwner ? 'Organizas este encuentro' : hasJoined ? 'Estás inscrito' : inWaitlist ? 'Estás en espera' : `Por ${event.ownerName}`}</span><span>Ver encuentro<ArrowUpRightIcon /></span></div></div>
-    <div className="ce-card-summary"><span className={`ce-status ${event.status !== 'open' || count >= event.capacity || Date.parse(event.startAt) < Date.now() ? 'ce-status-muted' : ''}`}>{statusLabel(event)}</span><div className="ce-card-occupancy"><span>{count} / {event.capacity} {entryLabel(event)}</span><div className="ce-progress-track"><span style={{ width: `${percentage}%` }} /></div></div></div>
+    <EventCover event={event} className="ce-card-cover" />
+    <div className="ce-card-body"><div className="ce-card-meta"><span className="ce-format-badge">{event.type === 'tournament' ? 'Torneo' : `Fútbol ${event.format}`}</span>{event.type === 'tournament' && <span>Fútbol {event.format} · {event.tournamentFormat === 'league' ? 'Liga' : 'Eliminatoria'}</span>}{privateEvent && <span><LockKeyhole size={13} aria-hidden="true" />Privado</span>}</div><h3>{event.title}</h3><p><CalendarDays size={15} aria-hidden="true" /><time dateTime={event.startAt}>{formatDate(event.startAt, event.timeZone)} · {formatTime(event.startAt, event.timeZone)}</time></p><p><MapPin size={15} aria-hidden="true" /><span>{event.venue} · {event.city}, {event.country}</span></p><div className="ce-card-footer"><span>{isOwner ? 'Organizas este encuentro' : hasJoined ? 'Estás inscrito' : inWaitlist ? 'Estás en espera' : `Por ${event.ownerName}`}</span></div></div>
+    <div className="ce-card-summary">{(event.status !== 'open' || count >= event.capacity || Date.parse(event.startAt) < Date.now()) && <span className="ce-status ce-status-muted">{statusLabel(event)}</span>}<span className="ce-level-badge"><Users size={13} aria-hidden="true" />{levelLabel(event.level)}</span><div className="ce-card-occupancy"><span><Users size={14} aria-hidden="true" />{count}/{event.capacity} {entryLabel(event)}</span><div className="ce-progress-track"><span style={{ width: `${percentage}%` }} /></div></div><span className="ce-card-cta">{isOwner ? 'Gestionar' : hasJoined ? 'Ver mi plaza' : inWaitlist ? 'Ver espera' : event.status === 'open' && Date.parse(event.startAt) > Date.now() ? 'Unirme' : 'Ver encuentro'}<ArrowUpRightIcon /></span><span className="ce-sr-only">{statusLabel(event)}. Imagen genérica de fútbol.</span></div>
   </Link>;
 }
 
@@ -361,7 +363,7 @@ function EventDetailReady({ event }: { event: PlayEvent }) {
   const registrationForm = <form onSubmit={full || waitlistOrder.length ? wait : join} className="ce-join-form"><label htmlFor="ce-join-name">{event.entry === 'teams' ? 'Nombre de tu equipo o grupo' : 'Nombre en la convocatoria'}</label><input aria-label={event.entry === 'teams' ? 'Nombre de tu equipo o grupo' : 'Nombre en la convocatoria'} className="c-input" id="ce-join-name" value={joinName} maxLength={100} minLength={2} required onChange={change => setJoinName(change.target.value)} /><label className="ce-checkbox ce-confirm-join"><input type="checkbox" required checked={joinConfirmed} onChange={change => setJoinConfirmed(change.target.checked)} /><span>He revisado el horario, el lugar y las condiciones, incluidos posibles costes del campo. Mi nombre será visible {privateEvent ? 'para las cuentas de este encuentro privado' : 'en la convocatoria pública'}.</span></label><button className="c-button" disabled={!!busy} type="submit">{busy === 'join' || busy === 'wait' ? 'Confirmando…' : full || waitlistOrder.length ? 'Añadirme a la espera' : 'Confirmar inscripción'}<ArrowRight size={18} /></button></form>;
   return <div className="ce-detail">
     <Link to="/play" className="ce-back-link"><ArrowLeft size={17} />Volver a Juega</Link>
-    <header className="ce-detail-header"><div className="ce-detail-tags"><span>{event.type === 'tournament' ? <Trophy size={15} /> : <Flag size={15} />}{event.type === 'tournament' ? 'Torneo' : 'Partido'}</span><span>Fútbol {event.format}</span><span>{levelLabel(event.level)}</span>{privateEvent && <span><LockKeyhole size={14} aria-hidden="true" />Privado</span>}{isOwner && <span className="ce-owner-tag">Tu encuentro</span>}</div><div className="ce-detail-title"><h1>{event.title}</h1><span className="ce-detail-status">{statusLabel(event)}</span></div><p>Organizado por <strong>{event.ownerName}</strong>{event.teamId && <> · <Link to={`/teams/${event.teamId}`}>Ver equipo organizador</Link></>}</p><div className="ce-detail-location"><span><MapPin size={17} aria-hidden="true" />{event.city}, {event.country}</span><span><CalendarDays size={17} aria-hidden="true" />{formatDate(event.startAt, event.timeZone)} · {formatTime(event.startAt, event.timeZone)}</span></div></header>
+    <header className="ce-detail-header"><EventCover event={event} className="ce-detail-cover" priority label /><div className="ce-detail-header-content"><div className="ce-detail-tags"><span>{event.type === 'tournament' ? <Trophy size={15} /> : <Flag size={15} />}{event.type === 'tournament' ? 'Torneo' : 'Partido'}</span><span>Fútbol {event.format}</span><span>{levelLabel(event.level)}</span>{privateEvent && <span><LockKeyhole size={14} aria-hidden="true" />Privado</span>}{isOwner && <span className="ce-owner-tag">Tu encuentro</span>}</div><div className="ce-detail-title"><h1>{event.title}</h1><span className="ce-detail-status">{statusLabel(event)}</span></div><div className="ce-detail-location"><span><MapPin size={17} aria-hidden="true" /><span>{event.venue}<small>{event.city}, {event.country}</small></span></span><span><CalendarDays size={17} aria-hidden="true" /><span>{formatDate(event.startAt, event.timeZone)}<small>{formatTime(event.startAt, event.timeZone)} · {timeZoneLabel(event.timeZone, event.startAt)}</small></span></span><span><Users size={17} aria-hidden="true" />{entries.length}/{event.capacity} {entryLabel(event)}</span></div><div className="ce-organizer"><span className="ce-avatar" aria-hidden="true">{event.ownerName.trim().slice(0, 2).toUpperCase()}</span><span><small>Organiza</small><Link to={`/people/${encodeURIComponent(event.ownerId)}`}>{event.ownerName}</Link>{event.teamId && <Link className="ce-organizer-team" to={`/teams/${event.teamId}`}>Ver equipo organizador</Link>}</span></div></div></header>
     {mode === 'demo' && <p className="ce-demo-note">Este encuentro se guarda sólo en este navegador de prueba. Las invitaciones, las inscripciones de otras personas y los avisos compartidos estarán disponibles cuando el servicio esté publicado.</p>}
     {error && <div className="c-error" role="alert">{error}</div>}{message && <div className="ce-success" role="status"><Check size={18} />{message}</div>}
     <nav className="ce-detail-nav" aria-label="Secciones del encuentro">
@@ -417,6 +419,8 @@ export default function EventsPage() {
   const [level, setLevel] = useState('all');
   const [onlyOpen, setOnlyOpen] = useState(() => searchParams.get('view') !== 'mine');
   const [search, setSearch] = useState('');
+  const [dateFilter, setDateFilter] = useState<EventDateFilter>('all');
+  const [formatFilter, setFormatFilter] = useState<'all' | PlayEvent['format']>('all');
   const [pagingError, setPagingError] = useState('');
 
   useEffect(() => { setOnlyOpen(view === 'explore'); setPagingError(''); }, [view]);
@@ -468,7 +472,7 @@ export default function EventsPage() {
   }
   function resetFilters() {
     updateQuery({ country: '', city: '', type: '', create: '' });
-    setLevel('all'); setSearch(''); setOnlyOpen(false); setFiltersOpen(false);
+    setLevel('all'); setSearch(''); setDateFilter('all'); setFormatFilter('all'); setOnlyOpen(false); setFiltersOpen(false);
   }
 
   async function moreEvents() {
@@ -488,6 +492,7 @@ export default function EventsPage() {
       (!city || locationKey(event.city) === locationKey(city)) &&
       (level === 'all' || event.level === level) &&
       (type === 'all' || event.type === type) &&
+      (formatFilter === 'all' || event.format === formatFilter) && matchesEventDate(event, dateFilter, now) &&
       (!onlyOpen || (Date.parse(event.startAt) >= now && (view === 'mine' || event.status === 'open'))) &&
       (!search.trim() || locationKey([event.title, event.country, event.city, event.venue].join(' ')).includes(locationKey(search)))
     ).sort((a, b) => {
@@ -498,8 +503,8 @@ export default function EventsPage() {
       }
       return aTime - bTime;
     });
-  }, [publicEvents, myEvents, view, country, city, level, type, onlyOpen, search]);
-  const hasFilters = !!country || !!city || level !== 'all' || type !== 'all' || !!search.trim() || onlyOpen;
+  }, [publicEvents, myEvents, view, country, city, level, type, onlyOpen, search, formatFilter, dateFilter]);
+  const hasFilters = !!country || !!city || level !== 'all' || type !== 'all' || !!search.trim() || onlyOpen || formatFilter !== 'all' || dateFilter !== 'all';
   const currentDirectEvent = mode === 'cloud' && directEvent?.id === eventId ? directEvent : null;
   const direct = currentDirectEvent?.event;
   const event = listedEvent || (direct && canReadEvent(direct, profile?.id) ? direct : null);
@@ -511,8 +516,9 @@ export default function EventsPage() {
   if (eventId) return event ? <EventDetail key={event.id} event={event} /> : <section className="c-panel ce-not-found"><Trophy size={36} /><h1>No encontramos este encuentro.</h1><p>Puede que el enlace no sea correcto o que no esté disponible en este navegador. Si es privado, necesitas el código de la organización.</p><Link className="c-button secondary" to="/connect">Tengo un código<LockKeyhole size={17} /></Link><Link className="c-button" to="/play">Explorar encuentros<ArrowRight size={17} /></Link></section>;
 
   return <div className="ce-events-page">
+    <div className="ce-explore-hero">
     <header className="ce-workspace-header">
-      <div><span className="c-eyebrow">PARTIDOS Y TORNEOS</span><h1>Juega</h1><p><MapPin size={15} aria-hidden="true" /><span>{locationSummary}</span></p></div>
+      <div><span className="c-eyebrow">ENCUENTRA. ORGANIZA. JUEGA.</span><h1>{view === 'mine' ? 'Tus encuentros' : 'Tu próximo partido empieza aquí.'}</h1><p><MapPin size={15} aria-hidden="true" /><span>{locationSummary}</span></p></div>
       {profile ? <button type="button" className="c-button" onClick={openCreate} aria-label="Organizar un partido o torneo"><Plus size={18} />Crear encuentro</button> : <Link className="c-button" to="/profile" aria-label="Crear perfil para organizar un partido o torneo"><Plus size={18} />Crear encuentro</Link>}
     </header>
     <section className={'ce-filter-bar' + (filtersOpen ? ' ce-filters-open' : '')} aria-label="Buscar y filtrar encuentros">
@@ -525,11 +531,13 @@ export default function EventsPage() {
         {activeFilterCount > 0 && <button className="ce-text-button ce-clear-filters" type="button" onClick={() => { updateQuery({ country: '', city: '' }); setLevel('all'); }}>Limpiar ubicación y nivel</button>}
       </div>
     </section>
+    <div className="ce-quick-filters"><div role="group" aria-label="Fecha del encuentro">{([{ value: 'all', label: 'Cualquier fecha' }, { value: 'today', label: 'Hoy' }, { value: 'tomorrow', label: 'Mañana' }, { value: 'week', label: 'Esta semana' }] as const).map(item => <button key={item.value} type="button" aria-pressed={dateFilter === item.value} onClick={() => setDateFilter(item.value)}>{item.label}</button>)}</div><div role="group" aria-label="Formato de fútbol">{([{ value: 'all', label: 'Todos los formatos' }, { value: '5', label: 'Fútbol 5' }, { value: '7', label: 'Fútbol 7' }, { value: '11', label: 'Fútbol 11' }] as const).map(item => <button key={item.value} type="button" aria-pressed={formatFilter === item.value} onClick={() => setFormatFilter(item.value)}>{item.label}</button>)}</div></div>
+    </div>
     <div className="ce-list-toolbar">
       <div className="ce-view-tabs" role="group" aria-label="Vista de encuentros"><button type="button" aria-pressed={view === 'explore'} onClick={() => changeView('explore')}>Explorar</button><button type="button" aria-pressed={view === 'mine'} onClick={() => changeView('mine')}>Mis encuentros{profile && myEvents.length > 0 && <span aria-hidden="true">{myEvents.length}</span>}</button></div>
       <div className="ce-type-tabs" role="group" aria-label="Tipo de encuentro">{([{ value: 'all', label: 'Todos' }, { value: 'match', label: 'Partidos' }, { value: 'tournament', label: 'Torneos' }] as const).map(item => <button type="button" key={item.value} aria-pressed={type === item.value} onClick={() => updateQuery({ type: item.value === 'all' ? '' : item.value })}>{item.label}</button>)}</div>
     </div>
-    <div className="ce-results-row"><h2>{view === 'mine' ? 'Mis encuentros' : onlyOpen ? 'Próximos encuentros' : 'Todos los encuentros'}<span className="ce-heading-count" role="status" aria-label={`${filtered.length} encuentros encontrados`}>{filtered.length}</span></h2><label className="ce-open-toggle"><input type="checkbox" checked={onlyOpen} onChange={event => setOnlyOpen(event.target.checked)} /><span>{view === 'mine' ? 'Solo próximos' : 'Solo próximos y abiertos'}</span></label></div>
+    <div className="ce-results-row"><h2>{view === 'mine' ? 'Mis encuentros' : city ? `Encuentros en ${city}` : onlyOpen ? 'Partidos y torneos para ti' : 'Todos los encuentros'}<span className="ce-heading-count" role="status" aria-label={`${filtered.length} encuentros encontrados`}>{filtered.length}</span></h2><label className="ce-open-toggle"><input type="checkbox" checked={onlyOpen} onChange={event => setOnlyOpen(event.target.checked)} /><span>{view === 'mine' ? 'Solo próximos' : 'Solo próximos y abiertos'}</span></label></div>
     {view === 'mine' && !profile ? <div className="ce-empty-state"><Users size={28} aria-hidden="true" /><h3>Tus encuentros, en un solo lugar.</h3><p>Entra para consultar los partidos y torneos que organizas o donde estás inscrito.</p><Link className="c-button" to="/profile">Entrar a mi cuenta<ArrowRight size={17} /></Link></div> : filtered.length ? <div className="ce-event-grid">{filtered.map(event => <EventCard key={event.id} event={event} />)}</div> : <div className="ce-empty-state"><Flag size={28} aria-hidden="true" /><h3>{view === 'mine' && !myEvents.length ? 'Todavía no tienes encuentros.' : events.length ? 'No hay encuentros con estos filtros.' : 'Todavía no hay encuentros.'}</h3><p>{view === 'mine' && !myEvents.length ? 'Organiza un partido o explora la convocatoria para inscribirte.' : events.length ? 'Prueba otra ubicación o nivel, o muestra todos los estados.' : 'Publica una convocatoria y comparte el enlace con tu grupo.'}</p><div className="ce-empty-actions">{view === 'mine' && !myEvents.length ? <button className="c-button secondary" type="button" onClick={() => changeView('explore')}>Explorar encuentros</button> : events.length && hasFilters ? <button className="c-button secondary" type="button" onClick={resetFilters}>Limpiar filtros</button> : null}{profile ? <button className="c-button" type="button" onClick={openCreate}><Plus size={17} />Crear encuentro</button> : <Link className="c-button" to="/profile">Crear mi perfil<ArrowRight size={17} /></Link>}</div></div>}
     {(view === 'mine' ? profile && ownEventsHasMore : eventsHasMore) && <div className="ce-pagination"><p>Los filtros se aplican a los encuentros cargados. Carga más para ampliar la búsqueda.</p><button className="c-button secondary" type="button" disabled={view === 'mine' ? ownEventsLoading : eventsLoading} onClick={moreEvents}>{(view === 'mine' ? ownEventsLoading : eventsLoading) ? 'Cargando…' : 'Cargar más encuentros'}</button></div>}{pagingError && <p className="c-error" role="alert">{pagingError}</p>}
     <p className="ce-workspace-note"><ShieldCheck size={15} aria-hidden="true" />Organizar e inscribirse en LaCantera es gratis. Los costes del campo se acuerdan con la organización.</p>

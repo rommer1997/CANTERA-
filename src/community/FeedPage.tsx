@@ -359,8 +359,6 @@ export default function FeedPage() {
   const [filter, setFilter] = useState<FeedFilter>('all');
   const [source, setSource] = useState<FeedSource>('community');
   const [search, setSearch] = useState('');
-  const [searchOpen, setSearchOpen] = useState(false);
-  const searchRef = useRef<HTMLInputElement>(null);
   const [pagingError, setPagingError] = useState('');
   const [params, setParams] = useSearchParams();
   const location = useLocation();
@@ -403,7 +401,6 @@ export default function FeedPage() {
   useEffect(() => {
     if (communityUnavailable) { setComposerRequest({ sequence: 0 }); setPublishedMessage(''); setPagingError(''); }
   }, [communityUnavailable]);
-  useEffect(() => { if (searchOpen) searchRef.current?.focus(); }, [searchOpen]);
   useEffect(() => {
     if (!mediaUploadsEnabled && (filter === 'photo' && !hasPhotos || filter === 'reel' && !hasReels)) setFilter('all');
   }, [mediaUploadsEnabled, filter, hasPhotos, hasReels]);
@@ -440,7 +437,12 @@ export default function FeedPage() {
   async function morePosts() { setPagingError(''); try { await loadMorePosts(); } catch (err) { setPagingError(errorMessage(err)); } }
 
   return <div className="cf-page">
-    <header className="cf-page-head"><div><h1 id="cf-feed-heading" tabIndex={-1}>Comunidad</h1><p>Lo que pasa dentro y fuera del campo.</p></div>{profile && !communityUnavailable ? <button type="button" className="c-button cf-publish-action" onClick={() => setComposerRequest(previous => ({ sequence: previous.sequence + 1 }))}><Plus size={17} />Publicar</button> : <Link className="c-button cf-publish-action" to="/profile">{profile ? 'Mi perfil' : 'Acceder'} <ArrowUpRight size={16} /></Link>}</header>
+    <header className="cf-community-cover">
+      <img src="/images/design-2026-10/profile-football.webp" alt="" className="cf-community-cover-image" decoding="async" />
+      <div className="cf-community-cover-content"><div className="cf-page-head"><div><h1 id="cf-feed-heading" tabIndex={-1}>Comunidad</h1><p>Personas que viven el fútbol como tú.</p></div>{profile && !communityUnavailable ? <button type="button" className="c-button cf-publish-action cf-publish-action--signed" onClick={() => setComposerRequest(previous => ({ sequence: previous.sequence + 1 }))}><Plus size={17} />Publicar</button> : <Link className="c-button cf-publish-action" to="/profile">{profile ? 'Mi perfil' : 'Acceder'} <ArrowUpRight size={16} /></Link>}</div>
+      {!communityUnavailable && <div className="cf-feed-search"><Search size={18} aria-hidden="true" /><label htmlFor={searchId} className="cf-sr-only">Buscar en las publicaciones cargadas</label><input id={searchId} type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Buscar publicaciones" aria-describedby={`${searchId}-scope`} enterKeyHint="search" />{search && <button type="button" className="cf-icon-button" onClick={() => setSearch('')} aria-label="Borrar búsqueda"><X size={16} /></button>}</div>}
+      </div>
+    </header>
     <div className="cf-layout">
       <aside className="cf-profile-rail" aria-label="Tu cuenta y comunidad">
         <section className="c-panel cf-profile-card">{profile ? <><Link className="cf-avatar cf-profile-avatar" to={`/people/${encodeURIComponent(profile.id)}`} aria-label="Ver tu perfil público">{initials(profile.name)}</Link><Link className="cf-rail-name" to={`/people/${encodeURIComponent(profile.id)}`}>{profile.name}{profile.verification === 'verified' && <ShieldCheck size={16} className="cf-verified" role="img" aria-label="Identidad verificada" />}</Link>{profile.team && <p>{profile.team}</p>}{(profile.city || profile.country) && <span className="cf-rail-location"><MapPin size={13} />{[profile.city, profile.country].filter(Boolean).join(', ')}</span>}{profile.bio && <p className="cf-rail-bio">{profile.bio}</p>}<Link className="cf-rail-edit" to="/profile">Editar mi perfil <ArrowUpRight size={14} /></Link></> : <><span className="cf-avatar cf-profile-avatar"><CircleUserRound size={28} /></span><h2>Tu cuenta</h2><p>Publica y conecta con personas y equipos.</p><Link className="c-button" to="/profile">Acceder</Link></>}</section>
@@ -451,8 +453,7 @@ export default function FeedPage() {
         {communityUnavailable ? <section className="c-panel cf-empty-feed cf-service-state" aria-labelledby="cf-service-state-title" role="status"><ShieldCheck size={26} aria-hidden="true" /><h2 id="cf-service-state-title">{communityPaused ? 'Comunidad en pausa' : 'La comunidad está en preparación'}</h2><p>{communityPaused ? 'La consulta y las nuevas publicaciones están temporalmente pausadas.' : 'La apertura del servicio está pendiente. Las publicaciones estarán disponibles cuando se habilite la comunidad.'}</p><p>Tu perfil y las opciones de privacidad siguen accesibles.</p><div className="cf-service-links"><Link className="c-button secondary" to="/profile">{profile ? 'Ir a mi perfil' : 'Perfil y cuenta'}<ArrowRight size={17} /></Link><Link to="/legal/privacy">Privacidad y tus derechos</Link></div></section> : <>
         <Composer key={`${mode}:${profile?.id || 'guest'}`} onPublished={onPublished} openRequest={composerRequest} />
         <div className="cf-feed-controls">
-          <div className="cf-source-tabs" role="group" aria-label="Elegir comunidad o cuentas seguidas"><button id="cf-feed-fallback" type="button" className={source === 'community' ? 'is-active' : ''} aria-pressed={source === 'community'} onClick={() => setSource('community')}>Comunidad</button><button type="button" className={source === 'following' ? 'is-active' : ''} aria-pressed={source === 'following'} onClick={() => setSource('following')}>Siguiendo</button><button type="button" className="cf-search-toggle" aria-label={searchOpen ? 'Cerrar búsqueda de publicaciones' : 'Buscar publicaciones'} aria-expanded={searchOpen} aria-controls={`${searchId}-wrap`} onClick={() => { setSearchOpen(!searchOpen); if (searchOpen) setSearch(''); }}><Search size={20} /></button><Link to="/people" className="cf-people-link" aria-label="Buscar personas y equipos"><UsersRound size={20} /></Link></div>
-          <div id={`${searchId}-wrap`} className={`cf-feed-search ${searchOpen ? 'is-open' : ''}`}><Search size={18} aria-hidden="true" /><label htmlFor={searchId} className="cf-sr-only">Buscar en las publicaciones cargadas</label><input ref={searchRef} id={searchId} type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Buscar publicaciones" aria-describedby={`${searchId}-scope`} enterKeyHint="search" />{search && <button type="button" className="cf-icon-button" onClick={() => setSearch('')} aria-label="Borrar búsqueda"><X size={16} /></button>}</div>
+          <div className="cf-source-tabs" role="group" aria-label="Elegir comunidad o cuentas seguidas"><button id="cf-feed-fallback" type="button" className={source === 'community' ? 'is-active' : ''} aria-pressed={source === 'community'} onClick={() => setSource('community')}>Comunidad</button><button type="button" className={source === 'following' ? 'is-active' : ''} aria-pressed={source === 'following'} onClick={() => setSource('following')}>Siguiendo</button><Link to="/people" className="cf-people-link"><UsersRound size={16} />Personas y equipos</Link></div>
           <div className="cf-filter-row"><div className="cf-filters" role="group" aria-label="Filtrar publicaciones">{availableFilters.map(item => { const Icon = item.icon; return <button type="button" key={item.id} className={filter === item.id ? 'is-active' : ''} aria-pressed={filter === item.id} onClick={() => setFilter(item.id)}>{Icon && <Icon size={15} />}{item.label}</button>; })}</div></div>
           <p id={`${searchId}-scope`} className={`cf-search-scope ${query ? 'cf-search-scope--active' : ''}`}>{query ? `${visiblePosts.length} resultados en las publicaciones cargadas.` : 'Publicaciones recientes · búsqueda sobre contenido cargado.'}</p>
         </div>

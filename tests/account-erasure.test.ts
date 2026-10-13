@@ -8,6 +8,7 @@ import os from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { Timestamp } from 'firebase/firestore';
 import { applyErasurePlan, assertReviewedPlan, buildErasurePlan, collectErasureSource, erasureHash, erasureReadAll, ERASURE_TOKEN_GRACE_MS } from '../scripts/account-erasure.mjs';
+import { knownSharedSchema } from '../scripts/account-erasure-shared.mjs';
 const require = createRequire(import.meta.url);
 const cli = require('../scripts/erase-account.cjs');
 const uid = 'self_with_dot', peer = 'peer', projectId = 'demo-cantera', databaseId = 'named-test';
@@ -326,6 +327,44 @@ test('CLI exige plan/huella/diario y conserva archivos privados sin enlaces ni s
 });
 
 const actualEvent = (id: string, overrides: Record<string, unknown> = {}) => ({ id, ownerId: peer, ownerName: 'Organización superviviente', title: 'Encuentro privado de prueba', type: 'tournament', format: '7', level: 'amateur', city: 'Madrid', country: 'España', timeZone: 'Europe/Madrid', venue: 'Campo de prueba', startAt: '2026-10-07T10:00:00Z', startAtMs: Date.parse('2026-10-07T10:00:00Z'), capacity: 4, entry: 'players', description: 'Descripción del organizador', status: 'completed', tournamentFormat: 'league', participants: { [uid]: 'NOMBRE_SOLICITANTE', [peer]: 'Participante superviviente' }, participantIds: [uid, peer], fixtures: [], fixtureIds: ['game'], rsvps: { [uid]: 'yes', [peer]: 'yes' }, waitlist: {}, waitlistOrder: [], createdAt: '2026-10-06T10:00:00Z', ...overrides });
+
+test('portadas genéricas válidas no bloquean la baja y se conservan al anonimizar la organización y sus cruces', async () => {
+  assert.equal(knownSharedSchema('communityEvents', actualEvent('legacy')), true);
+  for (const coverId of ['day', 'night', 'tournament']) {
+    const eventId = `cover-${coverId}`;
+    const event = actualEvent(eventId, { ownerId: uid, ownerName: 'NOMBRE_SOLICITANTE', coverId });
+    assert.equal(knownSharedSchema('communityEvents', event), true);
+    const h = harness({
+      [`communityEvents/${eventId}`]: event,
+      [`communityFixtures/${eventId}_game`]: { id: 'game', eventId, ownerId: uid, round: 1, homeId: uid, awayId: peer, homeScore: 3, awayScore: 2, createdAt: 'old' },
+    });
+    const plan = buildErasurePlan(h.source()); assert.deepEqual(plan.blockers, []);
+    assert.ok(plan.operations.some(operation => operation.kind === 'redact-event'));
+    assert.ok(plan.operations.some(operation => operation.kind === 'redact-fixture'));
+    await h.run(plan); h.advance(); const result = await h.run(plan);
+    assert.equal(result.phase, 'completed'); assert.equal(h.identity, null);
+    const saved = h.records.get(`communityEvents/${eventId}`), fixture = h.records.get(`communityFixtures/${eventId}_game`);
+    assert.equal(saved.coverId, coverId); assert.equal(saved.ownerName, 'Cuenta eliminada');
+    assert.match(saved.ownerId, /^removed_[a-f0-9]{32}$/); assert.equal(fixture.ownerId, saved.ownerId);
+    assert.equal(saved.participants[fixture.homeId], 'Cuenta eliminada');
+    assert.equal(saved.participants[peer], 'Participante superviviente');
+    assert.equal(fixture.homeScore, 3); assert.equal(fixture.awayScore, 2);
+    assert.ok(!JSON.stringify([...h.records]).includes('NOMBRE_SOLICITANTE'));
+  }
+});
+
+test('la baja sigue bloqueando portadas desconocidas, URL e imágenes incrustadas antes de modificar la cuenta', async () => {
+  for (const coverId of ['', null, {}, [], 4, 'future-cover', '../day', 'https://example.invalid/cover.webp', 'data:image/png;base64,AAAA']) {
+    const event = actualEvent('invalid-cover', { coverId });
+    assert.equal(knownSharedSchema('communityEvents', event), false);
+    const h = harness({ 'communityEvents/invalid-cover': event });
+    const plan = buildErasurePlan(h.source());
+    assert.ok(plan.blockers.includes('unknown-shared-schema-review'));
+    assert.ok(!plan.operations.some(operation => operation.kind === 'redact-event'));
+    await assert.rejects(() => h.run(plan), /plan-blocked/); assert.deepEqual(h.events, []);
+    assert.deepEqual(h.records.get('communityEvents/invalid-cover'), event); assert.ok(h.identity);
+  }
+});
 
 test('retira identidad estructurada compartida y conserva marcadores, comentarios y mensajes ajenos en archivo sin vínculo', async () => {
   const conversationId = [uid, peer].sort().join(':');

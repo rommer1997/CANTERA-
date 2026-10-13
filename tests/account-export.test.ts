@@ -58,6 +58,20 @@ test('respuestas tras retirada y registros antiguos conservan datos personales s
   assert.ok(!JSON.stringify(result).includes('SECRET_NAME'));
 });
 
+test('exportación conserva la portada genérica del encuentro sin proyectar URLs ni datos de participantes ajenos', () => {
+  for (const coverId of ['day', 'night', 'tournament']) {
+    const result = buildAccountExport(source({ events: [row('with-cover', { ownerId: uid, coverId, participants: { [uid]: 'Yo', other: 'SECRET_PARTICIPANT' }, coverUrl: 'SECRET_URL' })] }));
+    assert.equal(result.events[0].coverId, coverId);
+    assert.ok(!Object.hasOwn(result.events[0], 'coverUrl'));
+    assert.ok(!JSON.stringify(result).includes('SECRET'));
+  }
+  for (const coverId of [undefined, '', null, {}, [], 4, 'future-cover', '../day', 'https://example.invalid/cover.webp', 'data:image/png;base64,AAAA']) {
+    const result = buildAccountExport(source({ events: [row('legacy-or-invalid-cover', { ownerId: uid, coverId })] }));
+    assert.equal(result.events.length, 1);
+    assert.ok(!Object.hasOwn(result.events[0], 'coverId'));
+  }
+});
+
 test('marcadores canónicos sustituyen la copia antigua y excluyen participantes y campos extra', () => {
   const event = row('event', { ownerId: uid, fixtureIds: ['r1-1'], fixtures: [{ id: 'r1-1', homeScore: 0, awayScore: 0, homeId: uid, awayId: 'SECRET_OPPONENT' }] });
   const fixture = row('event_r1-1', { id: 'r1-1', eventId: 'event', ownerId: uid, round: 1, homeId: uid, awayId: 'SECRET_OPPONENT', homeScore: 5, awayScore: 1, kickoffAt: timestamp, timeZone: 'Europe/Madrid', venue: 'Cancha', createdAt: timestamp, updatedAt: timestamp, privateRoster: 'SECRET_ROSTER', extra: 'SECRET_EXTRA' });

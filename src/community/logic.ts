@@ -1,5 +1,6 @@
 import type { EventInput, Fixture, FixtureSchedule, MatchResult, PlayEvent, Standing } from './types';
 import { eventVisibility } from './eventPrivacy.ts';
+import { isEventCoverId } from './eventCovers.ts';
 
 export function requireText(value: string, label: string, max = 200): string {
   const text = value.trim();
@@ -11,7 +12,8 @@ export function validateEvent(input: EventInput, now = Date.now()): EventInput {
   if (!['match', 'tournament'].includes(input.type) || !['5', '7', '11'].includes(input.format) ||
     !['amateur', 'professional'].includes(input.level) || !['players', 'teams'].includes(input.entry) ||
     !['league', 'knockout'].includes(input.tournamentFormat) ||
-    input.visibility !== undefined && !['public', 'private'].includes(input.visibility)) throw new Error('Formato de evento inválido.');
+    input.visibility !== undefined && !['public', 'private'].includes(input.visibility) ||
+    input.coverId !== undefined && !isEventCoverId(input.coverId)) throw new Error('Formato de evento inválido.');
   if (!Number.isInteger(input.capacity) || input.capacity < 2 || input.capacity > 64) throw new Error('El aforo debe estar entre 2 y 64.');
   if (input.type === 'tournament' && input.capacity > 32) throw new Error('Los torneos admiten hasta 32 participantes para generar el calendario.');
   if (!Number.isFinite(Date.parse(input.startAt)) || Date.parse(input.startAt) <= now) throw new Error('La fecha debe ser futura.');

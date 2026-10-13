@@ -100,7 +100,8 @@ export function normalizeFollow(value: unknown, documentId?: string): FollowReco
 export function normalizeEvent(value: unknown, documentId?: string): PlayEvent | null {
   value = dates(value);
   if (!object(value) || !documentIdentity(value, documentId) || value.teamId !== undefined && value.teamId !== '' && !id(value.teamId) || !id(value.ownerId) || !text(value.ownerName, 1, 100)
-    || !text(value.title, 1, 100) || value.visibility !== undefined && !enumValue(value.visibility, ['public', 'private'] as const) || !enumValue(value.type, ['match', 'tournament'] as const)
+    || !text(value.title, 1, 100) || value.visibility !== undefined && !enumValue(value.visibility, ['public', 'private'] as const)
+    || value.coverId !== undefined && !enumValue(value.coverId, ['day', 'night', 'tournament'] as const) || !enumValue(value.type, ['match', 'tournament'] as const)
     || !enumValue(value.format, ['5', '7', '11'] as const) || !enumValue(value.level, ['amateur', 'professional'] as const)
     || !text(value.city, 1, 100) || !text(value.country, 1, 100) || !timeZone(value.timeZone)
     || !text(value.venue, 1, 200) || !date(value.startAt) || !integer(value.capacity, 2, value.type === 'tournament' ? 32 : 64)
@@ -129,6 +130,7 @@ export function normalizeEvent(value: unknown, documentId?: string): PlayEvent |
     fixtures.push({ id: raw.id, round: raw.round, homeId: raw.homeId, awayId: raw.awayId, homeScore: raw.homeScore, awayScore: raw.awayScore, ...(raw.startAt === undefined ? {} : { startAt: raw.startAt as string, timeZone: raw.timeZone as string, venue: raw.venue as string }) });
   }
   return { id: value.id, ownerId: value.ownerId, ownerName: value.ownerName, title: value.title, visibility: value.visibility === 'private' ? 'private' : 'public', type: value.type,
+    ...(value.coverId === undefined ? {} : { coverId: value.coverId as PlayEvent['coverId'] }),
     format: value.format, level: value.level, city: value.city, country: value.country, timeZone: value.timeZone,
     venue: value.venue, startAt: value.startAt, ...(value.startAtMs === undefined ? {} : { startAtMs }),
     capacity: value.capacity, entry: value.entry, description: value.description, status: value.status,

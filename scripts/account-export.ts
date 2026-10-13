@@ -112,6 +112,7 @@ export function projectAccountEvent(record: ExportRecord, uid: string): Data | n
   const participating = owns(data.participants, uid), waiting = owns(data.waitlist, uid), responded = owns(data.rsvps, uid);
   if (data.ownerId !== uid && !participating && !waiting && !responded) return null;
   const result = projected(record, ['ownerId', 'ownerName', 'title', 'type', 'format', 'level', 'city', 'country', 'timeZone', 'venue', 'startAt', 'startAtMs', 'capacity', 'entry', 'description', 'status', 'tournamentFormat', 'createdAt', 'updatedAt', 'revision', 'teamId', 'visibility']);
+  if (['day', 'night', 'tournament'].includes(data.coverId as string)) result.coverId = data.coverId;
   result.organizer = data.ownerId === uid;
   result.participants = participating ? { [uid]: scalar((data.participants as Data)[uid]) ?? null } : {};
   result.rsvps = responded ? { [uid]: scalar((data.rsvps as Data)[uid]) ?? null } : {};
