@@ -44,6 +44,41 @@ node scripts/community-backup.cjs --apply --output output/private/respaldo-2026-
 
 El manifiesto contiene versión de formato, procedencia exacta, esquema, instante de lectura, inventario, exclusiones y SHA-256 de todos los datos. El hash detecta alteraciones accidentales; no sustituye una firma ni demuestra quién produjo el archivo.
 
+## Proteger una copia local con cifrado
+
+`scripts/seal-community-backup.cjs` ofrece cifrado local manual con AES-256-GCM y clave derivada mediante scrypt (`N=131072`, `r=8`, `p=1`). Cada copia recibe una sal aleatoria de 32 bytes y un nonce de 12 bytes; la cabecera versionada también se autentica. No utiliza Firebase, red, Keychain ni variables de entorno con secretos. Esta herramienta preparada no significa que las copias existentes ya estén cifradas.
+
+Revisar primero el manifiesto y el destino, sin crear un archivo ni solicitar una frase:
+
+```sh
+node scripts/seal-community-backup.cjs seal --input output/private/respaldo-2026-10-13.json --output output/private/respaldo-2026-10-13.lcb --dry-run
+```
+
+Cifrar con una frase larga y única que el responsable conserve de forma segura, separada de la copia:
+
+```sh
+node scripts/seal-community-backup.cjs seal --input output/private/respaldo-2026-10-13.json --output output/private/respaldo-2026-10-13.lcb --apply
+```
+
+El terminal solicita y confirma la frase con entrada oculta; exige al menos 16 bytes UTF-8, pero ese mínimo no garantiza una frase resistente. Nunca incluirla en argumentos, historial de comandos, archivos del repositorio o logs. Para automatización local, stdin admite una sola línea procedente de un gestor de secretos; el script no crea ni configura ese gestor. Perder la frase impide recuperar la copia.
+
+Antes de guardar el `.lcb`, se descifra en memoria, se comprueban la autenticación, la integridad del manifiesto y la igualdad exacta de los bytes. La entrada siempre se conserva. Los destinos deben ser nuevos, estar dentro de `output/private/`, permanecer ignorados por Git y no atravesar enlaces; los archivos se crean con `0600` y carpetas privadas con `0700`.
+
+Comprobar una copia cifrada sin emitir sus datos:
+
+```sh
+node scripts/seal-community-backup.cjs unseal --input output/private/respaldo-2026-10-13.lcb --dry-run
+```
+
+Para un ensayo de recuperación, descifrar primero a un JSON privado nuevo. Sólo se escribe después de autenticar el archivo completo y validar su manifiesto:
+
+```sh
+node scripts/seal-community-backup.cjs unseal --input output/private/respaldo-2026-10-13.lcb --output output/private/recuperacion-2026-10-13.json --apply
+node scripts/restore-backup-emulator.cjs --input output/private/recuperacion-2026-10-13.json --project demo-cantera-recovery --dry-run
+```
+
+El JSON original y el descifrado siguen en claro: el cifrado de una copia no protege esos archivos, un ordenador comprometido o la sesión durante el uso. El responsable debe decidir su almacenamiento cifrado y eliminación conforme a la política de conservación, y gestionar también versiones sincronizadas y respaldos anteriores. Este script no borra entradas, no rota claves ni restaura producción. Las pruebas en `tests/seal-community-backup.test.ts` usan exclusivamente archivos sintéticos locales e incluyen corrupción, frase incorrecta, permisos, destinos y conservación exacta de bytes.
+
 ## Ensayo local de recuperación
 
 El único destino permitido es **`http://127.0.0.1:8080`**, con un proyecto **`demo-*`** y la base **`(default)`**. El script no carga credenciales de producción, no acepta otros hosts/puertos y rechaza redirecciones. Usa el acceso de propietario del emulador local. No cambies el código para apuntar este comando a producción.

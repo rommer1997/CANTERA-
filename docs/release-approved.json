@@ -1,0 +1,25 @@
+{
+  "approvedBy": "Rommer Volcanes",
+  "approvedAt": "2026-10-13T21:36:34.538Z",
+  "projectId": "gen-lang-client-0853130215",
+  "databaseId": "ai-studio-647af55f-499b-43f3-9268-9bf5f62701bb",
+  "checks": {
+    "rulesAndIndexes": true,
+    "migration": true,
+    "twoAccounts": true,
+    "admin": true,
+    "authDomain": true,
+    "backupRestore": true,
+    "support": true,
+    "legalAndPrivacy": true,
+    "accountRights": true
+  },
+  "evidence": {
+    "operatorReview": "Confirmación explícita del responsable el 13 de octubre: Revisado y aceptado; correo probado. Propuesta PUBLIC_OPENING_REVIEW y OPERATING_POLICY aceptada.",
+    "twoAccounts": "Google: conexión recíproca confirmada por GET; chat QA enviado y respuesta Recibido recibida; admisión privada y retirada verificadas en Firestore. Safari físico e instalación confirmados por el responsable.",
+    "backupRestore": "Siete documentos reales restaurados y verificados en emulador vacío. No se restauró producción ni Auth.",
+    "accountRights": "Integración real Auth Emulator y Firestore Emulator con cuentas sintéticas y gracia de 65 minutos mediante reloj de ensayo; revisión de operación manual aceptada.",
+    "custody": "Custodia cifrada y conservación son compromisos manuales aceptados. La herramienta local de cifrado conserva la entrada; no se afirma que copias históricas estén ya cifradas.",
+    "activation": "Acta de revisión previa. El estado público sólo se acredita mediante el recibo posterior de Hosting y lectura de runtime abierto."
+  }
+}

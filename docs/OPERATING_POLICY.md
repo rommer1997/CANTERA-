@@ -1,16 +1,16 @@
 # Operación del núcleo gratuito de LaCantera
 
-13 de octubre de 2026 · propuesta concreta para que el responsable revise y acepte antes de abrir el registro público. No es un acta, no acredita soporte atendido y no establece aprobaciones por el hecho de estar escrita. Los intervalos internos propuestos son decisiones de operación, no plazos impuestos por la ley ni procesos automáticos ya activos.
+13 de octubre de 2026 · criterios revisados y aceptados expresamente por el responsable durante esta sesión. La aceptación se registra al final; este documento no es el acta de lanzamiento ni activa el registro público. Los intervalos internos son compromisos de operación manual, no plazos impuestos por la ley ni procesos automáticos ya activos.
 
 ## Alcance e identificación
 
 Se prepara el núcleo gratuito adulto: acceso con una cuenta Google, perfil completado por su titular, partidos/torneos, equipos, publicaciones escritas/logros, conexiones y chat de texto. Una cuenta completa no obtiene verificación o administración automáticamente. Fotos/reels cloud, menores/tutores, push, correo automático, llamadas, adjuntos y cobros quedan fuera. La gratuidad de uso no hace gratuitos los gastos externos del encuentro ni garantiza infraestructura ilimitada; no se activa facturación, Storage o Functions para esta operación.
 
-El responsable declarado es Rommer, persona física establecida en España. Falta confirmar su identificación completa publicable; el nombre de Google o un nombre de perfil no la sustituye. La orientación sin ánimo de lucro no constituye una asociación ni elimina el tratamiento de datos. Antes de abrir debe figurar identidad y contacto del responsable, junto con finalidades, bases y conservación o criterios. [RGPD, artículos 5 y 13, texto oficial BOE](https://www.boe.es/buscar/doc.php?id=DOUE-L-2016-80807).
+El responsable que ha confirmado la identificación publicable es **Rommer Volcanes**, persona física establecida en España; la firma visible elegida es **Powered by Rommer Volcanes**. La orientación sin ánimo de lucro no constituye una asociación ni elimina el tratamiento de datos. Antes de abrir debe figurar identidad y contacto del responsable, junto con finalidades, bases y conservación o criterios. [RGPD, artículos 5 y 13, texto oficial BOE](https://www.boe.es/buscar/doc.php?id=DOUE-L-2016-80807).
 
 ## Canales y rutina propuesta
 
-El canal previsto para soporte, privacidad, verificación y revisión de decisiones es **rommer@garitocastizo.com**. No se ha acreditado todavía una prueba real de recepción y respuesta. El responsable la realiza desde otra cuenta y conserva sólo fecha, resultado y referencia privada; no se publican mensajes ni cabeceras. Una solicitud de derechos puede llegar también desde la app o por otro medio válido: no se exige iniciar sesión de nuevo o aceptar términos para atenderla.
+El canal para soporte, privacidad, verificación y revisión de decisiones es **rommer@garitocastizo.com**. El responsable ha confirmado expresamente que lo recibe y atiende, con la respuesta «Revisado y aceptado; correo probado». Es una confirmación humana del ensayo de correo; no se publican mensajes ni cabeceras ni se atribuye a una comprobación técnica del buzón por el agente. Una solicitud de derechos puede llegar también desde la app o por otro medio válido: no se exige iniciar sesión de nuevo o aceptar términos para atenderla.
 
 | Frecuencia propuesta | Trabajo del responsable | Registro mínimo |
 |---|---|---|
@@ -61,7 +61,7 @@ Firestore usa la región `eur3`. Firebase documenta Authentication como servicio
 
 Firebase informa de retirada de datos de Authentication de sistemas vivos/copias dentro de 180 días tras solicitar eliminar al usuario; IP registradas de Auth durante algunas semanas e IP de Hosting durante algunos meses. Son criterios del proveedor, distintos de los límites internos propuestos, y no los controla LaCantera. No se presentan como copias o registros propios ya eliminados. [Conservación documentada por Firebase](https://firebase.google.com/support/privacy#data_processing_information).
 
-## Decisiones que debe confirmar el responsable
+## Alcance de la revisión del responsable
 
 1. Identificación completa publicable, país y correo que realmente atenderá; prueba de recepción/respuesta.
 2. Capacidad de revisión diaria y mensual, objetivo de soporte y atención de derechos.
@@ -69,4 +69,12 @@ Firebase informa de retirada de datos de Authentication de sistemas vivos/copias
 4. Tratamiento del historial compartido y revisión de referencias personales en texto; gestión de reservas legales por caso.
 5. Proveedores, Authentication en Estados Unidos y garantías de transferencias; texto público coherente antes de abrir.
 
-Registrar aceptación real y fecha cuando llegue; no marcar estos puntos aprobados por inferencia. Siguen pendientes los recorridos entre dos cuentas Google, instalación/cámara en Safari físico y atención de correo, salvo evidencia posterior. No se ha creado `release-approved.json` ni se afirma apertura pública.
+Estos puntos formaron parte de la propuesta revisada; sus intervalos no se modifican al registrar la aceptación. No se afirma que cada tarea mensual, entrega o eliminación ya se haya ejecutado.
+
+## Aceptación expresa y límites de la evidencia · 13 de octubre
+
+Ante la pregunta que pedía confirmar recepción/atención del correo y aceptar identificación, privacidad y operación manual, incluidas las copias cifradas, el responsable respondió **«Revisado y aceptado; correo probado»**. Se registra como aceptación de esos compromisos y del nombre/contacto indicados, sin inferirla del perfil de Google ni de los resultados de CI.
+
+La aceptación del compromiso de custodia cifrada no acredita el cifrado de las copias existentes. No se ha comprobado cifrado del archivo de respaldo ni de FileVault; permisos `0600` no equivalen a cifrado. La herramienta local de protección está en preparación, sin crear secretos ni modificar la copia real en este registro. Debe verificarse su ejecución y custodia por separado.
+
+Se han comprobado conexión recíproca y chat de ensayo entre las cuentas Google del piloto. El responsable confirmó instalación en la pantalla de inicio y acceso/uso en Safari; tras abandonar el encuentro privado y reabrirlo informó «no podemos cargar este encuentro». La relectura cloud de las 21:34:24.024 UTC confirma retirada de esa cuenta del mapa y lista de participantes, encuentro todavía privado y cero participantes. El comprobante histórico de admisión permanece; las reglas desplegadas no lo usan para conceder lectura sin participación actual. No se afirma eliminación física de ese comprobante. La revisión se registró separadamente en `release-approved.json` a las 21:36:34.538 UTC. Este texto no sustituye esa acta ni acredita una publicación abierta: build y runtime deben verificarse en su recibo posterior.
