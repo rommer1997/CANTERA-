@@ -273,7 +273,7 @@ class NumberedCanvas(canvas.Canvas):
             self.line(MARGIN, 43, PAGE_WIDTH - MARGIN, 43)
             self.setFillColor(MUTED)
             self.setFont('CanteraBody', 7)
-            self.drawString(MARGIN, 27, 'Documento de proyecto - lanzamiento pendiente')
+            self.drawString(MARGIN, 27, 'Documento de proyecto - núcleo gratuito abierto')
             self.setFillColor(FOREST)
             self.setFont('CanteraTitleBold', 7.8)
             self.drawRightString(PAGE_WIDTH - MARGIN, 27, str(self._pageNumber))
@@ -397,7 +397,7 @@ def build(source: Path, output: Path, publish: bool, expected_sha: str | None) -
     body = parse_content(markdown, renderer, style)
     output.parent.mkdir(parents=True, exist_ok=True)
     document = WhitepaperDocument(str(output), version, pagesize=A4, title=f'LaCantera - Whitepaper del proyecto - v{version}',
-                                 author='LaCantera', subject='Misión, producto, gobernanza, sostenibilidad y trazabilidad. Lanzamiento pendiente.',
+                                 author='LaCantera', subject='Misión, producto, gobernanza, sostenibilidad y trazabilidad. Núcleo gratuito abierto.',
                                  pageCompression=1)
     contents = TableOfContents()
     contents.levelStyles = [style['toc']]
@@ -405,12 +405,12 @@ def build(source: Path, output: Path, publish: bool, expected_sha: str | None) -
     story: list[Flowable] = [Cover(version, date, status_match.group(1).strip()), NextPageTemplate('Body'), PageBreak(),
                              Spacer(1, 18), Paragraph('CONTENIDO', style['eyebrow']),
                              Paragraph('Guía de lectura', style['index_title']),
-                             Paragraph('El alcance y la hoja de ruta describen la intención del proyecto. La sección 12 identifica las pruebas realizadas y los pasos pendientes para publicar un servicio real.', style['note']),
+                             Paragraph('El alcance y la hoja de ruta distinguen el núcleo gratuito abierto de los servicios pendientes. La sección 12 identifica las pruebas y el recibo de apertura pública.', style['note']),
                              Spacer(1, 13), contents,
                              PageBreak()]
     story.extend(body)
     story.extend([CondPageBreak(560), SectionHeading('Origen y referencias', style['h2'], 'source-notes', 'Origen y referencias'),
-                  Paragraph('Esta edición se ha generado a partir de la fuente editable y versionada del proyecto. Se añaden portada, índice, enlaces y datos de identificación del archivo. Este documento no acredita la aprobación de apertura del servicio.', style['body']),
+                  Paragraph('Esta edición se ha generado a partir de la fuente editable y versionada del proyecto. Incluye portada, índice, enlaces y datos de identificación. Registra la apertura pública con sus recibos; generar el documento no sustituye el acta ni las operaciones de publicación y servidor.', style['body']),
                   Paragraph(f'<b>Fuente:</b> {html.escape(source.name)}<br/><b>Versión de contenido:</b> {version}<br/><b>Fecha de edición:</b> {html.escape(date)}', style['body']),
                   Paragraph('Huella SHA-256 de la fuente', style['h3']),
                   Paragraph(f'<font name="CanteraMono" size="8.0">{source_sha}</font>', style['body']),
