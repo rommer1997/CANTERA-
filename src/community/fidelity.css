@@ -151,7 +151,7 @@
   .c-app .c-auth-layout { border: 0; border-radius: 0; margin: 0 -16px; }
   .c-app .c-auth-layout { grid-template-columns: .24fr .76fr; min-height: 550px; }
   .c-app .c-auth-art { height: auto; min-height: 550px; }
-  .c-app .c-auth-art>div { left: 6px; right: 6px; bottom: 24px; padding: 6px; }
+  .c-app .c-auth-art>div { left: 3px; right: 3px; bottom: 24px; padding: 2px; }
   .c-app .c-auth-art p { font-size: 15px; overflow-wrap: normal; }
   .c-app .c-auth-content { padding: 26px 16px; }
   .c-app .c-auth-content>.c-brand { font-size: 19px; }

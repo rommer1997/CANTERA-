@@ -2,9 +2,9 @@
 
 14 de octubre de 2026, Europe/Madrid.
 
-**final result: blocked**
+**final result: passed**
 
-Este pase sustituye la valoración anterior, demasiado permisiva, por una comparación de composición, densidad y acabado. Al preparar esta fuente falta el cierre visual del chat real en el dominio autorizado tras publicar la candidata; la demo no simula conversaciones.
+Este pase sustituye la valoración anterior, demasiado permisiva, por una comparación de composición, densidad y acabado. El cierre publicado compara la conversación existente con dos mensajes reales, sin enviar mensajes nuevos. La demo no simula conversaciones.
 
 ## Fuente, capturas y normalización
 
@@ -21,7 +21,7 @@ Home se compara completo. Acceso se compara también en móvil porque el tablero
 | P1 Explorar retrasaba las tarjetas | Búsqueda primero, título/creación en una fila, chips desplazables, opciones de vista/tipo desplegables. | play.png y compare-play.png recapturado al cerrar |
 | P2 Formulario largo y galería por delante | Lugar, fecha/hora y pares a 390 px; ubicación global y galería desplegables con resumen; privacidad junto al envío. | create.png, create-320.png, compare-create.png |
 | P2 Acceso con imagen ancha/césped sin sujeto | Franja lateral 24–26%, recorte de login enfocado en botas. También lateral en móvil. | register-mobile.png, login-mobile.png, register.png, login.png |
-| P2 Palabra del lateral partida | Texto 15 px y envoltura normal. | Recaptura final requerida tras publicar |
+| P2 Palabra del lateral partida | Texto 15 px y envoltura normal. | login-css-320.png y recaptura posterior al ampliar el ancho útil de la leyenda |
 | P2 Directorio de equipos retrasado por gestión | Tus equipos desplegable; directorio visible antes. | teams-desktop.png, recaptura móvil al cerrar |
 | P2 CTA de ficha lejos del organizador | Enlace visible a gestión/inscripción con foco del panel de destino. | event.png y prueba de foco ce-manage |
 
@@ -41,6 +41,14 @@ Creación y edición locales mediante controles nativos: fecha 16 octubre, 19:30
 
 Durante HMR se observó un aviso de React al cambiar el tamaño de dependencias de un efecto. Se recargó el documento para revisar la versión completa; el cierre publicado comprobará consola sin HMR. No se afirma prueba física nueva en iPhone ni accesibilidad completa desde imágenes.
 
-## Cierre pendiente
+## Cierre publicado
 
-Capturar y comparar el chat real, recapturar lateral móvil corregido y estados finales de Perfil/Comunidad/Explorar/Equipos, y revisar consola de producción. Cambiar a passed sólo tras ese cierre. Las diferencias de proveedores, datos, campos necesarios e instalación son restricciones explícitas, no precisión de píxel inventada.
+Frontend funcional bf65b44cf92687fdcb168b72e0eb2bc645548973 publicado y actualizado mediante Actualizar app. Perfil y Ajustes reales: profile-production.png/settings-production.png; correo confirmado únicamente dentro de Tu cuenta. Comunidad/Explorar/Equipos reales: feed-production.png/play-production.png/teams-production.png; estados vacíos corresponden a ausencia de registros públicos, no se inventa contenido.
+
+Chat real: messages-desktop-production.png (1280 × 838) y messages-mobile-production.png (390 × 844), sin overflow. Pares compare-messages.png / compare-messages-mobile.png abiertos juntos con la fuente. Se conservaron dos mensajes guardados; no se envió, borró ni alteró una conversación. Consola de producción: errors []. La adaptación móvil muestra un hilo y acceso de vuelta a la lista en vez de dos columnas comprimidas.
+
+Acceso móvil corregido: login-css-320.png, 320 × 780, DOM 320 × 780 y scrollX=0. Se rechazó login-mobile.png como prueba definitiva al detectar un recorte de cabecera causado por transición de viewport. La nueva captura incluye la marca y se obtiene con screenshot del tab a su tamaño CSS. El área útil de la leyenda se amplió para conservar la palabra completa. No se infiere el viewport de un tab oculto a partir del tamaño de otro; las dimensiones DOM se verifican antes de capturar.
+
+Se compararon fuente/implementación juntas, incluidas capturas publicadas. No quedan diferencias P0/P1/P2 accionables dentro del alcance funcional actual. Permanece P3 la escritura del lateral como texto de UI sobre fotografía en lugar del tratamiento manuscrito del tablero. Las diferencias de proveedores, campos necesarios, contenido real, avatares sin foto e instalación son restricciones explícitas; no son igualdad de píxel inventada.
+
+CI 38616429882 de la fuente funcional: 423 pruebas (328 unitarias, 79 reglas en emuladores, 16 limpieza Node 22), todas aprobadas sin omisiones. Se conserva el aviso de tamaño del chunk Firebase del build. El ajuste final de ancho de la leyenda cambia CSS solamente, se recompila y publica junto a este cierre. No se despliegan reglas, índices, roles ni facturación.
