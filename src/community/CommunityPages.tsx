@@ -12,6 +12,7 @@ import './community.css';
 import './mobile.css';
 import './brand.css';
 import './design-refresh.css';
+import './fidelity.css';
 
 const routeNames: Record<string, string> = {
   '/': 'Inicio', '/play': 'Juega', '/feed': 'Comunidad', '/profile': 'Tu perfil',
@@ -23,13 +24,14 @@ export function CommunityLayout() {
   const { profile, mode, error, isAdmin, mediaUploadsEnabled, eventNotices, runtimeConfig } = useCommunity();
   const { pathname, search } = useLocation();
   const mainRef = useRef<HTMLElement>(null);
-  const previousPath = useRef(pathname);
+  const pageKey = pathname === '/profile' ? `${pathname}:${new URLSearchParams(search).get('tab') || ''}` : pathname;
+  const previousPath = useRef(pageKey);
   const [createOpen, setCreateOpen] = useState(false);
   const createDialog = useRef<HTMLDialogElement>(null);
-  const routeName = routeNames[pathname] || (pathname.startsWith('/messages/') ? 'Conversación privada' : pathname.startsWith('/invite/') ? 'Aceptar invitación' : pathname.startsWith('/play/') ? 'Detalle del encuentro' : pathname.startsWith('/teams/') ? 'Equipo' : pathname.startsWith('/people/') ? 'Perfil de la comunidad' : 'LaCantera');
+  const routeName = pathname === '/profile' && ['settings', 'verify'].includes(new URLSearchParams(search).get('tab') || '') ? 'Ajustes' : routeNames[pathname] || (pathname.startsWith('/messages/') ? 'Conversación privada' : pathname.startsWith('/invite/') ? 'Aceptar invitación' : pathname.startsWith('/play/') ? 'Detalle del encuentro' : pathname.startsWith('/teams/') ? 'Equipo' : pathname.startsWith('/people/') ? 'Perfil de la comunidad' : 'LaCantera');
   useEffect(() => {
-    const changed = previousPath.current !== pathname;
-    previousPath.current = pathname;
+    const changed = previousPath.current !== pageKey;
+    previousPath.current = pageKey;
     if (!changed) return;
     window.scrollTo({ top: 0, left: 0 });
     if (new URLSearchParams(search).has('create')) return;
@@ -37,7 +39,7 @@ export function CommunityLayout() {
       if (!document.querySelector('dialog[open]')) mainRef.current?.focus({ preventScroll: true });
     });
     return () => cancelAnimationFrame(frame);
-  }, [pathname, search]);
+  }, [pageKey, pathname, search]);
   useEffect(() => {
     const dialog = createDialog.current;
     if (!dialog) return;

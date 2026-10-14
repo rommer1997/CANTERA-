@@ -148,3 +148,22 @@ test('cambio de cuenta descarta el borrador y las confirmaciones de la identidad
     assert.deepEqual(h.saves, []); assert.deepEqual(h.navigated, []);
   } finally { h.cleanup(); }
 });
+
+test('Ajustes conserva edición y derechos sin volver a aceptar condiciones ni cambiar de identidad', async () => {
+  const h = profileHarness(fixture(confirmed)); const requests: string[] = [];
+  h.api.accountEmail = 'owner@example.test'; h.api.requestRights = async (kind: string) => { requests.push(kind); };
+  try {
+    const settings = h.nodes().find(node => node.type === 'Link' && node.props['aria-label'] === 'Ajustes de tu cuenta');
+    assert.ok(settings); h.followLink(settings.props.to);
+    assert.match(h.text(), /Ajustes/); assert.match(h.text(), /owner@example.test/);
+    const edit = h.nodes().find(node => node.type === 'button' && node.props.children === 'Editar mi cuenta');
+    assert.ok(edit); edit.props.onClick(); h.render();
+    assert.equal(h.label('Nombre público').props.value, 'Perfil propio');
+    assert.equal(h.label('Acepto').props.checked, true);
+    const exportButton = h.nodes().find(node => node.type === 'button' && node.props.children === 'Solicitar mis datos');
+    assert.ok(exportButton); exportButton.props.onClick(); await h.settle();
+    assert.deepEqual(requests, ['export']); assert.deepEqual(h.saves, []);
+    assert.equal(h.api.profile.acceptedTermsAt, confirmed.acceptedTermsAt);
+    assert.equal(h.api.profile.id, 'new-google');
+  } finally { h.cleanup(); }
+});
