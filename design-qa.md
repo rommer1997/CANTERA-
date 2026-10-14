@@ -2,18 +2,15 @@
 
 Fecha: 14 de octubre de 2026 (Europe/Madrid).
 
-**final result: blocked**
+**final result: passed**
 
-La comparación de Home, Comunidad, ficha de encuentro, perfil propio, equipos y acceso conserva la dirección visual seleccionada: tipografía sans geométrica, verde deportivo, superficies blancas, fotografía de fútbol y navegación compacta. La incidencia responsive de Comunidad a 320 px está resuelta y ya existen capturas comparables de creación nueva y perfil público. Sólo falta la comparación visual de una conversación real. Este informe no es un certificado de seguridad ni una afirmación de que fotos o reels estén habilitados en producción.
+La comparación de Home, Comunidad, ficha de encuentro, perfil propio, equipos y acceso conserva la dirección visual seleccionada: tipografía sans geométrica, verde deportivo, superficies blancas, fotografía de fútbol y navegación compacta. La incidencia responsive de Comunidad a 320 px está resuelta y ya existen capturas comparables de creación nueva y perfil público. La conversación real de producción se ha comparado en escritorio, móvil y lista de contactos. No quedan incidencias P0/P1/P2 en las superficies inspeccionadas. Este informe no es un certificado de seguridad ni una afirmación de que fotos o reels estén habilitados en producción.
 
 ## Hallazgos
 
-- **[Único bloqueo de evidencia] Conversación real aún no comparada.**
-  - Fuente: `reference-messages.png` (389 × 358).
-  - Captura existente: `messages-desktop-local.png` (1280 × 838) muestra honestamente «Mensajes entre cuentas reales»; la prueba local no inventa una conversación.
-  - Falta: capturar, con la cuenta propietaria y su conexión real ya existente, lista/panel de conversación, burbujas, historial, composer y navegación móvil. El agente principal comprobará sus dos mensajes guardados, sin enviar mensajes nuevos. No es un fallo del estado demo.
+**No quedan P0/P1/P2 visuales abiertos en los estados comparables inspeccionados.** Comunidad a 320 px, creación nueva, perfil público y conversación real de producción se recapturaron y compararon después de las correcciones. Los P3 de abajo son refinamientos, no bloqueos.
 
-**No quedan P0/P1/P2 visuales abiertos en los estados comparables inspeccionados.** Comunidad a 320 px, creación nueva y perfil público se recapturaron y compararon después de las correcciones. `final result` permanece `blocked` exclusivamente por la evidencia de conversación real que falta.
+La conversación conserva únicamente dos mensajes reales previamente guardados entre las cuentas del propietario. No se enviaron mensajes nuevos para obtener una captura. El estado local «Mensajes entre cuentas reales» era una restricción correcta de la demostración; se cerró el hueco de evidencia mediante las capturas autenticadas de producción.
 
 ## Fuente visual, normalización y estados
 
@@ -30,6 +27,7 @@ Fuente visual de verdad: `output/design/redesign-2026-10/reference-board.png`, 1
 | Formulario | `reference-create.png`, 208 × 443 | `create-new-390.png`, 390 × 844; `create-new-320.png`, 320 × 780 | Fuente escalada a ancho equivalente. Estado nuevo sin guardar, privacidad seleccionable y CTA «Publicar encuentro». Pares `qa-create-new-390-paired.png`, `qa-create-new-320-paired.png`. Las capturas anteriores de edición se conservan como historia, no prueba de creación. |
 | Registro | `reference-registration.png`, 273 × 399 | `registration-desktop.png`, 1280 × 838 | Panel de origen escalado a 550 px y captura a 840 px sólo para la comparación de composición; no se presenta como igualdad de viewport. Par `qa-registration-paired.png`. |
 | Acceso | `reference-login.png`, 293 × 398 | `login-desktop.png`, 1280 × 838 | Comparación de composición equivalente a Registro. La captura está desplazada y el logo del panel queda fuera del recorte visible; no se interpreta como un defecto de maquetación. Par `qa-login-paired.png`. |
+| Mensajes reales | `reference-messages.png`, 389 × 358 | `messages-desktop-production.png`, 1280 × 838; `messages-mobile-production.png` y `messages-list-mobile-production.png`, 390 × 844 | Fuente desktop. Par desktop de composición con fuente a 650 px y captura a 1000 px; móvil conserva screenshot nativo y fuente a 390 px. DOM móvil CSS 390 × 844 / DPR 1 / sin overflow, confirmado por root. Pares `qa-messages-desktop-production-paired.png`, `qa-messages-mobile-production-paired.png`, `qa-messages-list-mobile-production-paired.png`. |
 
 Las capturas locales de 390 × 844 y 320 × 780 se tratan como salidas de densidad 1 suministradas por el agente principal. Este revisor no abrió navegador ni verificó por sí mismo el `deviceScaleFactor`. Los pares se generaron con Pillow, sin modificar el contenido de las capturas, únicamente escala proporcional y rótulos externos de comparación. El editor no alteró las imágenes de producto para hacerlas pasar.
 
@@ -61,8 +59,9 @@ Las capturas locales de 390 × 844 y 320 × 780 se tratan como salidas de densid
 | P2: Comunidad creaba una fila adicional de descubrimiento a 320 px y retrasaba el post. | Personas en la misma fila, portada de 156 px, CTA móvil en compositor y recaptura sin aviso temporal. | `qa-feed-320-paired.png` frente a `qa-feed-320-final-paired.png`; post/acciones completos visibles. | Resuelta tras comparación. |
 | Hueco de estado: capturas create eran de edición. | Se abrió un encuentro nuevo sin guardar a 390/320 px. | `qa-create-new-390-paired.png`, `qa-create-new-320-paired.png`. | Resuelto; campos, privacidad y galería reales legibles, CTA inferior visible. |
 | Hueco de densidad: perfil público 390 × 255 con canvas escalado. | Native `getScreenshot` y cierre del banner de instalación; CSS 390 × 844 / DPR 1 / overflow false registrados por root. | `qa-public-profile-final-paired.png`, `public-profile-mobile-final.png`. | Resuelto; portada, avatar, nombre, recuentos y acciones legibles al ancho real. |
+| Hueco de estado: la demostración no contiene una conversación real. | Se abrió en producción la conversación existente entre las cuentas del propietario, sin enviar mensajes nuevos, y se comprobó Volver a mensajes. | Tres pares `qa-messages-*-production-paired.png`; CSS móvil 390 × 844 / DPR 1 / sin overflow. | Resuelto; lista/conexión real, dos mensajes, composer y navegación legibles. Consola de producción `errors: []` según root. |
 
-La inspección se basó en fuentes e implementaciones abiertas juntas mediante `view_image`; no en memoria del código. Los controles y textos se leen en los pares móviles a su ancho normalizado. Home tiene además el recorte focal de tipografía. Los recapturados de creación y perfil público ya tienen estado/escala comparables. La conversación real todavía impide cerrar el pase global.
+La inspección se basó en fuentes e implementaciones abiertas juntas mediante `view_image`; no en memoria del código. Los controles y textos se leen en los pares móviles a su ancho normalizado. Home tiene además el recorte focal de tipografía. Los recapturados de creación y perfil público ya tienen estado/escala comparables. La conversación real de producción se comparó también en tres estados: split desktop, conversación móvil y lista móvil, cerrando el último hueco de evidencia.
 
 ## Interacciones y accesibilidad: cobertura de este pase
 
@@ -74,15 +73,30 @@ Este revisor no operó navegador. El agente principal informa estas comprobacion
 - Creación nueva a 390/320 px; las portadas y privacidad son seleccionables y el botón inferior permanece visible.
 - Perfil público recapturado a 390 × 844, DPR 1, sin overflow; portada etiquetada, avatar de inicial y datos/acciones legibles.
 
-Consola antes del intento de Google: `[]`, según inspección del agente principal. El acceso Google del entorno localhost falló por dominio no autorizado; es la restricción esperada del proveedor y no se amplió Firebase Auth para esta revisión. No se atribuye a la captura del botón un acceso local exitoso. El acceso/contacto y chat reales se revisarán en `lacantera.web.app` con la cuenta propietaria existente.
+Consola antes del intento de Google: `[]`, según inspección del agente principal. El acceso Google del entorno localhost falló por dominio no autorizado; es la restricción esperada del proveedor y no se amplió Firebase Auth para esta revisión. No se atribuye a la captura del botón un acceso local exitoso. El agente principal revisó después el chat real en `lacantera.web.app` con la cuenta propietaria existente: dos mensajes guardados, Volver a mensajes con la lista/conexión real, DOM móvil de ancho 390 px sin overflow y consola de producción `errors: []`. El revisor visual inspeccionó las tres capturas juntas con su fuente.
 
-Se observan etiquetas legibles, foco visible en formularios, objetivos móviles amplios y estados de demo separados de producción. No se detecta navegación persistentemente ocultada. Instalar PWA/cámara/seguridad tienen pruebas históricas; este pase no pretende repetirlas a partir de imágenes.
+Se observan etiquetas legibles, foco visible en formularios, objetivos móviles amplios y estados de demo separados de producción. No se detecta navegación persistentemente ocultada. En la conversación móvil, el botón volver, el historial y el compositor permanecen visibles; la lista se presenta en su propia pantalla en lugar de forzar dos columnas a 390 px. Instalar PWA/cámara/seguridad tienen pruebas históricas; este pase no pretende repetirlas a partir de imágenes.
 
-## Lista de cierre
+## Comprobación final de Mensajes
 
-1. Capturar chat real desktop/móvil y comparar `reference-messages.png` con lista, conversación, dos mensajes existentes, composer y botón volver. No enviar mensajes nuevos ni fabricar actividad.
-2. Anotar lectura de esos mensajes, comprobación de consola de producción y validación responsive por el agente principal.
-3. Actualizar este informe y cambiar `final result` a `passed` sólo si no aparecen P0/P1/P2 en ese pase final.
+- Tipografía/ritmo: encabezados y nombres legibles, lista compacta en escritorio y pantalla independiente en móvil. Los mensajes largos envuelven dentro de sus burbujas sin recortar texto.
+- Colores: mensajes propios verdes, respuesta recibida sobre verde/gris pálido, superficies blancas y separadores suaves. El botón de envío vacío aparece deshabilitado; no se confunde con una acción activa.
+- Contenido: la prueba técnica y «Recibido» son los mensajes existentes de las cuentas reales del propietario. No se copian nombres, conversaciones, estados online, llamadas o adjuntos ficticios del tablero.
+- Responsive: desktop conserva lista/conversación; móvil oculta la lista dentro del hilo y muestra un botón volver. La recaptura de lista contiene la conexión real y su búsqueda. CSS móvil 390 × 844, DPR 1, sin overflow según DOM verificado por root.
+- Evidencia conjunta: `qa-messages-desktop-production-paired.png`, `qa-messages-mobile-production-paired.png`, `qa-messages-list-mobile-production-paired.png`, abiertas mediante `view_image`. Los controles son legibles en esos pares; no hizo falta un recorte adicional para esta región.
+
+## Persistencia de portadas en producción
+
+Root comprobó en el encuentro privado técnico existente, sin participantes, la selección «Bajo los focos», guardado con motivo técnico, cierre del formulario y recarga. El DOM posterior contiene `.ce-event-cover img` con `src='/images/design-2026-10/event-night.webp'` y etiqueta «Imagen genérica». Consola `errors: []`. Evidencia proporcionada: `cover-picker-production.png`, `event-cover-production-saved.png`.
+
+Esta prueba no crea convocatorias públicas ficticias ni cambia horario o privacidad. La galería estática gratuita es reemplazable por el organizador; no se presenta como carga de archivos propios. No se activaron Storage, facturación, reels ni nuevos proveedores de autenticación.
+
+## Cierre de QA
+
+1. Comunidad mínima, creación nueva y perfil público comparados después de sus correcciones.
+2. Chat real comparado en tres estados con lectura de mensajes existentes, navegación y consola verificadas por root.
+3. Portada genérica persistida y recargada en un encuentro privado de prueba en producción.
+4. Sin P0/P1/P2 abiertos en este pase: `final result: passed`. Los límites funcionales y las restricciones de datos reales permanecen documentados; un pase visual no elimina esas restricciones.
 
 ## Pulido posterior (P3)
 
