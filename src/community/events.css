@@ -349,6 +349,12 @@
 .ce-rsvp button[aria-pressed=true]{border-color:var(--c-green,#006d46);color:var(--c-green,#006d46);background:color-mix(in srgb,var(--c-green,#006d46) 5%,white)}
 .ce-rsvp small{display:block;font-size:12px;color:var(--c-muted,#696970);line-height:1.6;margin-top:8px}
 .ce-manage-panel>.c-button+.c-button{margin-top:9px}
+.ce-detail .ce-manage-panel{display:grid;grid-template-columns:minmax(0,1fr);gap:14px}
+.ce-detail .ce-manage-panel>h3,.ce-detail .ce-manage-panel>.c-eyebrow,.ce-detail .ce-manage-panel>.ce-helper{margin:0!important}
+.ce-detail .ce-manage-panel>button{width:100%;min-width:0;min-height:44px;margin:0;justify-content:center;line-height:1.4;overflow-wrap:anywhere}
+.ce-detail .ce-manage-panel>.c-button+.c-button{margin-top:0}
+.ce-detail .ce-manage-panel>.ce-text-button{padding:10px 12px;font-size:12px}
+.ce-detail .ce-manage-panel>.ce-danger{border-top:1px solid var(--c-line);padding-top:14px;min-height:48px}
 .ce-cancel-confirm>label,.ce-schedule-form>label,.ce-result-form>label{display:flex;flex-direction:column;gap:7px;font-size:12px;font-weight:600;line-height:1.5;min-width:0;text-align:left;margin:0}
 .ce-cancel-confirm textarea{width:100%;resize:vertical;font-weight:400}
 .ce-cancel-confirm>p{margin:10px 0 12px;text-align:left}
@@ -467,6 +473,9 @@
 .ce-modal{border-radius:0;padding:0 16px}
 .ce-cover-options{gap:7px}
 .ce-cover-option>span{font-size:10px;padding:7px 2px}
+.ce-modal .ce-type-choices{gap:12px}
+.ce-modal .ce-type-choice{min-height:44px;padding:10px 12px;border-radius:8px;gap:8px}
+.ce-modal .ce-type-choice>svg{width:18px;height:18px}
 .ce-cover-option>span svg{width:13px;height:13px}
 .ce-cover-option img{aspect-ratio:1.2}
 }

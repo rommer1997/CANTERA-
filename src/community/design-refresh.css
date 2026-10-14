@@ -25,6 +25,8 @@
 .c-main { max-width: 1240px; padding: 0 30px; }
 .c-button { border-radius: 8px; box-shadow: 0 2px 5px #005e3e0b; }
 .c-button.secondary { border-color: var(--c-line); box-shadow: none; }
+.c-app .c-button { min-height: 44px; padding: 10px 16px; gap: 8px; font-size: 13px !important; font-weight: 650; line-height: 1.4; white-space: normal; }
+.c-app .c-button > svg { flex-shrink: 0; width: 17px; height: 17px; }
 .c-input { border-color: var(--c-line); border-radius: 8px; }
 .c-panel, .c-empty, .c-upcoming-card, .c-pillar { border-radius: 12px; }
 .c-section-head h1 { font-size: 32px; font-weight: 800; }
