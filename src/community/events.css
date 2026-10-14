@@ -352,6 +352,7 @@
 .ce-detail .ce-manage-panel{display:grid;grid-template-columns:minmax(0,1fr);gap:14px}
 .ce-detail .ce-manage-panel>h3,.ce-detail .ce-manage-panel>.c-eyebrow,.ce-detail .ce-manage-panel>.ce-helper{margin:0!important}
 .ce-detail .ce-manage-panel>button{width:100%;min-width:0;min-height:44px;margin:0;justify-content:center;line-height:1.4;overflow-wrap:anywhere}
+.ce-detail .ce-manage-panel>.ci-invite-control>.c-button{width:100%;margin:0;justify-content:center}
 .ce-detail .ce-manage-panel>.c-button+.c-button{margin-top:0}
 .ce-detail .ce-manage-panel>.ce-text-button{padding:10px 12px;font-size:12px}
 .ce-detail .ce-manage-panel>.ce-danger{border-top:1px solid var(--c-line);padding-top:14px;min-height:48px}
