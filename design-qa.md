@@ -40,3 +40,9 @@ La lectura del CSS efectivo tras publicación detectó además una regla antigua
 Se prueban ambos caminos de la retirada local, revisión/cierre del torneo en Firebase SDK emulado, bloqueo de resultado futuro, aceptación QR de imagen entre dos cuentas, envío/respuesta y lectura del chat, cambio de identidad sin contenido anterior, selección administrativa y salto legal con foco. Los tests de reglas cubren accesos ajenos, bloqueos y resultados prematuros.
 
 Pendiente de dispositivo físico: cámara/permiso QR en iPhone, instalación y actualización desde pantalla de inicio, Google OAuth real y teclado virtual/VoiceOver. Se prueba autenticación de identidades sintéticas mediante Auth Emulator; no se presenta como una nueva prueba de OAuth de Google. Multimedia cloud sigue cerrada hasta patrocinio, como condición de operación existente.
+
+## Comprobación publicada
+
+Fuente funcional `83c2a1991fd9d9b4525f40abb38a56c482e26d98`, Hosting `820fd1a828211254`, 55 archivos idénticos al build, reglas e índices verificados. La ubicación publicada usa blanco sobre verde opaco (no gris heredado), y el documento a 390×844 no tiene desbordamiento horizontal. Consola final: cero entradas de error en la consulta realizada.
+
+La sesión real actualiza la PWA y conserva el acceso. La bandeja carga el último mensaje guardado y retira el pendiente al leer; Mensaje del perfil conectado abre el hilo existente. Agenda separa 0 próximos y 2 pasados. Se conservan estado abierto, administración y datos reales. No se envían mensajes ni crean contenidos nuevos en producción. Las capturas `37-inicio-produccion.png` y `39-chat-produccion.png` a `42-juega-produccion.png` están en la carpeta de evidencia. CI final: 432 pruebas aprobadas, sin omisiones, además de TypeScript/build.

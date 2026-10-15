@@ -37,4 +37,15 @@ El núcleo gratuito conserva su alcance; subir fotos/reels cloud espera patrocin
 
 ## Cierre de publicación
 
-Pendiente de registrar CI final y recibos de Hosting/reglas tras publicación. El acta anterior de apertura no sustituye estos recibos.
+Publicado el **15 de octubre de 2026 a las 10:09 Madrid** (08:09 UTC).
+
+- Fuente funcional: `83c2a1991fd9d9b4525f40abb38a56c482e26d98`. [CI final](https://github.com/rommer1997/CANTERA-/actions/runs/38703360228): 335 unitarias, 81 reglas emuladas y 16 limpieza Node 22, todas aprobadas sin fallos, omisiones ni cancelaciones; TypeScript y build aprobados.
+- Hosting site `lacantera`, versión `820fd1a828211254`, release `1792051760586000`. Los **55 archivos** servidos coinciden byte a byte con el build local.
+- Base nominal correcta, reglas `9d5c9c51-b081-4c87-8d76-6a0761351e05`, SHA-256 `03f92814313a51e0384aa7748b545353a431d75bc2442b0cd3789563c0a77df4`; contenido idéntico al código. **32 índices READY**, definiciones iguales a las revisadas. Dominio autorizado; runtime abierto y multimedia desactivada.
+- Recibos detallados locales, excluidos de Git: `.audit/audit-corrections-hosting-2026-10-15.json`, `.audit/audit-corrections-cloud-2026-10-15.json` y `.audit/audit-corrections-ci-2026-10-15.log`.
+
+Comprobación CUA con sesión real: actualizar la app; Mensajes persistente, vista previa «Recibido», pendiente inicial y lectura guardada; Mensaje desde perfil conectado abre el historial de dos mensajes. No se envían mensajes nuevos ni se borra contenido. Agenda muestra 0 próximos y los dos encuentros pasados sólo en Historial; Mis encuentros muestra las dos convocatorias privadas existentes. Avisos usa «Marcar como leído»; administración muestra sólo Pausar y conserva el servicio abierto. Feed mantiene el estado vacío real, navegación interna y alcance visible de búsqueda.
+
+El cierre visual de Inicio comprueba blanco `rgb(255,255,255)` sobre fondo opaco `rgb(22,61,44)` en la ubicación, documento de 390×844 sin desbordamiento horizontal y consola sin entradas de error en la consulta final. `37-inicio-produccion.png`, `39-chat-produccion.png`, `40-agenda-produccion.png`, `41-perfil-contacto-produccion.png` y `42-juega-produccion.png` documentan el cierre localmente. La actualización final sólo cambia el contraste de Inicio; el resto de recorridos se comprobó en el paquete inmediatamente anterior de la misma entrega.
+
+No se atribuyen estos resultados a una prueba física nueva de iPhone. El acta anterior de apertura no sustituye los recibos de esta entrega.
