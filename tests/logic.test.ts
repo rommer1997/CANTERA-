@@ -17,7 +17,7 @@ test('liga pares únicos, una aparición por jornada, tamaños pares e impares',
   }
 });
 test('eliminatoria impar con pase libre genera final sin duplicar ni permitir editar ronda cerrada', () => {
-  const e = event(3, 'knockout'); e.fixtures = makeFixtures(e);
+  const e = event(3, 'knockout'); e.startAt = '2020-01-01T12:00:00.000Z'; e.fixtures = makeFixtures(e);
   assert.equal(e.fixtures.filter(f => !f.awayId).length, 1);
   const match = e.fixtures.find(f => f.awayId)!;
   e.fixtures = recordScore(e, match.id, 2, 1);
@@ -28,7 +28,7 @@ test('eliminatoria impar con pase libre genera final sin duplicar ni permitir ed
   e.fixtures = recordScore(e, final.id, 3, 1); assert.equal(e.fixtures.length, 3);
 });
 test('clasificación calcula puntos, goles y empates sin contar pendientes', () => {
-  const e = event(3); e.fixtures = makeFixtures(e);
+  const e = event(3); e.startAt = '2020-01-01T12:00:00.000Z'; e.fixtures = makeFixtures(e);
   e.fixtures = recordScore(e, e.fixtures[0].id, 2, 0);
   const table = standings(e); assert.equal(table.reduce((n, row) => n + row.points, 0), 3);
   assert.equal(table.reduce((n, row) => n + row.played, 0), 2);
@@ -115,7 +115,7 @@ test('serie rechaza límites, inicio pasado y una ocurrencia en hora inexistente
 });
 
 test('agenda exporta sólo cruces con horario real, zona en descripción y revisión', () => {
-  const e = event(3); e.fixtures = makeFixtures(e); e.revision = 4;
+  const e = event(3); e.startAt = '2020-01-01T12:00:00.000Z'; e.fixtures = makeFixtures(e); e.revision = 4;
   e.fixtures[0] = { ...e.fixtures[0], startAt: '2026-10-25T17:00:00.000Z', timeZone: 'Europe/Madrid', venue: 'Campo 2' };
   const calendar = buildEventCalendar(e, 'https://cantera.example/#/play/event', undefined, Date.parse('2026-10-01T00:00:00Z'));
   const unfolded = calendar.replace(/\r\n /g, '');
@@ -145,4 +145,15 @@ test('una hora repetida permite elegir ambas ocurrencias sin desplazar una edici
  assert.equal(Date.parse(options[1]) - Date.parse(options[0]), 3600000);
  assert.equal(zonedDateTimeToIso('2026-10-25T02:30', 'Europe/Madrid', 'second'), options[1]);
  assert.equal(zonedDateTimeToIso('2026-10-25T02:30', 'Europe/Madrid'), options[0]);
+});
+
+test('resultado de torneo respeta inicio efectivo y cambio de horario sin alterar clasificación antes de empezar', () => {
+  const e = event(2); e.fixtures = makeFixtures(e); const f = e.fixtures[0];
+  const now = Date.parse('2099-01-01T11:59:00.000Z');
+  assert.throws(() => recordScore(e, f.id, 1, 0, now), /todavía no ha comenzado/);
+  assert.equal(standings(e).reduce((sum, row) => sum + row.points, 0), 0);
+  assert.equal(recordScore(e, f.id, 1, 0, Date.parse(e.startAt))[0].homeScore, 1);
+  f.startAt = '2099-01-02T12:00:00.000Z';
+  assert.throws(() => recordScore(e, f.id, 1, 0, Date.parse(e.startAt)), /todavía no ha comenzado/);
+  assert.equal(recordScore(e, f.id, 1, 0, Date.parse(f.startAt))[0].homeScore, 1);
 });

@@ -6,7 +6,7 @@ Estas herramientas permiten obtener una instantánea de los documentos comunitar
 
 La fuente está fijada al proyecto `gen-lang-client-0853130215` y a su base nombrada `ai-studio-647af55f-499b-43f3-9268-9bf5f62701bb`. El script verifica ambos identificadores en `firebase-applet-config.json`; no acepta sustituirlos por argumentos o variables de entorno. Utiliza la sesión humana seleccionada en Firebase CLI, mediante `requireAuth` y `apiv2.Client`. No exporta tokens, claves, claims ni cuentas de Firebase Authentication.
 
-Se incluyen los documentos de las 26 colecciones `community*` enumeradas en `ROOT_COLLECTIONS`, incluidas configuración, perfiles, cuentas moderadas, eventos, resultados, equipos, interacciones, invitaciones, derechos, conexiones y conversaciones. Sólo se admiten estas subcolecciones conocidas:
+Se incluyen los documentos de las 27 colecciones `community*` enumeradas en `ROOT_COLLECTIONS`, incluidas configuración, perfiles, cuentas moderadas, eventos, resultados, equipos, interacciones, invitaciones, derechos, conexiones, conversaciones y marcadores privados de lectura. Sólo se admiten estas subcolecciones conocidas:
 
 - `communityConnections/{uid}/members/{peerId}`.
 - `communityEventAdmissions/{eventId}/members/{uid}`.

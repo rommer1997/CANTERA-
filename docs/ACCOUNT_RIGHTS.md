@@ -140,3 +140,11 @@ Cada contacto tiene dos documentos: `communityConnections/UID/members/PEER` y `c
 Los recibos propios se localizan por `userId == UID` y por la ruta exacta `communityEventAdmissions/EVENT/members/UID`, sin ampliar la consulta a otros miembros. Antes de borrar el recibo hay que tratar por separado la inscripción, RSVP, espera y resultados del encuentro según el procedimiento acordado. El recibo no es la inscripción del evento: borrar uno no borra automáticamente el otro. Revisar también las referencias propias `usedBy` que permanezcan en invitaciones consumidas. Registrar los cambios concretos y verificar los residuos antes de declarar resuelta la solicitud; no basta con eliminar Firebase Auth.
 
 En modo de prueba, invitaciones y contactos se guardan aparte en `cantera-invitations-v1` dentro del navegador. Esos datos locales no los consulta el exportador Admin ni se sincronizan con la nube; su retirada requiere tratar también ese almacén de la demo cuando corresponda.
+
+## Marcadores privados de lectura — revisión del 15 de octubre
+
+`communityMessageReads` conserva sólo `userId`, `conversationId`, `lastReadAt`, `lastReadMessageId` y `updatedAt`. La exportación consulta `userId == UID`, valida la pareja canónica y entrega el cursor con una referencia de exportación que no revela el identificador del contacto. No incluye texto de mensajes.
+
+La supresión consulta los marcadores de cada conversación canónica vinculada mediante `conversationId == ID`, además de los propios. Retira ambos cursores porque la ruta original deja de existir; no traslada el cursor del superviviente al archivo ni elimina por ello sus textos. Se validan pareja, propietario y ruta exacta antes de retirar, con la misma huella y presupuesto acotado del plan. Las conversaciones ajenas quedan fuera. El respaldo revisado incluye esta colección. Estas herramientas no ejecutan bajas ni copias automáticamente.
+
+Las consultas nuevas requieren los índices explícitos de colección `communityMessageReads.userId` y `communityMessageReads.conversationId`, ambos con orden ascendente de documento. Comprobar estado `READY` en la base Enterprise antes de operar.

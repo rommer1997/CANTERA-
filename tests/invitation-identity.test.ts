@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 import * as invitations from '../src/community/invitations.ts';
+import * as experience from '../src/community/experience.ts';
 
 const code = 'DME2M8Z4PFA6GF89';
 const otherCode = '23456789ABCDEFGH';
@@ -44,7 +45,7 @@ function acceptanceHarness(initial = invite()) {
     react, 'react/jsx-runtime': { jsx: (type: any, props: any) => ({ type, props }), jsxs: (type: any, props: any) => ({ type, props }), Fragment: 'Fragment' },
     'react-router-dom': { Link: 'Link', useNavigate: () => (path: string) => navigated.push(path) },
     'lucide-react': {}, './CommunityContext': { useCommunity: () => community }, './InvitationsContext': { useInvitations: () => api },
-    './MessagingContext': {}, './messagingLogic': {}, './InvitationDialog': {}, './invitations': invitations, './invitations.css': {},
+    './experience': experience, './MessagingContext': {}, './messagingLogic': {}, './InvitationDialog': {}, './invitations': invitations, './invitations.css': {},
   };
   const source = readFileSync(new URL('../src/community/ConnectionsPage.tsx', import.meta.url), 'utf8') + '\nexport { InvitationAcceptance };';
   const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;

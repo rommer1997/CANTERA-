@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 import { TERMS_VERSION } from '../src/community/policy.ts';
 import { canonicalCountry } from '../src/community/geography.ts';
+import * as experience from '../src/community/experience.ts';
 import { safeReturnTo } from '../src/community/teamLogic.ts';
 
 const fixture = (extra = {}) => ({ id: 'new-google', name: 'Perfil propio', bio: '', city: '', country: '', position: '', team: '',
@@ -42,7 +43,7 @@ function profileHarness(initial: any, returnTo = '') {
     'react-router-dom': { Link: 'Link', useNavigate: () => navigate, useSearchParams: () => [routeParams] },
     '../components/BrandMark': { default: 'BrandMark' },
     'lucide-react': {}, './CommunityContext': { useCommunity: () => api, TERMS_VERSION, friendlyError: (error: Error) => error.message },
-    './TeamsContext': { useTeams: () => ({ ownTeams: [] }) }, './teamLogic': { safeReturnTo }, './GeographyFields': { CountryInput: 'CountryInput' },
+    './experience': experience, './useClock': { useClock: () => Date.now() }, './TeamsContext': { useTeams: () => ({ ownTeams: [] }) }, './teamLogic': { safeReturnTo }, './GeographyFields': { CountryInput: 'CountryInput' },
     './geography': { canonicalCountry }, './legal': { legalReady: true, operator: { email: 'support@example.test' } } };
   const source = readFileSync(new URL('../src/community/ProfilePage.tsx', import.meta.url), 'utf8');
   const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;

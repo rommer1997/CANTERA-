@@ -1,4 +1,4 @@
-import type { MessagingConversation, MessagingErrorCode, MessagingMessage } from './messagingTypes';
+import type { MessagingConversation, MessagingErrorCode, MessagingMessage, MessageRead } from './messagingTypes';
 
 export const MESSAGE_MAX_LENGTH = 2000;
 export const MESSAGE_PAGE_SIZE = 40;
@@ -78,4 +78,17 @@ export function mergeMessagePages(...pages: MessagingMessage[][]): MessagingMess
   const unique = new Map<string, MessagingMessage>();
   for (const page of pages) for (const message of page) unique.set(message.id, message);
   return [...unique.values()].sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
+}
+
+export function normalizeMessageRead(data: unknown, uid: string): MessageRead | null {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
+  const value = data as Record<string, unknown>;
+  const pair = conversationParticipants(value.conversationId);
+  const lastReadAt = timestamp(value.lastReadAt);
+  if (value.userId !== uid || !pair?.includes(uid) || !lastReadAt || typeof value.lastReadMessageId !== 'string' || !/^[A-Za-z0-9]{20}$/.test(value.lastReadMessageId)) return null;
+  return { conversationId: value.conversationId as string, lastReadAt, lastReadMessageId: value.lastReadMessageId };
+}
+
+export function messageIsAfterRead(message: MessagingMessage, read?: MessageRead): boolean {
+  return !read || message.createdAt > read.lastReadAt || message.createdAt === read.lastReadAt && message.id > read.lastReadMessageId;
 }

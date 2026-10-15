@@ -88,11 +88,13 @@ export function makeFixtures(event: PlayEvent): Fixture[] {
   return fixtures;
 }
 
-export function recordScore(event: PlayEvent, fixtureId: string, home: number, away: number): Fixture[] {
+export function recordScore(event: PlayEvent, fixtureId: string, home: number, away: number, now = Date.now()): Fixture[] {
   if (event.status === 'cancelled') throw new Error('El evento está cancelado.');
   if (![home, away].every(n => Number.isInteger(n) && n >= 0 && n <= 99)) throw new Error('Introduce goles enteros entre 0 y 99.');
   const fixture = event.fixtures.find(f => f.id === fixtureId);
   if (!fixture || !fixture.awayId) throw new Error('Partido no encontrado o pase libre.');
+  const kickoff = Date.parse(fixture.startAt || event.startAt);
+  if (!Number.isFinite(kickoff) || kickoff > now) throw new Error('El cruce todavía no ha comenzado. Registra el resultado después de su hora de inicio.');
   if (event.tournamentFormat === 'knockout' && home === away) throw new Error('En eliminatorias introduce el marcador decisivo, incluidos los penaltis si los hubo.');
   if (event.tournamentFormat === 'knockout' && event.fixtures.some(f => f.round > fixture.round)) throw new Error('No puedes cambiar un resultado que ya generó la siguiente ronda.');
   const updated = event.fixtures.map(f => f.id === fixtureId ? { ...f, homeScore: home, awayScore: away } : f);

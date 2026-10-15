@@ -7,6 +7,8 @@ import { useConversation, useMessaging } from './MessagingContext';
 import { conversationParticipants, MESSAGE_MAX_LENGTH, safeMessagingError } from './messagingLogic';
 import type { MessagingConversation, MessagingMessage } from './messagingTypes';
 import './messages.css';
+import { messageIsAfterRead } from './messagingLogic';
+import { profileInitials } from './experience';
 
 const dayFormatter = new Intl.DateTimeFormat('es', { day: 'numeric', month: 'long', year: 'numeric' });
 const timeFormatter = new Intl.DateTimeFormat('es', { hour: '2-digit', minute: '2-digit' });
@@ -41,10 +43,15 @@ function MessagesStatus({ title, children, login = false }: { title: string; chi
   return <section className="cm-page"><header className="cm-page-heading"><div><h1>Mensajes</h1></div></header><div className="cm-empty cm-status"><span className="cm-empty-icon"><LockKeyhole size={28} aria-hidden="true" /></span><h2>{title}</h2><p>{children}</p><Link className="c-button" to={login ? '/profile?returnTo=%2Fmessages' : '/profile'}>{login ? 'Entrar a mi cuenta' : 'Mi cuenta'}<ArrowRight size={17} aria-hidden="true" /></Link></div></section>;
 }
 
+function conversationIdForContact(peerId: string, conversations: MessagingConversation[]) { return conversations.find(item => item.participantIds.includes(peerId))?.id || ''; }
+
 function ContactRow({ peerId, selected, onOpen, opening, disabled, hidden }: { peerId: string; selected?: boolean; onOpen: (id: string) => void; opening?: boolean; disabled?: boolean; hidden: boolean }) {
   const person = usePublicProfile(peerId);
   const label = person?.name || 'Conexión de LaCantera';
-  return <li hidden={hidden}><button className={`cm-contact ${selected ? 'is-current' : ''}`} type="button" disabled={disabled || opening} aria-current={selected ? 'page' : undefined} aria-label={`Escribir a ${label}`} onClick={() => onOpen(peerId)}><span className="cm-avatar" aria-hidden="true">{person?.name.slice(0, 1).toLocaleUpperCase('es') || <Users size={18} />}</span><span className="cm-contact-copy"><strong>{label}{person?.verification === 'verified' ? <ShieldCheck size={14} aria-label="Cuenta verificada" /> : null}</strong><small>Mensajes privados</small></span>{opening ? <LoaderCircle size={17} className="cm-spinning" aria-hidden="true" /> : <ChevronRight size={17} aria-hidden="true" />}</button></li>;
+  const messaging = useMessaging(); const id = conversationIdForContact(peerId, messaging.conversations);
+  const preview = messaging.previews[id]; const last = preview?.latest;
+  const unread = messaging.readsReady && !messaging.readsError && last && last.senderId !== messaging.uid && messageIsAfterRead(last, messaging.reads[id]);
+  return <li hidden={hidden}><button className={`cm-contact ${selected ? 'is-current' : ''} ${unread ? 'is-unread' : ''}`} type="button" disabled={disabled || opening} aria-current={selected ? 'page' : undefined} aria-label={`Escribir a ${label}${unread ? ' · mensajes sin leer' : ''}`} onClick={() => onOpen(peerId)}><span className="cm-avatar" aria-hidden="true">{person?.name ? profileInitials(person.name) : <Users size={18} />}</span><span className="cm-contact-copy"><strong>{label}{person?.verification === 'verified' ? <ShieldCheck size={14} aria-label="Cuenta verificada" /> : null}</strong><small className={`cm-preview ${preview?.error ? 'cm-preview-error' : ''}`}>{preview?.error ? 'Vista previa no disponible' : preview?.loading ? 'Cargando conversación…' : last ? `${last.senderId === messaging.uid ? 'Tú: ' : ''}${last.text}` : preview ? 'Empieza una conversación' : 'Cargar vista previa'}</small></span><span className="cm-contact-meta">{last && <time dateTime={last.createdAt}>{new Intl.DateTimeFormat('es', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(last.createdAt))}</time>}{unread && <span className="cm-unread">Sin leer</span>}</span>{opening ? <LoaderCircle size={17} className="cm-spinning" aria-hidden="true" /> : <ChevronRight size={17} aria-hidden="true" />}</button></li>;
 }
 
 function ConversationSidebar({ selectedId, online }: { selectedId?: string; online: boolean }) {
@@ -54,7 +61,7 @@ function ConversationSidebar({ selectedId, online }: { selectedId?: string; onli
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const uid = community.profile!.id;
   const matches = (id: string) => !search.trim() || (community.publicProfiles[id]?.name || '').toLocaleLowerCase('es').includes(search.trim().toLocaleLowerCase('es'));
-  const conversations = messaging.conversations;
+  const conversations = messaging.conversations.slice().sort((a, b) => { const first = messaging.previews[a.id]?.latest?.createdAt || a.createdAt; const second = messaging.previews[b.id]?.latest?.createdAt || b.createdAt; return second.localeCompare(first) || a.id.localeCompare(b.id); });
   const matchedCount = conversations.filter(item => matches(peerOf(item, uid))).length;
   const searchPending = !!search.trim() && conversations.some(item => { const state = community.publicProfileStates[peerOf(item, uid)]; return !state || state === 'loading'; });
   async function open(peerId: string) {
@@ -68,7 +75,7 @@ function ConversationSidebar({ selectedId, online }: { selectedId?: string; onli
     {messaging.loading ? <p className="cm-list-note" role="status">Cargando tus contactos…</p> : null}
     {messaging.error || error ? <p className="c-error" role="alert">{error || messaging.error}</p> : null}
     <div className="cm-sidebar-scroll"><h3 className="cm-list-label">Escribir a una conexión</h3><ul className="cm-contact-list">{conversations.map(item => <ContactRow key={item.id} peerId={peerOf(item, uid)} selected={item.id === selectedId} opening={opening === peerOf(item, uid)} hidden={!matches(peerOf(item, uid))} disabled={!!opening || !online || !messaging.eligible} onOpen={id => void open(id)} />)}</ul>{!matchedCount && !messaging.loading ? <p className="cm-list-note" role="status">{searchPending ? 'Buscando en los perfiles que se están cargando…' : search.trim() ? 'No hay contactos con ese nombre entre los cargados.' : 'Acepta una invitación para conectar con alguien y escribirle.'}</p> : null}
-    </div><Link className="cm-connect-link" to="/connect"><Users size={17} aria-hidden="true" />Gestionar conexiones<ArrowRight size={16} aria-hidden="true" /></Link>
+    </div>{messaging.readsError && <p className="c-error" role="alert">{messaging.readsError}</p>}{messaging.previewsHasMore && <div className="cm-preview-pagination"><p className="c-small">Las vistas previas y pendientes corresponden a las conversaciones cargadas.</p><button className="c-button secondary" onClick={messaging.loadMorePreviews}>Cargar más conversaciones</button></div>}<Link className="cm-connect-link" to="/connect"><Users size={17} aria-hidden="true" />Gestionar conexiones<ArrowRight size={16} aria-hidden="true" /></Link>
   </aside>;
 }
 
@@ -95,7 +102,19 @@ function ConversationThread({ conversationId, online }: { conversationId: string
   const uid = community.profile!.id;
   const lastMessage = messages.at(-1);
   const lastId = lastMessage?.id || '';
+  const [readError, setReadError] = useState('');
   const canSend = messaging.eligible && thread.canSend && online && !blocked && !!conversation && !thread.error;
+  useEffect(() => {
+    if (!lastMessage || thread.loading || thread.error || !conversation) return;
+    let alive = true;
+    const readVisible = () => {
+      if (!atBottom.current || document.visibilityState !== 'visible') return;
+      void messaging.markRead(conversationId, lastMessage).then(() => { if (alive) setReadError(''); }).catch(() => { if (alive) setReadError('No pudimos guardar el estado de lectura. Puedes seguir usando la conversación.'); });
+    };
+    readVisible();
+    document.addEventListener('visibilitychange', readVisible);
+    return () => { alive = false; document.removeEventListener('visibilitychange', readVisible); };
+  }, [conversationId, lastId, thread.loading, thread.error, !!conversation, below, messaging.scope]);
   function scrollToLatest() { const element = viewport.current; if (!element) return; element.scrollTop = element.scrollHeight; atBottom.current = true; setBelow(false); }
   useLayoutEffect(() => {
     const element = viewport.current;
@@ -138,7 +157,7 @@ function ConversationThread({ conversationId, online }: { conversationId: string
     catch (err) { if (mounted.current) setError(safeMessagingError(err)); }
     finally { if (mounted.current) setDeleting(''); }
   }
-  return <section className="cm-thread" aria-label="Conversación privada"><header className="cm-thread-heading"><Link className="cm-icon-button cm-thread-back" to="/messages" aria-label="Volver a mensajes"><ArrowLeft size={21} aria-hidden="true" /></Link><span className="cm-avatar" aria-hidden="true">{person?.name.slice(0, 1).toLocaleUpperCase('es') || <Users size={19} />}</span><div className="cm-thread-person"><h2>{name}</h2><p><LockKeyhole size={12} aria-hidden="true" />Conversación entre dos cuentas</p></div>{peerId ? <Link className="cm-profile-link" to={`/people/${encodeURIComponent(peerId)}`}>Ver perfil<ChevronRight size={15} aria-hidden="true" /></Link> : null}</header>
+  return <section className="cm-thread" aria-label="Conversación privada">{readError && <p className="c-error" role="alert">{readError}</p>}<header className="cm-thread-heading"><Link className="cm-icon-button cm-thread-back" to="/messages" aria-label="Volver a mensajes"><ArrowLeft size={21} aria-hidden="true" /></Link><span className="cm-avatar" aria-hidden="true">{person?.name ? profileInitials(person.name) : <Users size={19} />}</span><div className="cm-thread-person"><h2>{name}</h2><p><LockKeyhole size={12} aria-hidden="true" />Conversación entre dos cuentas</p></div>{peerId ? <Link className="cm-profile-link" to={`/people/${encodeURIComponent(peerId)}`}>Ver perfil<ChevronRight size={15} aria-hidden="true" /></Link> : null}</header>
     {blocked ? <p className="cm-notice" role="status"><Ban size={17} aria-hidden="true" />Has bloqueado esta cuenta. Puedes gestionar el bloqueo desde su perfil.</p> : null}
     <div className="cm-message-viewport" ref={viewport} tabIndex={0} aria-label="Historial de mensajes" aria-busy={thread.loading || thread.loadingOlder} onScroll={() => { const element = viewport.current; if (!element) return; atBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 70; if (atBottom.current) setBelow(false); }}>
       {thread.loading ? <div className="cm-thread-state" role="status"><LoaderCircle size={24} className="cm-spinning" aria-hidden="true" /><p>Cargando conversación…</p></div> : thread.error ? <div className="cm-thread-state" role="alert"><LockKeyhole size={26} aria-hidden="true" /><h3>No se puede abrir esta conversación</h3><p>{thread.error}</p><Link className="c-button secondary" to="/messages">Volver a mi bandeja</Link></div> : !conversation ? <div className="cm-thread-state" role="status"><MessageCircle size={27} aria-hidden="true" /><h3>Conversación no disponible</h3><p>Comprueba el enlace o inicia una conversación desde tus conexiones.</p><Link className="c-button secondary" to="/connect">Mis conexiones</Link></div> : <>

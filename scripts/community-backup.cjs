@@ -15,7 +15,7 @@ const ROOT_COLLECTIONS = Object.freeze([
   'communityAccountModeration', 'communityBlocks', 'communityComments', 'communityConfiguration',
   'communityConnections', 'communityConversations', 'communityEventAdmissions', 'communityEventChanges',
   'communityEventDeliveries', 'communityEventNotices', 'communityEventPromotions', 'communityEvents',
-  'communityFixtures', 'communityFollows', 'communityInvitations', 'communityLikes', 'communityPosts',
+  'communityFixtures', 'communityFollows', 'communityInvitations', 'communityLikes', 'communityMessageReads', 'communityPosts',
   'communityProfiles', 'communityPublicProfiles', 'communityReports', 'communityRightsRequests',
   'communityTeamInvites', 'communityTeamJoinRequests', 'communityTeamMembers', 'communityTeams', 'communityVerifications',
 ].sort());

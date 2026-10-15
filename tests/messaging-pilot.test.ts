@@ -15,7 +15,7 @@ test('revocar sólo al peer del piloto cierra su hilo y descarta callbacks con e
   const auth = { currentUser: { uid: 'alice', emailVerified: true } };
   let cursor = 0;
   const refs: any[] = [], writes: any[] = [];
-  const react = { createContext: () => ({ Provider: 'provider' }), useRef(value: unknown) { return refs[cursor++] ||= { current: value }; } };
+  const react = { useState(value: any) { const index = cursor++; if (!Object.hasOwn(refs, index)) refs[index] = typeof value === 'function' ? value() : value; return [refs[index], () => {}]; }, useEffect() {}, createContext: () => ({ Provider: 'provider' }), useRef(value: unknown) { return refs[cursor++] ||= { current: value }; } };
   const modules: Record<string, unknown> = {
     react, 'react/jsx-runtime': { jsx: (type: unknown, props: unknown) => ({ type, props }) },
     'firebase/firestore': { doc: (_db: unknown, ...parts: string[]) => ({ path: parts.join('/') }), serverTimestamp: () => 'server-time', runTransaction: async (_db: unknown, callback: any) => callback({ get: async () => ({ exists: () => false }), set: (target: unknown, value: unknown) => writes.push({ target, value }) }) },

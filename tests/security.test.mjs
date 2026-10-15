@@ -762,6 +762,14 @@ async function canonicalUpdate(client, eventId, fixtureId, changes) {
   });
 }
 describe('Cruces canónicos con validación individual', { concurrency: false }, () => {
+  test('no se pueden crear cruces puntuados antes del inicio ni puntuar un torneo futuro sin horario propio', async () => {
+    const value = event('future-score', { type: 'tournament', participants: { alice: 'alice', bob: 'bob' }, participantIds: ['alice', 'bob'], revision: 0, history: [] });
+    await seed('communityEvents/future-score', value);
+    await assertFails(canonicalGeneration(db('alice'), value, [{ ...fixture, homeScore: 1, awayScore: 0 }]));
+    await assertSucceeds(canonicalGeneration(db('alice'), value, [fixture]));
+    await assertFails(canonicalUpdate(db('alice'), 'future-score', fixture.id, { homeScore: 1, awayScore: 0 }));
+    assert.equal((await getDoc(doc(db('alice'), 'communityFixtures/future-score_r1-1'))).data().homeScore, null);
+  });
   test('liga completa de 32 equipos publica 496 cruces en una única operación de 498 escrituras', async () => {
     const participants = Object.fromEntries(Array.from({ length: 32 }, (_, i) => [`guest-${i}`, `Equipo ${i}`]));
     const value = event('full-league', { type: 'tournament', capacity: 32, participants, participantIds: Object.keys(participants), revision: 0, history: [] });
@@ -771,7 +779,7 @@ describe('Cruces canónicos con validación individual', { concurrency: false },
     await assertFails(updateDoc(doc(db('bob'), 'communityEvents/full-league'), { participants: { ...participants, bob: 'bob' }, participantIds: [...Object.keys(participants), 'bob'] }));
   });
   test('ni organizador admite oponentes inexistentes, resultados fuera de rango o identidad reescrita', async () => {
-    const value = event('canonical', { type: 'tournament', participants: { alice: 'alice', bob: 'bob' }, participantIds: ['alice', 'bob'], revision: 0, history: [] });
+    const value = event('canonical', { startAt: new Date(Date.now() - 3600000).toISOString(), startAtMs: Date.now() - 3600000, type: 'tournament', participants: { alice: 'alice', bob: 'bob' }, participantIds: ['alice', 'bob'], revision: 0, history: [] });
     await seed('communityEvents/canonical', value);
     await assertFails(canonicalGeneration(db('alice'), value, [{ ...fixture, awayId: 'unknown' }]));
     await assertSucceeds(canonicalGeneration(db('alice'), value, [fixture]));
@@ -788,6 +796,8 @@ describe('Cruces canónicos con validación individual', { concurrency: false },
     await assertFails(canonicalUpdate(db('alice'), 'schedule', fixture.id, { kickoffAt: Timestamp.fromMillis(Date.now() - 1000), venue: 'Campo pasado' }));
     await assertSucceeds(canonicalUpdate(db('alice'), 'schedule', fixture.id, { kickoffAt: Timestamp.fromMillis(Date.now() + 86400000), venue: 'Campo próximo' }));
     await assertFails(canonicalUpdate(db('alice'), 'schedule', fixture.id, { homeScore: 2, awayScore: 2 }));
+    await assertFails(canonicalUpdate(db('alice'), 'schedule', fixture.id, { homeScore: 2, awayScore: 1 }));
+    await env.withSecurityRulesDisabled(context => updateDoc(doc(context.firestore(), 'communityFixtures/schedule_r1-1'), { kickoffAt: Timestamp.fromMillis(Date.now() - 1000) }));
     await assertSucceeds(canonicalUpdate(db('alice'), 'schedule', fixture.id, { homeScore: 2, awayScore: 1 }));
     await assertFails(canonicalUpdate(db('alice'), 'schedule', fixture.id, { kickoffAt: Timestamp.fromMillis(Date.now() + 172800000), venue: 'Campo distinto' }));
   });

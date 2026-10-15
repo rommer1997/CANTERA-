@@ -1,54 +1,42 @@
-# LaCantera — fidelidad al tablero elegido
+# LaCantera — cierre de las correcciones de auditoría
 
-14 de octubre de 2026, Europe/Madrid.
+15 de octubre de 2026, Europe/Madrid.
 
-**final result: passed**
+**final result: passed** — revisión visual local del alcance F01–F14. No equivale a una certificación WCAG ni a una prueba física en Safari. La verificación de publicación se registra en `docs/AUDIT_CORRECTIONS_2026-10-15.md`.
 
-Este pase sustituye la valoración anterior, demasiado permisiva, por una comparación de composición, densidad y acabado. El cierre publicado compara la conversación existente con dos mensajes reales, sin enviar mensajes nuevos. La demo no simula conversaciones.
+## Referencia y fidelidad
 
-## Fuente, capturas y normalización
+Se conserva el diseño aprobado: marca C con balón, verde/blanco/menta, Manrope, fotografías genéricas existentes, tarjetas, cabecera y cinco destinos inferiores. Referencia de acabado: tablero adjunto de once pantallas `codex-clipboard-0485365f-d8a6-4715-ac4b-d21a4ac88a3a.png`. No se generan ni sustituyen imágenes en este pase. Las funciones disponibles, los permisos de eventos privados y el cierre de multimedia hasta patrocinio se conservan.
 
-Fuente: imagen adjunta `codex-clipboard-0485365f-d8a6-4715-ac4b-d21a4ac88a3a.png`, 1212 × 1298 px, once paneles reducidos sin metadatos de viewport. Capturas nuevas de CUA en `output/design/fidelity-final-2026-10-14/`: escritorio 1280 × 838 y móvil 390 × 844 / 320 × 780, DPR 1, sin desbordamiento a 320 px. Las imágenes `compare-*.png` contienen la fuente y la implementación juntas, a escala proporcional y con rótulos externos. No se alteró el contenido del producto.
+La referencia inmediata de los defectos es `output/design/product-audit-2026-10-15/`; las capturas posteriores están en `output/design/audit-corrections-2026-10-15/`. Son capturas nuevas de CUA, con dimensiones verificadas en DOM. Escrituras de prueba sólo en localhost/demo o Firebase Emulator `demo-cantera-ux`, con identidades sintéticas. Los datos locales no se publican.
 
-Home se compara completo. Acceso se compara también en móvil porque el tablero muestra paneles aislados; las capturas de escritorio incluyen el marco compartido y no permiten afirmar igualdad de densidad. Equipos y Explorar son adaptaciones de paneles desktop. La barra de demo identifica los registros locales. Instalación/bottom nav son funciones solicitadas que el tablero omite.
+## Comparación visual
 
-## Iteraciones y evidencia posterior
+- `comparacion-retirada.png`: antes/después a 1280×720. La explicación ya tiene todo el ancho lateral y las dos acciones se apilan, en lugar de comprimirla entre botones. Prueba móvil adicional `23-retirada-movil.png`.
+- `comparacion-registro.png`: antes/después a 1280×720. Cambiar de acceso a registro vuelve al comienzo de la pantalla. Se preservan la franja fotográfica y el retorno interno.
+- `comparacion-feed.png`: antes/después a 320×780. Misma publicación con comentarios abiertos y enlace copiado, conservando tarjeta y formulario; texto auxiliar y nombre accesible más claros. La portada y navegación nueva se comprueban por separado en `28-feed-320.png`. Se conserva la misma escala; el encuadre vertical cambia por el espacio adicional de búsqueda y avisos.
+- `comparacion-resultados.png`: antes/después a 1280×800. Diferentes torneos sintéticos; se compara el estado de resultado futuro, no el contenido. Sin entradas de marcador antes del comienzo.
 
-| Incidencia | Corrección | Capturas posteriores |
-|---|---|---|
-| P1 Perfil precedido de correo/título/salida | Portada e identidad primero; Ajustes separado, con edición, verificación, derechos y salida. | profile.png, settings.png, compare-profile.png |
-| P1 Feed fragmentado | Encabezado integrado, fuentes/tipos en una fila, compositor compacto, aviso multimedia dentro del formulario. | feed.png, feed-320.png, feed-desktop.png, compare-feed.png |
-| P1 Explorar retrasaba las tarjetas | Búsqueda primero, título/creación en una fila, chips desplazables, opciones de vista/tipo desplegables. | play.png y compare-play.png recapturado al cerrar |
-| P2 Formulario largo y galería por delante | Lugar, fecha/hora y pares a 390 px; ubicación global y galería desplegables con resumen; privacidad junto al envío. | create.png, create-320.png, compare-create.png |
-| P2 Acceso con imagen ancha/césped sin sujeto | Franja lateral 24–26%, recorte de login enfocado en botas. También lateral en móvil. | register-mobile.png, login-mobile.png, register.png, login.png |
-| P2 Palabra del lateral partida | Texto 15 px y envoltura normal. | login-css-320.png y recaptura posterior al ampliar el ancho útil de la leyenda |
-| P2 Directorio de equipos retrasado por gestión | Tus equipos desplegable; directorio visible antes. | teams-desktop.png, recaptura móvil al cerrar |
-| P2 CTA de ficha lejos del organizador | Enlace visible a gestión/inscripción con foco del panel de destino. | event.png y prueba de foco ce-manage |
+Se normaliza sólo escala proporcional y rótulos externos. No se retoca el contenido de las pantallas. Los pares se inspeccionan junto a las capturas originales; no se afirma igualdad de píxel con el tablero reducido.
 
-## Cinco superficies de fidelidad
+## Hallazgos corregidos durante este pase
 
-- **Tipografía:** Manrope existente, titulares 800, tinta negra, auxiliares gris frío; entradas 16 px en móvil, botones mínimo 44 px. Se revisaron peso, escala, etiquetas, nombres largos y foco. No se deduce una familia exacta del tablero reducido. La rotura de palabra del lateral se corrigió y requiere recaptura.
-- **Espaciado:** blanco dominante en móvil, radios contenidos, divisores finos, identidad unida a portada y menos contenedores. Controles globales del evento quedan accesibles y agrupados. Instalación se compacta a una fila de 44 px; no se elimina.
-- **Colores:** verde #006747, tinta #111917, auxiliar #68737c, blancos y menta suave. Se mantienen señales de foco/selección/cancelación. Se deshabilitó la decoración geométrica previa de Explorar y no se añadieron dibujos o gradientes como sustitutos de imágenes.
-- **Imágenes:** seis recursos genéricos ya generados/documentados, recortes dirigidos y marca aprobada. Iniciales representan cuentas sin foto; no se inventaron rostros, clubes o escudos. Portadas genéricas identificadas; galería conservada.
-- **Contenido:** proveedores, datos y funciones reales. No se copian Apple/email, mapas simulados, cifras ni actividad ficticia. Ajustes no añade toggles de servicios inexistentes. Campo/ciudad/país, zona, privacidad, costes y patrocinio siguen accesibles.
+| Área | Resultado y evidencia |
+|---|---|
+| Navegación móvil | Mensajes persistente y Perfil abajo; Feed/Personas/Equipos/QR accesibles. `13-bandeja-pendiente-movil.png`, `28-feed-320.png`. |
+| Perfil público | Mensaje como acción principal del contacto y bloqueo en Más opciones. `16-perfil-contacto.png`. |
+| Equipos y Juega | Pestañas visibles y filtros de fechas separados de formatos. `05-equipos-propios.png`, `06-equipos-descubrir.png`, `07-juega.png`, `29-equipos-320.png`, `31-juega-tablet.png`. |
+| Organización | Gestión e invitación/enlace accesibles; recuperación secundaria. Revisión explícita de participantes y sistema antes de cerrar la convocatoria, con foco y margen bajo cabecera. `21-revision-cruces-movil.png`. |
+| Agenda y avisos | Próximos/Historial, cuenta por fecha y cancelación; Avisos como destino de campana. `04-agenda.png`, `32-historial-movil.png`. |
+| Chat | Vistas previas reales, fecha y pendientes; lectura sincronizada entre dos pestañas. `09-bandeja-emulador.png` a `15-lectura-sincronizada.png`. |
+| QR | Entrada QR/código separada; decodificación local de una imagen, identidad previa y conexión aceptada. `25-invitacion-qr-emulador.png` a `27-qr-conexion-aceptada.png`. |
+| Administración | Sólo transición de estado aplicable y búsqueda por nombre, identificador técnico secundario. `17-admin-estado.png`, `18-admin-buscar.png`. No se aplican decisiones a cuentas reales. |
+| Legibilidad | Iniciales consistentes, organizador espaciado, auxiliares aumentados, ubicación con fondo opaco e índice legal con foco. `30-privacidad-indice-320.png`. |
 
-## Verificación funcional
+La inspección detectó y corrigió una pestaña de Equipos sin estilo al entrar directamente, un título de confirmación bajo la cabecera y un alcance de búsqueda todavía recortado a 1×1 px por CSS cargado de forma diferida. Las capturas finales sustituyen esas iteraciones. Sin desbordamiento horizontal en las vistas comprobadas a 320, 390, 768 y 1280 px; no se deduce ausencia de overflow en cada estado imaginable.
 
-Información/Actividad y agenda; Ajustes/Tu cuenta/editar conservan datos. Una prueba de regresión demuestra que solicitar exportación desde Ajustes no cambia identidad, consentimiento ni guarda el perfil automáticamente. Comunidad/Siguiendo cambia de vista. El compositor permanece montado.
+## Controles y límites
 
-Creación y edición locales mediante controles nativos: fecha 16 octubre, 19:30 Madrid, portada nocturna; ficha e historial reflejan el guardado. Gestionar encuentro enfoca ce-manage. No se pulsaron cancelaciones/cierres reales. Sin desbordamiento horizontal en feed/formulario a 320 px. TypeScript/build y 328 unitarias pasan; no se atribuyen pruebas de reglas repetidas a un cambio visual.
+Se prueban ambos caminos de la retirada local, revisión/cierre del torneo en Firebase SDK emulado, bloqueo de resultado futuro, aceptación QR de imagen entre dos cuentas, envío/respuesta y lectura del chat, cambio de identidad sin contenido anterior, selección administrativa y salto legal con foco. Los tests de reglas cubren accesos ajenos, bloqueos y resultados prematuros.
 
-Durante HMR se observó un aviso de React al cambiar el tamaño de dependencias de un efecto. Se recargó el documento para revisar la versión completa; el cierre publicado comprobará consola sin HMR. No se afirma prueba física nueva en iPhone ni accesibilidad completa desde imágenes.
-
-## Cierre publicado
-
-Frontend funcional bf65b44cf92687fdcb168b72e0eb2bc645548973 publicado y actualizado mediante Actualizar app. Perfil y Ajustes reales: profile-production.png/settings-production.png; correo confirmado únicamente dentro de Tu cuenta. Comunidad/Explorar/Equipos reales: feed-production.png/play-production.png/teams-production.png; estados vacíos corresponden a ausencia de registros públicos, no se inventa contenido.
-
-Chat real: messages-desktop-production.png (1280 × 838) y messages-mobile-production.png (390 × 844), sin overflow. Pares compare-messages.png / compare-messages-mobile.png abiertos juntos con la fuente. Se conservaron dos mensajes guardados; no se envió, borró ni alteró una conversación. Consola de producción: errors []. La adaptación móvil muestra un hilo y acceso de vuelta a la lista en vez de dos columnas comprimidas.
-
-Acceso móvil corregido: login-css-320.png, 320 × 780, DOM 320 × 780 y scrollX=0. Se rechazó login-mobile.png como prueba definitiva al detectar un recorte de cabecera causado por transición de viewport. La nueva captura incluye la marca y se obtiene con screenshot del tab a su tamaño CSS. El área útil de la leyenda se amplió para conservar la palabra completa. No se infiere el viewport de un tab oculto a partir del tamaño de otro; las dimensiones DOM se verifican antes de capturar.
-
-Se compararon fuente/implementación juntas, incluidas capturas publicadas. No quedan diferencias P0/P1/P2 accionables dentro del alcance funcional actual. Permanece P3 la escritura del lateral como texto de UI sobre fotografía en lugar del tratamiento manuscrito del tablero. Las diferencias de proveedores, campos necesarios, contenido real, avatares sin foto e instalación son restricciones explícitas; no son igualdad de píxel inventada.
-
-CI final 38617559062 de 49dbfd1d8d65d5a34ab0c45e6bcbff54d0bc5cf9: 423 pruebas (328 unitarias, 79 reglas en emuladores, 16 limpieza Node 22), todas aprobadas sin omisiones. Se conserva el aviso de tamaño del chunk Firebase del build. El ajuste final de ancho de la leyenda cambia CSS solamente y está recompilado/publicado: Hosting e7c0aa5ad38a1024, 53 archivos idénticos al build. No se despliegan reglas, índices, roles ni facturación.
+Pendiente de dispositivo físico: cámara/permiso QR en iPhone, instalación y actualización desde pantalla de inicio, Google OAuth real y teclado virtual/VoiceOver. Se prueba autenticación de identidades sintéticas mediante Auth Emulator; no se presenta como una nueva prueba de OAuth de Google. Multimedia cloud sigue cerrada hasta patrocinio, como condición de operación existente.

@@ -1,13 +1,21 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { collection, deleteDoc, doc, limit, onSnapshot, orderBy, query, runTransaction, serverTimestamp, setDoc, startAfter, type DocumentData, type QueryDocumentSnapshot, type Unsubscribe } from 'firebase/firestore';
+import { collection, deleteDoc, doc, limit, onSnapshot, orderBy, query, runTransaction, serverTimestamp, setDoc, startAfter, where, Timestamp, type DocumentData, type QueryDocumentSnapshot, type Unsubscribe } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { TERMS_VERSION, useCommunity } from './CommunityContext';
 import { useInvitations } from './InvitationsContext';
-import { conversationIdFor, conversationParticipants, mergeMessagePages, MESSAGE_PAGE_SIZE, messageText, MessagingError, normalizeConversation, normalizeMessage, safeMessagingError, validMessagingUid } from './messagingLogic';
-import type { ConversationState, MessagingConversation, MessagingMessage } from './messagingTypes';
+import { conversationIdFor, conversationParticipants, mergeMessagePages, MESSAGE_PAGE_SIZE, messageText, MessagingError, normalizeConversation, normalizeMessage, normalizeMessageRead, messageIsAfterRead, safeMessagingError, validMessagingUid } from './messagingLogic';
+import type { ConversationState, MessagingConversation, MessagingMessage, ConversationPreview, MessageRead } from './messagingTypes';
 
 interface MessagingAPI {
   conversations: MessagingConversation[];
+  previews: Record<string, ConversationPreview>;
+  reads: Record<string, MessageRead>;
+  unreadCount: number;
+  readsError: string;
+  readsReady: boolean;
+  previewsHasMore: boolean;
+  loadMorePreviews(): void;
+  markRead(conversationId: string, message: MessagingMessage): Promise<void>;
   loading: boolean;
   error: string;
   eligible: boolean;
@@ -31,6 +39,72 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
   const scope = `${mode}:${uid}:${eligible}:${available.map(item => item.peerId).sort().join(',')}:${blockedIds.slice().sort().join(',')}:${pilotPeers?.slice().sort().join(',') || ''}`;
   const scopeRef = useRef(scope); scopeRef.current = scope;
   const conversations: MessagingConversation[] = eligible ? available.map(connection => ({ id: conversationIdFor(uid, connection.peerId), participantIds: conversationParticipants(conversationIdFor(uid, connection.peerId))!, createdAt: connection.createdAt })) : [];
+  const [previewLimit, setPreviewLimit] = useState(20);
+  const previewScope = `${scope}:${previewLimit}`;
+  const latestPreviewScope = useRef(previewScope); latestPreviewScope.current = previewScope;
+  const [previewState, setPreviewState] = useState<{ scope: string; values: Record<string, ConversationPreview> }>({ scope: previewScope, values: {} });
+  const [readState, setReadState] = useState<{ scope: string; values: Record<string, MessageRead>; ready: boolean; error: string }>({ scope, values: {}, ready: false, error: '' });
+  const marking = useRef(new Map<string, string>());
+  useEffect(() => { setPreviewLimit(20); marking.current.clear(); }, [uid]);
+  useEffect(() => {
+    let alive = true;
+    const current = () => alive && scopeRef.current === scope && auth.currentUser?.uid === uid;
+    setReadState({ scope, values: {}, ready: false, error: '' });
+    if (!eligible) return () => { alive = false; };
+    const stop = onSnapshot(query(collection(db, 'communityMessageReads'), where('userId', '==', uid)), snapshot => {
+      if (!current()) return;
+      const values: Record<string, MessageRead> = {};
+      snapshot.docs.forEach(record => { const read = normalizeMessageRead(record.data(), uid); if (read) values[read.conversationId] = read; });
+      setReadState({ scope, values, ready: true, error: '' });
+    }, () => { if (current()) setReadState({ scope, values: {}, ready: false, error: 'No se puede comprobar el estado de lectura. Los mensajes siguen disponibles.' }); });
+    return () => { alive = false; stop(); };
+  }, [scope, eligible, uid]);
+  useEffect(() => {
+    let alive = true;
+    const current = () => alive && latestPreviewScope.current === previewScope && scopeRef.current === scope && auth.currentUser?.uid === uid;
+    const stops: Unsubscribe[] = [];
+    setPreviewState({ scope: previewScope, values: {} });
+    if (!eligible) return () => { alive = false; };
+    const put = (id: string, preview: ConversationPreview) => { if (current()) setPreviewState(previous => ({ scope: previewScope, values: { ...(previous.scope === previewScope ? previous.values : {}), [id]: preview } })); };
+    conversations.slice(0, previewLimit).forEach(conversation => {
+      put(conversation.id, { latest: null, loading: true, error: false });
+      let messagesStop: Unsubscribe | undefined;
+      const fail = () => { messagesStop?.(); messagesStop = undefined; put(conversation.id, { latest: null, loading: false, error: true }); };
+      stops.push(onSnapshot(doc(db, 'communityConversations', conversation.id), snapshot => {
+        if (!current()) return;
+        if (!snapshot.exists()) { messagesStop?.(); messagesStop = undefined; put(conversation.id, { latest: null, loading: false, error: false }); return; }
+        if (!normalizeConversation(snapshot.data(), conversation.id)) { fail(); return; }
+        if (messagesStop) return;
+        messagesStop = onSnapshot(query(collection(db, 'communityConversations', conversation.id, 'messages'), orderBy('createdAt', 'desc'), orderBy('__name__', 'desc'), limit(1)), page => {
+          if (!current() || page.metadata.hasPendingWrites) return;
+          const latest = page.docs[0];
+          put(conversation.id, { latest: latest ? normalizeMessage(latest.data(), latest.id, conversation.id) : null, loading: false, error: false });
+        }, fail);
+      }, fail));
+      stops.push(() => messagesStop?.());
+    });
+    return () => { alive = false; stops.forEach(stop => stop()); };
+  }, [previewScope, scope, eligible, uid]);
+  const previews = previewState.scope === previewScope ? previewState.values : {};
+  const reads = readState.scope === scope ? readState.values : {};
+  const readsError = readState.scope === scope ? readState.error : '';
+  const unreadCount = readsError || readState.scope !== scope || !readState.ready ? 0 : Object.values(previews).filter(preview => preview.latest && preview.latest.senderId !== uid && messageIsAfterRead(preview.latest, reads[preview.latest.conversationId])).length;
+  async function markRead(conversationId: string, message: MessagingMessage) {
+    actor();
+    if (!conversations.some(item => item.id === conversationId) || message.conversationId !== conversationId) throw new MessagingError('unavailable');
+    const cursor = `${message.createdAt}:${message.id}`;
+    if (marking.current.get(conversationId) === cursor || !messageIsAfterRead(message, reads[conversationId])) return;
+    marking.current.set(conversationId, cursor);
+    try {
+      await runTransaction(db, async transaction => {
+        const target = doc(db, 'communityMessageReads', `${uid}:${conversationId}`);
+        const record = await transaction.get(target); actor();
+        const previous = record.exists() ? normalizeMessageRead(record.data(), uid) : null;
+        if (previous && !messageIsAfterRead(message, previous)) return;
+        transaction.set(target, { userId: uid, conversationId, lastReadAt: Timestamp.fromDate(new Date(message.createdAt)), lastReadMessageId: message.id, updatedAt: serverTimestamp() });
+      });
+    } catch (error) { marking.current.delete(conversationId); throw error; }
+  }
   function actor(participating = true) {
     if (mode !== 'cloud' || !uid || auth.currentUser?.uid !== uid || scopeRef.current !== scope) throw new MessagingError('signin-required');
     if (participating && !eligible) throw new MessagingError('unavailable');
@@ -49,7 +123,7 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
     });
     actor(); return id;
   }
-  return <Context.Provider value={{ conversations, loading, error, eligible, openConversation, scope, uid, actor }}>{children}</Context.Provider>;
+  return <Context.Provider value={{ conversations, previews, reads, unreadCount, readsError, previewsHasMore: conversations.length > previewLimit, loadMorePreviews: () => setPreviewLimit(value => value + 20), markRead, readsReady: readState.scope === scope && readState.ready, loading, error, eligible, openConversation, scope, uid, actor }}>{children}</Context.Provider>;
 }
 
 export function useMessaging(): MessagingAPI {

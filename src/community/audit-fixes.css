@@ -1,0 +1,93 @@
+/* Audit corrections extend the established green/white design. */
+.c-app .c-mobile-messages { display: none; position: relative; }
+.c-message-badge { position: absolute; right: 2px; top: 1px; min-width: 17px; height: 17px; padding: 0 3px; border-radius: 9px; background: var(--c-green); color: white; font-size: 10px; line-height: 17px; text-align: center; border: 1px solid white; }
+.c-community-tabs { display: flex; gap: 6px; align-items: center; margin: 12px 0 18px; border-bottom: 1px solid var(--c-line); padding: 0 0 8px; }
+.c-community-tabs>a { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 9px 16px; border-radius: 8px; font-size: 14px; color: var(--c-muted); }
+.c-community-tabs>a[aria-current=page] { background: #e5f1eb; color: var(--c-green); font-weight: 700; }
+.c-community-tabs .c-community-qr { margin-left: auto; color: var(--c-green); }
+.c-app .ce-browse-options { margin: 16px 0; }
+.c-app .ce-list-toolbar { display: flex; gap: 12px; flex-wrap: wrap; }
+.c-app .ce-inline-confirm { display: flex; flex-direction: column; align-items: stretch; gap: 12px; padding: 16px; }
+.c-app .ce-inline-confirm>p { width: 100%; margin: 0; }
+.c-app .ce-inline-confirm>.c-button,.c-app .ce-inline-confirm>.ce-text-button { width: 100%; min-height: 44px; white-space: normal; margin: 0; }
+.c-app .ce-inline-confirm .ce-inline-actions { display: flex; flex-direction: column; align-items: stretch; }
+.c-app .ce-inline-confirm .ce-inline-actions>button { width: 100%; white-space: normal; min-height: 44px; }
+.c-app .ce-fixtures-confirm ul { padding-left: 20px; max-height: 240px; overflow-y: auto; margin: 0; }
+.c-app .ce-fixtures-confirm h3 { margin: 0; }
+.c-app .ce-recovery { padding-top: 12px; border-top: 1px solid var(--c-line); }
+.c-app .ce-recovery summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; color: var(--c-muted); font-size: 14px; }
+.c-app .ce-recovery summary>svg { margin-left: auto; }
+.c-app .ce-recovery[open] summary>svg { transform: rotate(90deg); }
+.c-app .ce-organizer { gap: 12px; }
+.c-app .ce-organizer>span:not(.ce-avatar) { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.c-app .ce-organizer-team { display: block; font-size: 13px; }
+.c-app .ce-header-share { min-height: 44px; }
+.c-app #ce-fixtures-review,.c-app #ce-invitation,.c-app .c-legal section[id] { scroll-margin-top: 80px; }
+.c-app .people-safety>summary { min-height: 44px; display: flex; align-items: center; padding: 9px 14px; border: 1px solid var(--c-line); border-radius: 8px; cursor: pointer; }
+.c-app .people-safety[open] { flex-basis: 100%; }
+.c-app .people-safety .people-follow { margin-top: 10px; }
+.c-app .people-connection-note { max-width: 350px; font-size: 13px; margin-top: 8px; }
+.c-app .team-view-tabs { margin-bottom: 20px; }
+.c-app .team-own-teams { border-bottom: 0; }
+.c-app .c-agenda-tabs { margin: 0 0 16px; }
+.c-app .c-own-profile-body .c-profile-links a { font-size: 13px; }
+.c-app .c-profile-information p { font-size: 14px; }
+.c-app .c-notice-read { display: inline-flex; gap: 6px; align-items: center; color: var(--c-muted); font-size: 13px; min-height: 44px; }
+.c-app .cf-page .cf-search-scope { display: block; position: static; width: 100%; height: auto; flex-basis: 100%; overflow: visible; clip-path: none; white-space: normal; font-size: 13px; margin: 8px 0 0; }
+.c-app .cf-page .cf-post-meta,.c-app .cf-page .cf-comment-body time { font-size: 13px; }
+.c-app .c-mobile-location { opacity: 1; color: white; background: #163d2c; border-radius: 6px; padding: 6px 8px; width: fit-content; min-height: 44px; }
+.c-app .c-legal-index { display: flex; flex-direction: column; padding: 20px; margin: 24px 0; border: 1px solid var(--c-line); border-radius: 12px; background: white; }
+.c-app .c-legal-index>a { min-height: 44px; padding: 10px 0; color: var(--c-green); }
+.c-app .cm-contact-copy { min-width: 0; }
+.c-app .cm-preview { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; display: block; }
+.c-app .cm-contact-meta { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
+.c-app .cm-contact-meta time { font-size: 12px; color: var(--c-muted); }
+.c-app .cm-unread { background: var(--c-green); color: white; border-radius: 9px; padding: 2px 7px; font-size: 11px; }
+.c-app .cm-contact.is-unread strong { color: var(--c-green); }
+.c-app .cm-preview-error { color: #a9342c; }
+.c-app .cm-preview-pagination { padding: 12px 18px; }
+@media(max-width:767px) {
+  .c-app .c-header-tools>.c-account { display: none; }
+  .c-app .c-mobile-messages { display: grid; }
+  .c-community-tabs { margin: 10px 0 14px; gap: 3px; }
+  .c-community-tabs>a { flex: 1; padding: 7px 6px; font-size: 13px; }
+  .c-community-tabs .c-community-qr { flex: 0 0 44px; padding: 0; margin-left: 0; }
+  .c-community-qr>span { display: none; }
+  .c-app .ce-list-toolbar { flex-direction: column; gap: 8px; }
+  .c-app .ce-list-toolbar>div { width: 100%; }
+  .c-app .ce-quick-filters { flex-direction: column; gap: 8px; overflow: visible; }
+  .c-app .ce-quick-filters>div { display: flex; flex: none; gap: 6px; width: 100%; overflow-x: auto; scrollbar-width: thin; padding-bottom: 3px; }
+  .c-app .ce-quick-filters>div::after { content: ''; flex: 0 0 12px; }
+  .c-app .ce-quick-filters button { flex-shrink: 0; font-size: 12px; }
+  .c-app .ce-organizer { display: grid; grid-template-columns: 40px minmax(0,1fr); }
+  .c-app .ce-organizer>.ce-main-action,.c-app .ce-organizer>.ce-header-share { grid-column: 2; width: 100%; margin: 0; justify-content: center; }
+  .c-app .people-profile-actions { gap: 10px; }
+  .c-app .people-profile-actions>div:first-child { flex-basis: 100%; }
+  .c-app .people-profile-actions>div:first-child>.people-button { width: 100%; justify-content: center; }
+  .c-app .c-notice { display: flex; flex-direction: column; }
+  .c-app .c-notice>.c-button { width: 100%; }
+  .c-app .c-footer { padding-left: 16px; padding-right: 16px; }
+}
+
+.c-app .team-view-tabs { display:flex; padding:4px; gap:4px; background:var(--c-surface); border:1px solid var(--c-line); border-radius:10px; width:fit-content; }
+.c-app .team-view-tabs>button { flex:1; min-height:44px; border:0; border-radius:7px; padding:8px 18px; color:var(--c-muted); background:transparent; }
+.c-app .team-view-tabs>button[aria-pressed=true] { color:white; background:var(--c-green); font-weight:700; }
+.c-app .c-mobile-messages.is-current { background:#e5f1eb; color:var(--c-green); border-radius:8px; }
+@media(max-width:767px){.c-app .team-view-tabs{width:100%;}.c-app .c-community-tabs{padding-inline:4px;}}
+
+.c-app .ci-entry-method { display:flex; gap:6px; background:var(--c-surface); padding:4px; border-radius:10px; margin:8px 0 16px; }
+.c-app .ci-entry-method>button { min-height:44px; flex:1; border:0; border-radius:7px; background:transparent; color:var(--c-muted); padding:8px 12px; }
+.c-app .ci-entry-method>button[aria-pressed=true] { color:var(--c-green); background:white; box-shadow:0 1px 3px #10251b12; font-weight:700; }
+.c-app .ci-scan-entry { border-top:0; padding-top:0; margin-top:0; }
+.c-app .ci-scan-entry>.c-button { width:100%; justify-content:center; min-height:46px; }
+
+.c-admin-search,.c-admin-results {display:flex; gap:12px; flex-wrap:wrap; align-items:end; margin:16px 0;}
+.c-admin-search>label {flex:1; min-width:200px;}
+.c-admin-results {flex-direction:column; align-items:stretch;}
+.c-admin-identifier>summary {min-height:44px; display:flex; align-items:center; cursor:pointer; color:var(--c-muted);}
+
+.c-app .c-account-agenda>.c-section-head { display:flex; flex-direction:row; align-items:center; justify-content:space-between; gap:16px; margin-bottom:16px; }
+.c-app .c-account-agenda>.c-section-head h2 { margin:0; font-size:22px; }
+.c-app .c-account-agenda .c-upcoming-card { padding:16px; gap:8px; }
+.c-app .c-account-agenda .c-upcoming-card h3 { font-size:17px; line-height:1.5; margin:0; }
+.c-app .ce-helper,.c-app .ce-score-feedback { font-size:13px; line-height:1.6; }

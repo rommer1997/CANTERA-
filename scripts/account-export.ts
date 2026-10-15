@@ -1,7 +1,7 @@
 // Pure, explicit projections for operator account exports. Never serialize SDK
 // records wholesale: unknown fields may contain credentials or third-party data.
 export interface ExportRecord { id: string; data: Record<string, unknown>; path?: string; }
-export const exportCollections = ['communityPosts', 'communityComments', 'communityLikes', 'communityFollows', 'communityBlocks', 'communityRightsRequests', 'communityEventNotices', 'communityEventPromotions', 'communityEventDeliveries', 'communityVerifications', 'communityReports', 'communityEventChanges', 'communityTeamMembers', 'communityTeamJoinRequests', 'communityTeamInvites', 'communityInvitations', 'communityConnections', 'communityEventAdmissions', 'communityMessages'] as const;
+export const exportCollections = ['communityPosts', 'communityComments', 'communityLikes', 'communityFollows', 'communityBlocks', 'communityRightsRequests', 'communityEventNotices', 'communityEventPromotions', 'communityEventDeliveries', 'communityVerifications', 'communityReports', 'communityEventChanges', 'communityTeamMembers', 'communityTeamJoinRequests', 'communityTeamInvites', 'communityInvitations', 'communityConnections', 'communityEventAdmissions', 'communityMessages', 'communityMessageReads'] as const;
 export type ExportCollection = typeof exportCollections[number];
 export interface AccountExportSource {
   uid: string; projectId: string; databaseId: string; startedAt: string; completedAt: string;
@@ -77,6 +77,7 @@ const collectionPolicies: Record<ExportCollection, { owner: string; fields: stri
   communityInvitations: { owner: 'ownerId', fields: ['kind', 'eventId', 'status', 'createdAt', 'usedAt'] },
   communityConnections: { owner: 'ownerId', fields: ['ownerId', 'createdAt'] },
   communityEventAdmissions: { owner: 'userId', fields: ['userId', 'eventId', 'createdAt'] },
+  communityMessageReads: { owner: 'userId', fields: ['userId', 'lastReadAt', 'lastReadMessageId', 'updatedAt'] },
   communityMessages: { owner: 'senderId', fields: ['senderId', 'text', 'createdAt'] },
 };
 export const accountQueryPolicies = Object.fromEntries(exportCollections.map(collection => [collection, collectionPolicies[collection].owner])) as Record<ExportCollection, string>;
@@ -94,6 +95,13 @@ function privateRecordBelongs(record: ExportRecord, collection: ExportCollection
     if (record.path === undefined) return true;
     const path = record.path.split('/');
     return path.length === 4 && path[0] === collection && path[2] === 'members' && path[3] === uid && record.id === uid && record.data.eventId === path[1];
+  }
+  if (collection === 'communityMessageReads') {
+    const conversation = typeof record.data.conversationId === 'string' ? record.data.conversationId : '';
+    const pair = conversation.split(':');
+    return record.data.userId === uid && pair.length === 2 && pair[0] < pair[1] && pair.includes(uid)
+      && pair.every(id => /^[a-zA-Z0-9_-]{1,128}$/.test(id)) && record.id === `${uid}:${conversation}`
+      && (record.path === undefined || record.path === `${collection}/${record.id}`);
   }
   if (collection === 'communityMessages') {
     if (record.data.senderId !== uid || typeof record.path !== 'string') return false;
@@ -156,7 +164,7 @@ export function buildAccountExport(source: AccountExportSource) {
   const conversationReferences = new Map<string, string>();
   for (const name of exportCollections) {
     const policy = collectionPolicies[name];
-    const isPrivateCoordination = ['communityInvitations', 'communityConnections', 'communityEventAdmissions', 'communityMessages'].includes(name);
+    const isPrivateCoordination = ['communityInvitations', 'communityConnections', 'communityEventAdmissions', 'communityMessages', 'communityMessageReads'].includes(name);
     collections[name] = unique(source.collections?.[name]).filter(record => isPrivateCoordination ? privateRecordBelongs(record, name, source.uid) : record.data[policy.owner] === source.uid
       || name === 'communityEventPromotions' && record.data.recipientId === source.uid
       || name === 'communityEventChanges' && eventIds.has(record.data.eventId)).map((record, index) => {
@@ -170,6 +178,8 @@ export function buildAccountExport(source: AccountExportSource) {
           if (!conversationReferences.has(conversation)) conversationReferences.set(conversation, `conversation-${conversationReferences.size + 1}`);
           result.exportReference = `message-${index + 1}`;
           result.conversationReference = conversationReferences.get(conversation);
+        } else if (name === 'communityMessageReads') {
+          result.exportReference = `reading-${index + 1}`;
         } else if (name === 'communityInvitations') {
           result.exportReference = invitationReferences.get(record.id);
           result.createdBySelf = record.data.ownerId === source.uid;

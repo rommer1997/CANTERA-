@@ -53,3 +53,17 @@ test('errores de permisos nunca revelan mensajes, emails o información de terce
   assert.match(safeMessagingError(new MessagingError('invalid-text')), /2000/);
   assert.match(safeMessagingError(new MessagingError('offline')), /Internet/);
 });
+
+test('marcadores privados normalizan sólo la cuenta propia y desempatan mensajes del mismo instante', async () => {
+  const { normalizeMessageRead, messageIsAfterRead } = await import('../src/community/messagingLogic.ts');
+  const data = { userId: 'alice', conversationId: 'alice:bob', lastReadAt: Timestamp.fromDate(new Date(at)), lastReadMessageId: id, updatedAt: at, secret: 'omitido' };
+  const read = normalizeMessageRead(data, 'alice')!;
+  assert.deepEqual(read, { conversationId: 'alice:bob', lastReadAt: at, lastReadMessageId: id });
+  assert.equal(normalizeMessageRead(data, 'bob'), null);
+  assert.equal(normalizeMessageRead({ ...data, conversationId: 'bob:carol' }, 'alice'), null);
+  const m = normalizeMessage(message, id, 'alice:bob')!;
+  assert.equal(messageIsAfterRead(m, read), false);
+  assert.equal(messageIsAfterRead({ ...m, id: 'zzzzzzzzzzzzzzzzzzzz' }, read), true);
+  assert.equal(messageIsAfterRead({ ...m, createdAt: '2026-10-08T12:01:00.000Z' }, read), true);
+  assert.equal(messageIsAfterRead(m), true);
+});

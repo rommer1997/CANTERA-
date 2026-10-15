@@ -44,3 +44,13 @@ test('el titular superviviente exporta sólo su texto archivado sin ruta ni iden
   assert.equal(result.collections.communityMessages[0].senderId, 'self');
   assert.ok(!JSON.stringify(result).includes(archive));
 });
+
+test('exportación de lectura incluye marcador propio sin UID del contacto, rutas ni campos ajenos', () => {
+  const own = { id: 'self:PEER_SECRET:self', path: 'communityMessageReads/self:PEER_SECRET:self', data: { userId: 'self', conversationId: 'PEER_SECRET:self', lastReadAt: new Date('2026-10-15T01:00:00Z'), lastReadMessageId: '0123456789abcdefghij', updatedAt: new Date('2026-10-15T01:00:01Z'), secret: 'SECRET_EXTRA' } };
+  const other = { ...own, id: 'other:PEER_SECRET:other', path: 'communityMessageReads/other:PEER_SECRET:other', data: { ...own.data, userId: 'other' } };
+  const result = buildAccountExport({ uid: 'self', projectId: 'demo-cantera', databaseId: 'test', startedAt: '', completedAt: '', collections: { communityMessageReads: [own, other] } });
+  assert.equal(result.counts.communityMessageReads, 1);
+  assert.equal(result.collections.communityMessageReads[0].lastReadAt, '2026-10-15T01:00:00.000Z');
+  assert.equal(result.collections.communityMessageReads[0].exportReference, 'reading-1');
+  assert.ok(!JSON.stringify(result).includes('SECRET'));
+});

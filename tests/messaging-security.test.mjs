@@ -180,3 +180,26 @@ test('bloquear cuentas sin conexión funciona y la carrera con una nueva invitac
   assert.equal((await getDoc(doc(bob, 'communityConnections/bob/members/alice'))).exists(), false);
   await assertFails(setDoc(doc(bob, 'communityConversations', pair), conversation()));
 });
+
+test('lectura se sincroniza sólo para su titular; tercero, admin, futuro y retroceso están prohibidos', async () => {
+  await setupThread(); const alice = client('alice'); const bob = client('bob');
+  const target = doc(alice, 'communityMessageReads', 'alice:alice:bob');
+  const older = Timestamp.fromMillis(Date.now() - 60000);
+  const data = { userId: 'alice', conversationId: pair, lastReadAt: older, lastReadMessageId: messageId, updatedAt: at() };
+  await assertSucceeds(getDoc(target));
+  await assertSucceeds(setDoc(target, data));
+  await assertSucceeds(getDocs(query(collection(alice, 'communityMessageReads'), where('userId', '==', 'alice'))));
+  for (const who of [client(), bob, client('admin', true, true)]) {
+    await assertFails(getDoc(doc(who, 'communityMessageReads', 'alice:alice:bob')));
+    await assertFails(setDoc(doc(who, 'communityMessageReads', 'alice:alice:bob'), data));
+  }
+  await assertFails(getDocs(collection(alice, 'communityMessageReads')));
+  await assertFails(setDoc(target, { ...data, lastReadAt: Timestamp.fromMillis(Date.now() + 60000) }));
+  await assertFails(setDoc(target, { ...data, lastReadAt: Timestamp.fromMillis(Date.now() - 120000) }));
+  await assertFails(setDoc(target, { ...data, text: 'copia indebida' }));
+  await assertFails(setDoc(doc(alice, 'communityMessageReads', 'alice:bob:carol'), { ...data, conversationId: 'bob:carol' }));
+  await assertSucceeds(setDoc(target, { ...data, lastReadAt: Timestamp.fromMillis(Date.now() - 1000) }));
+  await block('bob', 'alice');
+  await assertFails(setDoc(target, { ...data, lastReadAt: Timestamp.fromMillis(Date.now() - 500) }));
+  await assertSucceeds(getDoc(target));
+});

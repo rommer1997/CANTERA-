@@ -16,12 +16,12 @@ const personalPolicies = {
   communityPosts: 'authorId', communityComments: 'authorId', communityLikes: 'userId',
   communityFollows: 'followerId', communityBlocks: 'ownerId', communityRightsRequests: 'userId',
   communityEventNotices: 'recipientId', communityVerifications: 'userId', communityReports: 'reporterId',
-  communityTeamMembers: 'userId', communityTeamJoinRequests: 'userId', communityTeamInvites: 'createdBy',
+  communityMessageReads: 'userId', communityTeamMembers: 'userId', communityTeamJoinRequests: 'userId', communityTeamInvites: 'createdBy',
 };
 const knownCollections = new Set([...directCollections, ...Object.keys(personalPolicies),
   'communityConfiguration', 'communityInvitations', 'communityConnections', 'communityEventAdmissions',
   'communityEvents', 'communityFixtures', 'communityEventChanges', 'communityEventPromotions',
-  'communityEventDeliveries', 'communityTeams', 'communityConversations']);
+  'communityEventDeliveries', 'communityTeams', 'communityConversations', 'communityMessageReads']);
 
 export function assertErasureUid(uid) {
   if (typeof uid !== 'string' || !uid.length || uid.length > 128 || uid !== uid.trim()
@@ -93,7 +93,7 @@ export async function collectErasureSource({ db, auth, uid, projectId, databaseI
   const runtime = await db.doc('communityConfiguration/runtime').get();
   source.runtime = runtime.exists ? account(snapshotRecord(runtime)) : null;
   const read = query => erasureReadAll(query, FieldPath.documentId(), account);
-  const extras = { ownConnections: [], mirrors: [], incomingFollows: [], incomingBlocks: [], postInteractions: [], fixtureReferences: [], conversations: [], messages: [], conversationMessages: [], sharedCoordination: [], archiveTargets: [], archiveExpected: routes.archiveExpected || {}, archiveIds: { ...(routes.archiveIds || {}) }, anonymousIds: { ...(routes.anonymousIds || {}) }, unknownCollections: [], unknownSubcollections: [] };
+  const extras = { ownConnections: [], mirrors: [], incomingFollows: [], incomingBlocks: [], postInteractions: [], fixtureReferences: [], conversations: [], messages: [], conversationMessages: [], messageReads: [], sharedCoordination: [], archiveTargets: [], archiveExpected: routes.archiveExpected || {}, archiveIds: { ...(routes.archiveIds || {}) }, anonymousIds: { ...(routes.anonymousIds || {}) }, unknownCollections: [], unknownSubcollections: [] };
   const [ownConnections, mirrors, incomingFollows, incomingBlocks, home, away, fixtureOwners, audiences, deliveries, conversations, messages, roots] = await Promise.all([
     read(db.collection('communityConnections').doc(uid).collection('members')),
     read(db.collectionGroup('members').where('peerId', '==', uid)),
@@ -128,13 +128,14 @@ export async function collectErasureSource({ db, auth, uid, projectId, databaseI
   for (const row of source.events || []) extras.anonymousIds[row.id] ||= `removed_${randomUUID().replaceAll('-', '')}`;
   // The random destination is persisted in the reviewed plan, never derived
   // from an account ID. On resume only those exact original subtrees are read.
-  const conversationIds = new Set([...conversations.map(row => row.id), ...Object.keys(extras.archiveIds)]);
+  const conversationIds = new Set([...conversations.map(row => row.id), ...(source.collections?.communityMessageReads || []).map(row => row.data.conversationId), ...Object.keys(extras.archiveIds)]);
   for (const id of conversationIds) {
     if (!validId(id)) throw new ErasurePolicyError('invalid-conversation');
     if (!conversations.some(row => row.id === id)) {
       const document = await db.doc(`communityConversations/${id}`).get();
       if (document.exists) extras.conversations.push(account(snapshotRecord(document)));
     }
+    if (!ARCHIVE_ID.test(id)) extras.messageReads.push(...await read(db.collection('communityMessageReads').where('conversationId', '==', id)));
     extras.conversationMessages.push(...await read(db.collection('communityConversations').doc(id).collection('messages')));
     if (!ARCHIVE_ID.test(id)) extras.archiveIds[id] ||= `archive_${randomUUID().replaceAll('-', '')}`;
     const children = await db.doc(`communityConversations/${id}`).listCollections();
@@ -158,6 +159,7 @@ export async function collectErasureSource({ db, auth, uid, projectId, databaseI
   const own = [...directCollections.map(name => `${name}/${uid}`), ...Object.entries(source.collections || {}).flatMap(([name, rows]) => Object.hasOwn(personalPolicies, name) ? rows.map(row => `${name}/${row.id}`) : []),
     ...(source.legacyLikes || []).map(row => row.path), ...ownConnections.map(row => row.path), ...dedupe([...extras.messages, ...extras.conversationMessages, ...extras.archiveTargets.filter(row => row.path.split('/').length === 4)]).map(row => row.path),
     ...(source.collections?.communityEventAdmissions || []).map(row => row.path), ...(source.collections?.communityInvitations || []).filter(row => row.data.ownerId === uid).map(row => row.path),
+    ...extras.messageReads.map(row => row.path),
     ...[...(source.events || []), ...(source.fixtureRecords || []), ...extras.fixtureReferences, ...extras.sharedCoordination, ...incomingFollows, ...incomingBlocks].map(row => row.path)];
   for (const path of [...new Set(own)]) {
     const children = await db.doc(path).listCollections();
@@ -292,6 +294,16 @@ export function buildErasurePlan(source) {
   for (const row of dedupe([...(source.collections?.communityMessages || []), ...(extra.messages || [])])) {
     checkedRecord(row); const parts = row.path.split('/');
     if (parts.length !== 4 || parts[0] !== 'communityConversations' || parts[2] !== 'messages' || row.data.senderId !== uid) throw new ErasurePolicyError('foreign-message');
+    add(row);
+  }
+  // Both cursors refer to the retired canonical conversation. Remove only
+  // that minimal coordination metadata; the peer's text is archived below.
+  for (const row of extra.messageReads || []) {
+    checkedRecord(row);
+    const pair = typeof row.data.conversationId === 'string' ? row.data.conversationId.split(':') : [];
+    if (pair.length !== 2 || pair[0] >= pair[1] || !pair.every(id => /^[A-Za-z0-9_-]{1,128}$/.test(id)) || !pair.includes(uid)
+      || !pair.includes(row.data.userId) || row.path !== `communityMessageReads/${row.data.userId}:${row.data.conversationId}`) throw new ErasurePolicyError('foreign-read-marker');
+    if (!knownOwnedSchema('communityMessageReads', row.data)) { blockers.add('unknown-owned-schema-review'); continue; }
     add(row);
   }
   for (const conversation of extra.conversations || []) {

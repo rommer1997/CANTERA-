@@ -31,7 +31,7 @@ test('exportación no exige aceptar términos nuevos y filtra autoría de cada c
   const result = buildAccountExport(source({ privateProfile: row(uid, { id: uid, name: 'Persona', adultConfirmed: false, acceptedTermsVersion: '', acceptedTermsAt: '', customClaims: { admin: true } }), collections }));
   assert.equal(result.account.privateProfile!.adultConfirmed, false);
   assert.equal(result.account.privateProfile!.acceptedTermsVersion, '');
-  for (const name of exportCollections) { const count = name === 'communityMessages' ? 0 : 1; assert.equal(result.collections[name].length, count); assert.equal(result.counts[name], count); }
+  for (const name of exportCollections) { const count = ['communityMessages', 'communityMessageReads'].includes(name) ? 0 : 1; assert.equal(result.collections[name].length, count); assert.equal(result.counts[name], count); }
   assert.equal(result.collections.communityPosts[0].createdAt, '2026-10-06T12:00:00.000Z');
   assert.ok(!JSON.stringify(result).includes('SECRET'));
   assert.equal(result.scope.mediaBinariesIncluded, false);

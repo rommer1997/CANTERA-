@@ -156,6 +156,23 @@ service cloud.firestore {
     function messageConversation(id) {
       return validConversation(get(/databases/$(database)/documents/communityConversations/$(id)).data, id);
     }
+    match /communityMessageReads/{id} {
+      allow get: if signed() && id.split(':').size() == 3 && id.split(':')[0] == request.auth.uid
+        && validMessagingPair(id.split(':')[1] + ':' + id.split(':')[2]);
+      allow list: if owner(resource.data.userId);
+      allow create, update: if owner(request.resource.data.userId)
+        && request.resource.data.keys().hasAll(['userId', 'conversationId', 'lastReadAt', 'lastReadMessageId', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['userId', 'conversationId', 'lastReadAt', 'lastReadMessageId', 'updatedAt'])
+        && validMessagingPair(request.resource.data.conversationId) && messagingAllowed(request.resource.data.conversationId)
+        && id == request.auth.uid + ':' + request.resource.data.conversationId
+        && request.resource.data.lastReadAt is timestamp && request.resource.data.lastReadAt <= request.time
+        && request.resource.data.lastReadMessageId is string && request.resource.data.lastReadMessageId.matches('^[A-Za-z0-9]{20}$')
+        && request.resource.data.updatedAt == request.time
+        && (!exists(/databases/$(database)/documents/communityMessageReads/$(id))
+          || request.resource.data.lastReadAt > resource.data.lastReadAt
+          || request.resource.data.lastReadAt == resource.data.lastReadAt && request.resource.data.lastReadMessageId >= resource.data.lastReadMessageId);
+      allow delete: if owner(resource.data.userId);
+    }
     match /communityConversations/{id} {
       allow get: if signed() && validMessagingPair(id) && messagingAllowed(id);
       allow list, update, delete: if false;
@@ -368,7 +385,8 @@ service cloud.firestore {
         && (data.awayId in event.participants || data.awayId == '' && event.tournamentFormat == 'knockout')
         && (data.homeScore == null && data.awayScore == null
           || data.awayId != '' && data.homeScore is int && data.awayScore is int && data.homeScore >= 0 && data.homeScore <= 99 && data.awayScore >= 0 && data.awayScore <= 99
-            && (event.tournamentFormat != 'knockout' || data.homeScore != data.awayScore))
+            && (event.tournamentFormat != 'knockout' || data.homeScore != data.awayScore)
+            && (data.kickoffAt is timestamp ? data.kickoffAt <= request.time : event.startAtMs <= request.time.toMillis()))
         && (data.kickoffAt == null || data.kickoffAt is timestamp)
         && text(data.timeZone, 1, 100) && text(data.venue, 1, 200) && date(data.createdAt) && date(data.updatedAt)
         && event.updatedAt == request.time && event.get('revision', 0) == get(/databases/$(database)/documents/communityEvents/$(data.eventId)).data.get('revision', 0) + 1
