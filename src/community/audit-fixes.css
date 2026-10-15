@@ -91,3 +91,4 @@
 .c-app .c-account-agenda .c-upcoming-card { padding:16px; gap:8px; }
 .c-app .c-account-agenda .c-upcoming-card h3 { font-size:17px; line-height:1.5; margin:0; }
 .c-app .ce-helper,.c-app .ce-score-feedback { font-size:13px; line-height:1.6; }
+.c-app .c-auth-switch a { display:inline-flex; align-items:center; min-height:44px; white-space:nowrap; }
