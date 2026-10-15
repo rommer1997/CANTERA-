@@ -15,7 +15,7 @@ La versión corrige F01–F14 de la auditoría de producto conservando diseño y
 ## Pruebas locales
 
 - TypeScript y build Firebase Hosting sin emuladores; modo demo, piloto y multimedia desactivados para producción.
-- 334 pruebas unitarias y de integración con dobles locales, sin omisiones. Incluyen dominio temporal, navegación de acceso, aislamiento de identidad, lectura y derechos de cuenta.
+- 335 pruebas unitarias y de integración con dobles locales, sin omisiones. Incluyen dominio temporal, navegación de acceso, aislamiento de identidad, lectura y derechos de cuenta.
 - 81 pruebas de reglas en Auth/Firestore/Storage Emulator Suite. Incluyen resultados prematuros, aislamiento de marcas de lectura y permisos de mensajería existentes.
 - 16 pruebas de limpieza de publicaciones; comprobación estática de la función. No se despliega ninguna función.
 - CUA a 320×780, 390×844, 768×1024 y 1280×720/800. Ver `../design-qa.md` y capturas locales en `output/design/audit-corrections-2026-10-15/`.

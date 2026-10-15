@@ -216,3 +216,17 @@ test('restauración separa 101 escrituras, protege conflictos concurrentes y det
   };
   await assert.rejects(() => restore.restoreBackup({ payload: payload(), target, apply: true, fetchImpl: alteredFetch }), /fields-mismatch/);
 });
+
+
+test('respaldo anterior a cursores sigue siendo válido sin aceptar colecciones fuera de su manifiesto', () => {
+  const legacy = payload();
+  legacy.schema.rootCollections = legacy.schema.rootCollections.filter((name: string) => name !== 'communityMessageReads');
+  legacy.collections = legacy.collections.filter((row: any) => row.path !== 'communityMessageReads');
+  assert.equal(backup.validateBackup(resign(legacy)).documents.length, 1);
+  const foreignInventory = structuredClone(legacy);
+  foreignInventory.collections.push({ path: 'communityMessageReads', documents: 0, missingDocuments: 0 });
+  assert.throws(() => backup.validateBackup(resign(foreignInventory)), /unreviewed-collection-path/);
+  const incomplete = structuredClone(legacy);
+  incomplete.collections = incomplete.collections.filter((row: any) => row.path !== 'communityProfiles');
+  assert.throws(() => backup.validateBackup(resign(incomplete)), /incomplete-root-schema/);
+});

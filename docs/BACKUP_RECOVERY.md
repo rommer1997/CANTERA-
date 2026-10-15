@@ -118,3 +118,5 @@ Este ensayo acredita la copia y recuperación local de los documentos presentes 
 Los respaldos contienen datos personales y mensajes privados. `0600` limita el acceso local, pero no cifra el archivo. El responsable debe definir almacenamiento cifrado bajo su control, acceso, conservación y eliminación, y comprobar si la carpeta se sincroniza con servicios externos antes de usarla. No subir los JSON a Git, Pages, incidencias, capturas o canales de soporte. Una solicitud de supresión también exige revisar las copias conservadas y evitar reintroducir datos eliminados al recuperar.
 
 No hay ejecución recurrente, retención automática, rotación, copia externa, monitorización de fallos, RPO/RTO garantizados, importación de Auth ni restauración de producción implementados por estos scripts.
+
+La revisión del 15 de octubre mantiene la validación de las copias anteriores con el manifiesto exacto de 26 colecciones, además del nuevo de 27. No acepta subconjuntos arbitrarios ni una colección añadida fuera de su manifiesto; los hashes originales se comprueban sin reescribir la copia. Las copias nuevas incluyen `communityMessageReads`.

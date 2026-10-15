@@ -104,15 +104,15 @@ function canonicalJson(value, depth = 0) {
 }
 function backupHash(value) { return createHash('sha256').update(canonicalJson(value)).digest('hex'); }
 function payloadBody(payload) { const { integrity, ...body } = payload; return body; }
-function validateCounts(collections, documents, missingDocuments) {
+function validateCounts(collections, documents, missingDocuments, roots = ROOT_COLLECTIONS) {
   if (!Array.isArray(collections) || !Array.isArray(documents) || !Array.isArray(missingDocuments) || documents.length + missingDocuments.length > MAX_DOCUMENTS) error('invalid-inventory');
   const paths = new Set(), expected = new Map();
   for (const item of collections) {
     if (!onlyKeys(item, ['path', 'documents', 'missingDocuments']) || Object.keys(item).length !== 3 || !Number.isSafeInteger(item.documents) || item.documents < 0 || !Number.isSafeInteger(item.missingDocuments) || item.missingDocuments < 0) error('invalid-collection-inventory');
-    validateCollectionPath(item.path); if (expected.has(item.path)) error('duplicate-collection');
+    validateCollectionPath(item.path); if (!roots.includes(item.path.split('/')[0])) error('unreviewed-collection-path'); if (expected.has(item.path)) error('duplicate-collection');
     expected.set(item.path, { documents: 0, missingDocuments: 0, source: item });
   }
-  for (const name of ROOT_COLLECTIONS) if (!expected.has(name)) error('incomplete-root-schema');
+  for (const name of roots) if (!expected.has(name)) error('incomplete-root-schema');
   for (const record of documents) {
     if (!onlyKeys(record, ['path', 'fields', 'createTime', 'updateTime']) || !Object.hasOwn(record, 'fields')) error('invalid-backup-document');
     validateDocumentPath(record.path); validateRestFields(record.fields);
@@ -139,11 +139,15 @@ function validateBackup(payload) {
   if (!onlyKeys(payload, ['format', 'version', 'projectId', 'databaseId', 'createdAt', 'readTime', 'schema', 'excluded', 'excludedRootCollections', 'collections', 'documents', 'missingDocuments', 'integrity']) || Object.keys(payload).length !== 13 || payload.format !== FORMAT || payload.version !== VERSION) error('invalid-backup-format');
   validateConfig({ projectId: payload.projectId, firestoreDatabaseId: payload.databaseId });
   if (!validTimestamp(payload.createdAt) || !validTimestamp(payload.readTime) || Date.parse(payload.createdAt) < Date.parse(payload.readTime) || !Number.isSafeInteger(payload.excludedRootCollections) || payload.excludedRootCollections < 0) error('invalid-backup-metadata');
-  if (canonicalJson(payload.schema) !== canonicalJson({ rootCollections: [...ROOT_COLLECTIONS], nestedCollections: { ...NESTED_COLLECTIONS } }) || canonicalJson(payload.excluded) !== canonicalJson([...EXCLUDED])) error('unreviewed-backup-schema');
+  // Accept the exact reviewed pre-read-cursor schema as well. Existing signed
+  // backups remain recoverable; arbitrary subsets or new roots still fail.
+  const reviewedRoots = [ROOT_COLLECTIONS, ROOT_COLLECTIONS.filter(name => name !== 'communityMessageReads')];
+  const roots = reviewedRoots.find(names => canonicalJson(payload.schema) === canonicalJson({ rootCollections: [...names], nestedCollections: { ...NESTED_COLLECTIONS } }));
+  if (!roots || canonicalJson(payload.excluded) !== canonicalJson([...EXCLUDED])) error('unreviewed-backup-schema');
   if (!onlyKeys(payload.integrity, ['algorithm', 'sha256']) || Object.keys(payload.integrity).length !== 2 || payload.integrity.algorithm !== 'sha256' || typeof payload.integrity.sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(payload.integrity.sha256)) error('invalid-integrity');
   const actual = Buffer.from(backupHash(payloadBody(payload)), 'hex'), expected = Buffer.from(payload.integrity.sha256, 'hex');
   if (!timingSafeEqual(actual, expected)) error('integrity-mismatch');
-  validateCounts(payload.collections, payload.documents, payload.missingDocuments);
+  validateCounts(payload.collections, payload.documents, payload.missingDocuments, roots);
   if (Buffer.byteLength(JSON.stringify(payload, null, 2)) > MAX_FILE_BYTES) error('backup-volume-exceeded');
   return payload;
 }
