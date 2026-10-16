@@ -1,3 +1,7 @@
+## Equipos, Mensajes y Perfiles — acabado compartido, 16 octubre 2026
+
+Revisión local completada: superficies blancas, cabeceras y pestañas comunes, filtros agrupados de Equipos, chat con compositor dentro de pantalla y perfiles propios/públicos coherentes. Pruebas en emuladores con dos cuentas sintéticas verifican envío, recepción y respuesta; un equipo sintético verifica creación/edición. 336 pruebas locales aprobadas y TypeScript/build correctos. No se escriben datos de prueba en producción. Recibo final pendiente: `docs/APP_FINISH_2026-10-16.md`.
+
 ## Publicación de Juega y Comunidad — 16 octubre 2026
 
 Fuente `ab3a063`, CI 38851843424 aprobada: 432 pruebas. Hosting `618738acccf9d446`, release `1792125785946000` (06:43 Madrid); 54 archivos idénticos al build. CUA en producción confirma actualización PWA, tarjetas privadas propias, estado público vacío, recomendaciones reales y compositor con retorno del foco. Comunidad sin desbordamiento a 320 px. No se escribe contenido de prueba en producción. Detalles en `docs/DISCOVERY_DESIGN_2026-10-16.md`.

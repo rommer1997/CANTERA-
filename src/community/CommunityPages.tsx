@@ -17,6 +17,7 @@ import { useMessaging } from './MessagingContext';
 import { profileNavigationKey, profileInitials } from './experience';
 import './audit-fixes.css';
 import './discovery-design.css';
+import './app-finish.css';
 
 const routeNames: Record<string, string> = {
   '/': 'Inicio', '/play': 'Juega', '/feed': 'Comunidad', '/profile': 'Tu perfil',
@@ -52,7 +53,7 @@ export function CommunityLayout() {
     if (!createOpen && dialog.open) dialog.close();
   }, [createOpen]);
   const createLink = (destination: string) => profile ? destination : `/profile?returnTo=${encodeURIComponent(destination)}`;
-  return <div className={`c-app${pathname === '/play' || pathname === '/feed' ? ' c-discovery-shell' : ''}`}><header className="c-header">
+  return <div className={`c-app${pathname !== '/' ? ' c-product-shell' : ''}${pathname.startsWith('/messages/') ? ' c-chat-shell' : ''}${pathname === '/play' || pathname === '/feed' ? ' c-discovery-shell' : ''}`}><header className="c-header">
     <Link className="c-brand" to="/" aria-label="LaCantera, inicio"><BrandMark className="c-brand-mark" />LaCantera</Link>
     <nav aria-label="Navegación principal" className="c-nav"><NavLink to="/" end>Inicio</NavLink><NavLink to="/play">Juega</NavLink><NavLink to="/feed">Comunidad</NavLink><NavLink to="/teams">Equipos</NavLink><NavLink to="/messages">Mensajes</NavLink></nav>
     <div className="c-header-tools">

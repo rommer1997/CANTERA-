@@ -40,7 +40,7 @@ function profileHarness(initial: any, returnTo = '') {
   };
   const jsx = (type: any, props: any, key: any) => ({ type, props, key });
   const modules: Record<string, any> = { react, 'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
-    'react-router-dom': { Link: 'Link', useNavigate: () => navigate, useSearchParams: () => [routeParams] },
+    'react-router-dom': { Link: 'Link', useNavigate: () => navigate, useSearchParams: () => [routeParams, (next: URLSearchParams) => { routeParams = new URLSearchParams(next); dirty = true; }] },
     '../components/BrandMark': { default: 'BrandMark' },
     'lucide-react': {}, './CommunityContext': { useCommunity: () => api, TERMS_VERSION, friendlyError: (error: Error) => error.message },
     './experience': experience, './useClock': { useClock: () => Date.now() }, './TeamsContext': { useTeams: () => ({ ownTeams: [] }) }, './teamLogic': { safeReturnTo }, './GeographyFields': { CountryInput: 'CountryInput' },
@@ -48,7 +48,7 @@ function profileHarness(initial: any, returnTo = '') {
   const source = readFileSync(new URL('../src/community/ProfilePage.tsx', import.meta.url), 'utf8');
   const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
   const exports: any = {};
-  new Function('exports', 'require', 'window', compiled)(exports, (name: string) => modules[name], { addEventListener() {}, removeEventListener() {} });
+  new Function('exports', 'require', 'window', compiled)(exports, (name: string) => modules[name], { addEventListener() {}, removeEventListener() {}, requestAnimationFrame(fn: () => void) { return setImmediate(fn); }, cancelAnimationFrame(id: NodeJS.Immediate) { clearImmediate(id); } });
   let tree: any;
   function render() {
     for (let attempt = 0; attempt < 15; attempt++) {
@@ -165,6 +165,23 @@ test('Ajustes conserva edición y derechos sin volver a aceptar condiciones ni c
     assert.ok(exportButton); exportButton.props.onClick(); await h.settle();
     assert.deepEqual(requests, ['export']); assert.deepEqual(h.saves, []);
     assert.equal(h.api.profile.acceptedTermsAt, confirmed.acceptedTermsAt);
+    assert.equal(h.api.profile.id, 'new-google');
+  } finally { h.cleanup(); }
+});
+
+
+test('la pestaña Agenda del perfil respeta el enlace y vuelve a Información sin guardar datos', () => {
+  const h = profileHarness(fixture(confirmed));
+  try {
+    h.followLink('/profile?tab=activity');
+    assert.match(h.text(), /Tu agenda/);
+    const info = h.nodes().find(node => node.type === 'button' && node.props.children === 'Información');
+    assert.ok(info); info.props.onClick(); h.render();
+    assert.doesNotMatch(h.text(), /Tu agenda/);
+    const agenda = h.nodes().find(node => node.type === 'button' && node.props.children === 'Agenda');
+    assert.ok(agenda); agenda.props.onClick(); h.render();
+    assert.match(h.text(), /Tu agenda/);
+    assert.deepEqual(h.saves, []);
     assert.equal(h.api.profile.id, 'new-google');
   } finally { h.cleanup(); }
 });
