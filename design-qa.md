@@ -1,6 +1,6 @@
 ## Equipos, Mensajes y Perfiles — acabado compartido, 16 octubre 2026
 
-Revisión local completada: superficies blancas, cabeceras y pestañas comunes, filtros agrupados de Equipos, chat con compositor dentro de pantalla y perfiles propios/públicos coherentes. Pruebas en emuladores con dos cuentas sintéticas verifican envío, recepción y respuesta; un equipo sintético verifica creación/edición. 336 pruebas locales aprobadas y TypeScript/build correctos. No se escriben datos de prueba en producción. Recibo final pendiente: `docs/APP_FINISH_2026-10-16.md`.
+Revisión local completada: superficies blancas, cabeceras y pestañas comunes, filtros agrupados de Equipos, chat con compositor dentro de pantalla y perfiles propios/públicos coherentes. Pruebas en emuladores con dos cuentas sintéticas verifican envío, recepción y respuesta; un equipo sintético verifica creación/edición. 336 pruebas locales aprobadas y TypeScript/build correctos. No se escriben datos de prueba en producción. Publicado: fuente `92d43ee`, CI 38870263401 aprobada (433 pruebas), Hosting `2917c33cae21e8da`, release `1792137484491000`, 54 archivos idénticos al build. Pantallas reales comprobadas sin crear contenido nuevo; consola consultada sin errores. Recibo y límites físicos: `docs/APP_FINISH_2026-10-16.md`.
 
 ## Publicación de Juega y Comunidad — 16 octubre 2026
 

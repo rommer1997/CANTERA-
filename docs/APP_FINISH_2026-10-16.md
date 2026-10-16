@@ -23,4 +23,10 @@ Capturas locales en `output/design/app-finish-2026-10-16/`. Las imágenes de emu
 
 ## Publicación
 
-Pendiente de registrar CI, recibo de Hosting y comprobación de la versión pública. Este cambio no requiere desplegar reglas, índices, Functions, Storage, roles ni facturación.
+Publicada en https://lacantera.web.app el 16/10/2026 a las 09:58 Madrid. Fuente `92d43ee97c1e349bbe716cad93dc36e2a1fc8474`; [CI final aprobada](https://github.com/rommer1997/CANTERA-/actions/runs/38870263401): 336 pruebas de dominio, 81 de reglas y 16 de limpieza, **433 aprobadas**. Hosting `2917c33cae21e8da`, release `1792137484491000`. Los 54 archivos coinciden byte a byte con el build; recibo local `.audit/app-finish-hosting-2026-10-16.json`.
+
+Se despliega únicamente Hosting. No se cambian reglas, índices, Functions, Storage, roles ni facturación. En producción se comprueban la actualización de la PWA, Equipos vacío con contador real, bandeja y conversación existentes sin enviar contenido, y el perfil real con su portada cargada. A 430×932 el compositor termina en y=852 y la navegación empieza en y=854,7. Consulta final de consola sin errores.
+
+En el directorio a 320 px la identidad dispone del ancho de la tarjeta y la acción pasa a una segunda fila: se evita que Editar mi perfil comprima el nombre. Capturas públicas `equipos-publicado-430.png`, `mensajes-publicado-430.png`, `chat-publicado-430.png` y `perfil-publicado-430.png` en el directorio de evidencia. No se crean equipos, publicaciones ni mensajes de prueba en producción.
+
+Pendiente en iPhone físico: comprobar la vista instalada y el teclado virtual al escribir en el chat y editar el perfil. La emulación de viewport no acredita estos comportamientos del sistema.
