@@ -4,7 +4,7 @@ La revisión sustituye la acumulación de controles de las dos pantallas por la 
 
 ## Diseño implementado
 
-Juega: ubicación compacta, título/Crear, búsqueda con filtro, pestañas Explorar/Mis encuentros con subrayado y tres selectores nativos (fecha/formato/nivel). País, ciudad, partido/torneo y sólo próximos/abiertos se agrupan en el panel de filtros. Las tarjetas muestran fecha, formato, título, lugar y miniatura a la derecha; debajo, inscripciones reales, plazas disponibles y acceso a detalle/gestión. Hay dos columnas en escritorio y una en móvil.
+Juega: ubicación compacta, título/Crear, búsqueda con filtro, pestañas Explorar/Mis encuentros con subrayado y tres selectores nativos (fecha/formato/nivel). País, ciudad, partido/torneo y sólo próximos/abiertos se agrupan en el panel de filtros. Las tarjetas muestran fecha, formato, título, lugar y miniatura a la derecha; debajo, inscripciones reales, plazas disponibles y acceso a detalle/gestión. Hay dos columnas en escritorio y una en móvil. El estado vacío usa la colección de la vista activa: los encuentros privados propios no provocan un falso aviso de filtros en Explorar.
 
 Comunidad: cabecera blanca con Personas, búsqueda, compositor, pestañas Comunidad/Siguiendo y filtros de contenido. Se elimina la portada fotográfica y la navegación duplicada. El estado vacío tiene una composición centrada. La sección de personas consulta el directorio público existente y permite seguir usando la operación real; Equipos, invitaciones/QR y Mensajes mantienen acceso propio. El lateral de encuentros se conserva en escritorio.
 
