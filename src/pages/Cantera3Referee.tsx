@@ -128,7 +128,7 @@ export default function Cantera3Referee() {
               {/* Quick Actions */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <button 
-                  onClick={() => setActiveTab('evaluations')}
+                  onClick={() => setActiveTab('evaluation')}
                   className="p-6 rounded-2xl border border-gold/30 bg-gold/5 hover:bg-gold/10 transition-colors flex items-center justify-between group"
                 >
                   <div className="flex items-center gap-4">
@@ -153,7 +153,7 @@ export default function Cantera3Referee() {
                       <p className="text-xs text-charcoal/50 dark:text-gray-400">3 players waiting</p>
                     </div>
                   </div>
-                  <button onClick={() => setActiveTab('evaluations')} className="text-sm font-bold text-[#A1C4FD] hover:underline">View</button>
+                  <button onClick={() => setActiveTab('evaluation')} className="text-sm font-bold text-[#A1C4FD] hover:underline">View</button>
                 </div>
               </div>
 

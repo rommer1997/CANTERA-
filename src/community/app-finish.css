@@ -1,0 +1,209 @@
+/* Shared application finish. The public home keeps its established landing layout. */
+.c-app.c-product-shell {
+  --c-green:#006747;
+  --c-ink:#101e19;
+  --c-muted:#63717c;
+  --c-line:#dce5e1;
+  --c-surface:#edf7f1;
+  --c-bg:#f8faf9;
+  background:#fff;
+}
+.c-app.c-product-shell .c-main { width:100%; }
+.c-app.c-product-shell :is(.team-page,.cm-page,.people-page,.ci-page,.c-activity) { max-width:1080px; padding:28px 0 40px; margin-inline:auto; }
+.c-app.c-product-shell :is(.c-section-head,.cm-page-heading,.people-heading,.ci-page-head) { gap:16px; margin-bottom:20px; }
+.c-app.c-product-shell :is(.team-page,.cm-page,.people-page,.ci-page,.c-activity,.c-profile--settings) h1 { font-size:34px; font-weight:800; line-height:1.2; letter-spacing:-1.2px; margin:0; overflow-wrap:anywhere; }
+.c-app.c-product-shell :is(.c-section-head,.cm-page-heading,.people-heading,.ci-page-head)>div>p:not(.c-eyebrow) { font-size:16px; color:var(--c-muted); line-height:1.5; margin:6px 0 0; }
+.c-app.c-product-shell :is(.c-button,.people-button) { border-radius:9px; min-height:44px; font-size:14px; gap:7px; }
+.c-app.c-product-shell :is(.c-input,.people-search input,.people-type-label select) { background:#fff; border-color:var(--c-line); border-radius:10px; min-height:48px; font-size:16px; }
+.c-app.c-product-shell :is(.c-panel,.team-section,.people-information,.people-activity,.c-account-section) { border-color:var(--c-line); border-radius:12px; box-shadow:none; }
+.c-app.c-product-shell :is(.c-empty,.people-empty,.cm-empty) { background:#fff; border:1px solid var(--c-line); border-radius:12px; padding:32px 20px; text-align:center; margin:20px 0; }
+.c-app.c-product-shell :is(.c-empty,.people-empty,.cm-empty) :is(h2,h3) { font-size:22px; line-height:1.35; letter-spacing:-.6px; margin:14px 0 8px; }
+.c-app.c-product-shell :is(.c-empty,.people-empty,.cm-empty)>svg { color:var(--c-green); margin-inline:auto; }
+.c-app.c-product-shell :is(.c-empty,.people-empty,.cm-empty)>p { font-size:14px; color:var(--c-muted); line-height:1.6; }
+.c-app.c-product-shell :is(.c-profile-tabs,.team-view-tabs,.c-community-tabs,.ci-entry-method) { display:flex; gap:0; padding:0; background:none; border:0; border-bottom:1px solid var(--c-line); border-radius:0; }
+.c-app.c-product-shell :is(.c-profile-tabs,.team-view-tabs,.ci-entry-method)>button { position:relative; flex:1; display:flex; align-items:center; justify-content:center; gap:8px; min-height:50px; padding:12px 8px; background:none; border:0; border-radius:0; color:var(--c-muted); font-size:14px; font-weight:500; }
+.c-app.c-product-shell :is(.c-profile-tabs,.team-view-tabs,.ci-entry-method)>button[aria-pressed=true] { color:#073b2d; background:none; font-weight:800; }
+.c-app.c-product-shell :is(.c-profile-tabs,.team-view-tabs,.ci-entry-method)>button[aria-pressed=true]::after { content:''; position:absolute; bottom:-1px; left:0; right:0; height:3px; border-radius:3px; background:var(--c-green); }
+.c-app.c-product-shell .c-community-tabs>a { min-height:46px; border:0; border-radius:0; background:none; font-size:14px; }
+.c-app.c-product-shell .c-community-tabs>a.active { background:none; color:var(--c-green); box-shadow:inset 0 -3px var(--c-green); }
+.c-app.c-product-shell :is(button,a,input,select,textarea,summary):focus-visible { outline:2px solid var(--c-green); outline-offset:3px; }
+
+/* Teams: one create action, one search, and two views. */
+.c-app.c-product-shell .team-directory>.c-section-head { display:flex; flex-direction:row; align-items:center; justify-content:space-between; }
+.c-app.c-product-shell .team-directory>.c-section-head>.c-button { flex:none; min-width:90px; padding:10px 16px; }
+.c-app.c-product-shell .team-search-toolbar { display:grid; grid-template-columns:minmax(0,1fr) 48px; gap:10px; margin-bottom:10px; }
+.c-app.c-product-shell .team-search-input { display:flex; flex-direction:row; align-items:center; gap:12px; border:1px solid var(--c-line); border-radius:10px; min-height:48px; padding:0 14px; margin:0; }
+.c-app.c-product-shell .team-search-input input { width:100%; min-width:0; border:0; background:transparent; padding:0; font-size:16px; min-height:46px; }
+.c-app.c-product-shell .team-filter-toggle { display:flex; align-items:center; justify-content:center; gap:2px; border:1px solid var(--c-line); border-radius:10px; background:#fff; color:var(--c-ink); min-height:48px; }
+.c-app.c-product-shell .team-filter-toggle[aria-expanded=true] { background:var(--c-surface); border-color:var(--c-green); color:var(--c-green); }
+.c-app.c-product-shell .team-view-tabs { width:100%; margin:0 0 20px; }
+.team-view-tabs>button>span { display:grid; place-items:center; border-radius:50%; min-width:23px; height:23px; padding:0 5px; font-size:12px; color:var(--c-green); background:#e8f3ee; }
+.c-app.c-product-shell .team-filter-panel { padding:18px; background:#f7faf8; border:1px solid var(--c-line); border-radius:12px; margin-bottom:20px; }
+.team-filter-panel[hidden] { display:none; }
+.team-filter-heading,.team-results-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.c-app.c-product-shell .team-filter-heading h2 { font-size:18px; margin:0; }
+.c-app.c-product-shell .team-filter-panel .team-discovery-filters { grid-template-columns:repeat(3,minmax(0,1fr)); margin:12px 0 16px; }
+.c-app.c-product-shell .team-results-heading h2 { display:flex; align-items:baseline; gap:10px; font-size:22px; letter-spacing:-.6px; margin:0; }
+.team-results-heading h2>span { font-size:13px; font-weight:400; color:var(--c-muted); }
+.c-app.c-product-shell .team-grid { gap:14px; margin:14px 0 24px; }
+.c-app.c-product-shell .team-card { border-radius:12px; padding:22px 16px 14px; gap:7px; box-shadow:0 2px 4px #153c2c05; }
+.c-app.c-product-shell .team-card h3 { font-size:16px; letter-spacing:-.3px; }
+.c-app.c-product-shell .team-monogram { width:56px; height:56px; font-size:19px; border-radius:16px; border-color:#d1e5da; background:#e7f3ed; }
+.c-app.c-product-shell .team-card-cta { margin-top:auto; padding-top:10px; min-height:44px; background:var(--c-surface); border-radius:8px; }
+.c-app.c-product-shell .team-own-teams { border:0; margin:0; }
+.team-community-link { display:flex; flex-wrap:wrap; gap:8px 22px; border-top:1px solid var(--c-line); margin-top:24px; padding-top:10px; }
+.team-community-link>a { display:flex; align-items:center; gap:7px; color:var(--c-green); font-size:13px; min-height:44px; }
+.c-app.c-product-shell .team-profile-head { padding:22px; margin:14px 0 20px; border:1px solid var(--c-line); border-radius:12px; background:#f8fbf9; }
+.c-app.c-product-shell .team-profile-head h1 { font-size:28px; }
+.c-app.c-product-shell .team-page>.c-prewrap { font-size:15px; color:var(--c-muted); line-height:1.7; margin-bottom:20px; }
+.c-app.c-product-shell .team-page>.c-prewrap:empty { display:none; }
+.c-app.c-product-shell .team-page>.c-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.c-app.c-product-shell .team-page>.c-actions>.c-button:first-child:is(a),.c-app.c-product-shell .team-page>.c-actions>.c-button:only-child { grid-column:1/-1; }
+.c-app.c-product-shell .team-section { margin-top:20px; padding:22px; }
+.c-app.c-product-shell .team-member:last-child { border-bottom:0; padding-bottom:0; }
+
+/* Messaging: the conversation and its composer stay in the same workspace. */
+.c-app.c-product-shell .cm-page-heading { align-items:center; }
+.c-app.c-product-shell .cm-workspace { border-radius:12px; box-shadow:none; grid-template-columns:320px minmax(0,1fr); min-height:420px; height:min(720px,calc(100dvh - 280px)); }
+.c-app.c-product-shell .cm-sidebar-heading { padding:18px 18px 12px; }
+.c-app.c-product-shell .cm-sidebar-heading h2 { font-size:15px; }
+.c-app.c-product-shell .cm-search { margin:0 14px 12px; padding:0 12px; min-height:48px; border-radius:10px; }
+.c-app.c-product-shell .cm-search input { min-height:46px; font-size:16px; }
+.c-app.c-product-shell .cm-contact { padding:14px 10px; gap:10px; border-radius:10px; min-height:76px; }
+.c-app.c-product-shell .cm-avatar { flex-basis:44px; height:44px; font-size:15px; background:#e7f3ed; }
+.c-app.c-product-shell .cm-contact-copy strong { font-size:14px; }
+.c-app.c-product-shell .cm-contact-copy small { font-size:12px; }
+.c-app.c-product-shell .cm-contact-meta { max-width:80px; }
+.c-app.c-product-shell .cm-contact-meta time { font-size:10px; text-align:right; }
+.c-app.c-product-shell .cm-contact>svg { display:none; }
+.c-app.c-product-shell .cm-contact>svg.cm-spinning { display:block; }
+.c-app.c-product-shell .cm-welcome { background:#fafcfb; padding:32px; }
+.c-app.c-product-shell .cm-welcome h2 { font-size:28px; letter-spacing:-.8px; margin-bottom:12px; }
+.c-app.c-product-shell .cm-welcome p { font-size:15px; line-height:1.6; }
+.c-app.c-product-shell .cm-thread-heading { padding:16px; gap:10px; }
+.c-app.c-product-shell .cm-thread-person h2 { font-size:16px; }
+.c-app.c-product-shell .cm-message-viewport { background:#fafcfb; }
+.c-app.c-product-shell .cm-date-divider span { border:0; background:#edf3ef; font-size:11px; border-radius:20px; padding:5px 10px; }
+.c-app.c-product-shell .cm-bubble { background:#fff; border-color:#e1e9e5; border-radius:13px 13px 13px 3px; padding:10px 13px 5px; }
+.c-app.c-product-shell .cm-message-row.is-mine .cm-bubble { background:var(--c-green); border-color:var(--c-green); border-radius:13px 13px 3px 13px; }
+.c-app.c-product-shell .cm-composer { padding:12px 14px 10px; }
+.c-app.c-product-shell .cm-composer textarea { border-radius:22px; background:#f8faf9; font-size:16px; }
+.c-app.c-product-shell .cm-send { border-radius:12px; }
+.c-app.c-product-shell .cm-icon-button,.c-app.c-product-shell .cm-profile-link { min-height:44px; }
+
+/* Own and public profiles share a cover, avatar scale and content rhythm. */
+.c-app.c-product-shell :is(.c-profile,.people-public-profile) { max-width:760px; padding:28px 0 40px; margin-inline:auto; }
+.c-app.c-product-shell :is(.c-own-profile-card,.people-profile-card) { max-width:none; width:100%; border:1px solid var(--c-line); border-radius:12px; margin:0; box-shadow:none; }
+.c-app.c-product-shell :is(.c-own-profile-cover,.people-profile-cover) { height:160px; margin:0; }
+.c-app.c-product-shell :is(.c-own-profile-cover,.people-profile-cover) img { width:100%; height:100%; object-fit:cover; object-position:center 68%; }
+.c-app.c-product-shell .c-profile-settings-link { left:auto; right:12px; top:12px; }
+.c-app.c-product-shell .c-own-profile-cover>span { top:auto; bottom:10px; }
+.c-app.c-product-shell .c-own-profile-body { padding:0 24px 20px; }
+.c-app.c-product-shell :is(.c-own-profile-body>.c-profile-avatar,.people-profile-avatar) { width:76px; height:76px; border:4px solid #fff; font-size:24px; background:var(--c-green); color:#fff; }
+.c-app.c-product-shell .c-own-profile-body>.c-profile-avatar { margin-top:-38px; }
+.c-app.c-product-shell .people-public-profile .people-profile-heading { display:block; margin-top:-38px; padding:0 24px; position:relative; }
+.c-app.c-product-shell .people-public-profile .people-profile-heading>div { padding-top:10px; }
+.c-app.c-product-shell :is(.c-own-profile-body>h2,.people-profile-heading h1) { font-size:26px; font-weight:800; line-height:1.35; letter-spacing:-.7px; margin-top:10px; }
+.c-app.c-product-shell :is(.c-profile-location,.people-location) { font-size:14px; gap:6px; color:var(--c-muted); }
+.c-app.c-product-shell .c-profile-stats { margin:22px 0; padding:16px 0; border-block:1px solid var(--c-line); gap:8px; }
+.c-app.c-product-shell .c-profile-stats strong { font-size:24px; }
+.c-app.c-product-shell .c-profile-stats span { font-size:12px; }
+.c-app.c-product-shell .c-profile-tabs { margin:16px -24px 0; }
+.c-app.c-product-shell .c-profile-information { padding-top:18px; }
+.c-app.c-product-shell .c-profile-information p { font-size:14px; line-height:1.65; margin-bottom:14px; }
+.c-app.c-product-shell .c-own-profile-body .c-profile-links { display:grid; gap:0; margin-top:18px; padding:0; }
+.c-app.c-product-shell .c-profile-links>a { display:flex; align-items:center; justify-content:flex-start; gap:8px; min-height:48px; font-size:13px; padding:10px 0; border-bottom:1px solid #edf1ef; }
+.c-app.c-product-shell .c-profile-links>a:first-child { justify-content:space-between; }
+.c-app.c-product-shell .c-profile-links>a:last-child { border:0; }
+.c-app.c-product-shell .c-account-form { margin-top:20px; scroll-margin-top:90px; padding:24px; }
+.c-app.c-product-shell .c-profile-fields { gap:18px; }
+.c-app.c-product-shell .c-account-agenda .c-profile-tabs { margin:0 0 16px; }
+.c-app.c-product-shell .c-account-agenda h2 { font-size:22px; }
+.c-app.c-product-shell .c-settings-list { border-radius:12px; }
+.c-app.c-product-shell .c-settings-list>.c-account-section { border-radius:0; }
+.c-app.c-product-shell :is(.c-settings-list>.c-account-section>summary,.c-settings-row,.c-settings-signout) { min-height:60px; font-size:14px; }
+.c-app.c-product-shell .people-profile-card .people-counts { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); margin:20px 24px; padding:14px 0; border-block:1px solid var(--c-line); gap:12px; text-align:center; }
+.c-app.c-product-shell .people-counts>span { align-items:center; }
+.c-app.c-product-shell .people-counts>small { grid-column:1/-1; }
+.c-app.c-product-shell .people-profile-actions { padding:0 24px 18px; gap:10px; align-items:flex-start; }
+.c-app.c-product-shell .people-profile-actions .people-button { font-size:14px; min-height:44px; }
+.c-app.c-product-shell .people-profile-actions .people-safety { margin-left:auto; }
+.c-app.c-product-shell .people-safety>summary { min-height:44px; display:flex; align-items:center; width:fit-content; padding:8px 0; border:0; color:var(--c-muted); font-size:13px; }
+.c-app.c-product-shell :is(.people-profile-actions,.people-row) .people-follow>.people-button { background:#f3faf6; color:var(--c-green); border:1px solid #90b6a5; }
+.c-app.c-product-shell :is(.people-information,.people-activity) { margin-top:20px; padding:22px; background:#fff; border:1px solid var(--c-line); }
+.c-app.c-product-shell :is(.people-information,.people-activity) h2 { font-size:22px; letter-spacing:-.6px; }
+.c-app.c-product-shell .people-list { border:0; background:none; padding:0; display:grid; gap:10px; }
+.c-app.c-product-shell .people-row { padding:14px; border:1px solid var(--c-line); border-radius:12px; background:#fff; }
+.c-app.c-product-shell .people-person strong { font-size:15px; }
+.c-app.c-product-shell .people-search { background:none; border:0; padding:0; margin-top:18px; }
+.c-app.c-product-shell .people-search>label:first-child { border:1px solid var(--c-line); border-radius:10px; min-height:48px; }
+.c-app.c-product-shell .people-search input { border:0; }
+.c-app.c-product-shell .ci-entry { border-radius:12px; }
+.c-app.c-product-shell .ci-person-card { border-color:var(--c-line); border-radius:12px; box-shadow:none; }
+.c-app.c-product-shell .c-notice { border-radius:12px; padding:18px; margin-top:12px; }
+.c-app.c-product-shell .c-notice h2 { font-size:17px; line-height:1.4; }
+.c-app.c-product-shell .c-notice.unread { background:#f4faf6; border-color:#b8d7c8; }
+
+@media(max-width:900px) { .c-app.c-product-shell .cm-workspace { grid-template-columns:280px minmax(0,1fr); } }
+@media(max-width:767px) {
+  .c-app.c-product-shell :is(.team-page,.cm-page,.people-page,.ci-page,.c-activity,.c-profile) { padding:16px 0 28px; }
+  .c-app.c-product-shell :is(.team-page,.cm-page,.people-page,.ci-page,.c-activity,.c-profile--settings) h1 { font-size:29px; letter-spacing:-1px; }
+  .c-app.c-product-shell :is(.c-section-head,.cm-page-heading,.people-heading,.ci-page-head)>div>p:not(.c-eyebrow) { font-size:14px; }
+  .c-app.c-product-shell .team-directory>.c-section-head { gap:10px; margin-bottom:18px; }
+  .c-app.c-product-shell .team-directory>.c-section-head>.c-button { min-width:84px; padding:9px 12px; }
+  .c-app.c-product-shell .team-filter-panel .team-discovery-filters { grid-template-columns:1fr; }
+  .c-app.c-product-shell .team-grid { gap:10px; }
+  .c-app.c-product-shell .team-card { padding:18px 12px 12px; }
+  .c-app.c-product-shell .team-card h3 { font-size:15px; }
+  .c-app.c-product-shell .team-results-heading h2 { font-size:21px; }
+  .c-app.c-product-shell .team-profile-head { padding:18px; }
+  .c-app.c-product-shell .team-profile-head h1 { font-size:24px; }
+  .c-app.c-product-shell .team-section { padding:18px; }
+  .c-app.c-product-shell :is(.c-own-profile-cover,.people-profile-cover) { height:130px; }
+  .c-app.c-product-shell .c-own-profile-body { padding:0 18px 16px; }
+  .c-app.c-product-shell :is(.c-own-profile-body>h2,.people-profile-heading h1) { font-size:24px; }
+  .c-app.c-product-shell .c-profile-tabs { margin-inline:-18px; }
+  .c-app.c-product-shell .c-account-agenda .c-profile-tabs { margin-inline:0; }
+  .c-app.c-product-shell .people-public-profile .people-profile-heading { padding-inline:18px; }
+  .c-app.c-product-shell .people-profile-card .people-counts { margin-inline:18px; }
+  .c-app.c-product-shell .people-profile-actions { display:flex; flex-wrap:wrap; padding-inline:18px; }
+  .c-app.c-product-shell .people-profile-actions>div:first-child:not(.people-follow) { flex-basis:100%; }
+  .c-app.c-product-shell .people-profile-actions>div:first-child:not(.people-follow)>.people-button { width:100%; justify-content:center; }
+  .c-app.c-product-shell .people-profile-actions>.people-safety { order:3; flex-basis:100%; margin:0; }
+  .c-app.c-product-shell .people-profile-actions>.people-safety>summary { justify-content:flex-start; }
+  .c-app.c-product-shell :is(.people-information,.people-activity,.c-account-form) { padding:18px; }
+  .c-app.c-product-shell .ci-page-head { gap:14px; }
+}
+@media(max-width:700px) {
+  .c-app.c-product-shell .cm-workspace { display:flex; min-height:380px; height:auto; }
+  .c-app.c-product-shell .cm-sidebar { max-height:none; min-height:380px; }
+  .c-app.c-product-shell .cm-contact { min-height:78px; }
+  .c-app.c-product-shell .cm-sidebar-scroll { min-height:160px; }
+  .c-app.c-product-shell .cm-thread-person h2 { font-size:15px; }
+  /* A thread occupies the space between the app header and persistent navigation. */
+  .c-app.c-product-shell.c-chat-shell { display:flex; flex-direction:column; height:100dvh; min-height:0; padding-bottom:0; }
+  .c-chat-shell> * { flex-shrink:0; }
+  .c-chat-shell>.c-header { width:100%; max-width:none; }
+  .c-chat-shell .c-install-recommendation,.c-chat-shell>.c-mobile-info,.c-chat-shell>.c-footer { display:none; }
+  .c-app.c-chat-shell>.c-main { flex:1; min-height:0; margin:0 0 calc(80px + env(safe-area-inset-bottom,0px)); padding:0; max-width:none; }
+  .c-app.c-product-shell .cm-page.has-conversation { height:100%; min-height:0; padding:0; display:flex; flex-direction:column; }
+  .c-app.c-product-shell .cm-page.has-conversation>.cm-page-heading { display:none; }
+  .c-app.c-product-shell .cm-page.has-conversation .cm-workspace { flex:1; min-height:0; height:100%; border:0; border-radius:0; }
+  .c-app.c-product-shell .cm-page.has-conversation .cm-sidebar { display:none; }
+  .c-app.c-product-shell .cm-thread-heading { padding:10px 14px; }
+  .c-app.c-product-shell .cm-message-viewport { padding:12px 16px; }
+  .c-app.c-product-shell .cm-thread-back { flex-basis:40px; }
+  .c-app.c-product-shell .cm-composer { padding-inline:14px; }
+  .c-app.c-product-shell .cm-thread-person p { font-size:10px; }
+}
+@media(max-width:359px) {
+  .c-app.c-product-shell :is(.team-page,.cm-page,.people-page,.ci-page,.c-activity) h1 { font-size:26px; }
+  .c-app.c-product-shell .cm-page-heading>.c-button { font-size:12px; padding:9px; }
+  .c-app.c-product-shell .cm-contact-meta { max-width:66px; }
+  .c-app.c-product-shell .cm-contact { gap:8px; }
+  .c-app.c-product-shell .team-directory>.c-section-head { flex-direction:row; align-items:center; }
+  .c-app.c-product-shell .team-directory>.c-section-head>.c-button { min-width:75px; font-size:13px; padding:9px 10px; }
+  .c-app.c-product-shell .people-row { display:flex; flex-direction:column; align-items:stretch; gap:12px; }
+  .c-app.c-product-shell .people-row>.people-person { width:100%; }
+  .c-app.c-product-shell .people-row>.people-follow,.c-app.c-product-shell .people-row>.people-button { align-self:flex-end; }
+}

@@ -1,0 +1,74 @@
+## Equipos, Mensajes y Perfiles — acabado compartido, 16 octubre 2026
+
+Revisión local completada: superficies blancas, cabeceras y pestañas comunes, filtros agrupados de Equipos, chat con compositor dentro de pantalla y perfiles propios/públicos coherentes. Pruebas en emuladores con dos cuentas sintéticas verifican envío, recepción y respuesta; un equipo sintético verifica creación/edición. 336 pruebas locales aprobadas y TypeScript/build correctos. No se escriben datos de prueba en producción. Publicado: fuente `92d43ee`, CI 38870263401 aprobada (433 pruebas), Hosting `2917c33cae21e8da`, release `1792137484491000`, 54 archivos idénticos al build. Pantallas reales comprobadas sin crear contenido nuevo; consola consultada sin errores. Recibo y límites físicos: `docs/APP_FINISH_2026-10-16.md`.
+
+## Publicación de Juega y Comunidad — 16 octubre 2026
+
+Fuente `ab3a063`, CI 38851843424 aprobada: 432 pruebas. Hosting `618738acccf9d446`, release `1792125785946000` (06:43 Madrid); 54 archivos idénticos al build. CUA en producción confirma actualización PWA, tarjetas privadas propias, estado público vacío, recomendaciones reales y compositor con retorno del foco. Comunidad sin desbordamiento a 320 px. No se escribe contenido de prueba en producción. Detalles en `docs/DISCOVERY_DESIGN_2026-10-16.md`.
+
+# LaCantera — Juega y Comunidad según las nuevas referencias
+
+16 de octubre de 2026.
+
+**final result: passed** — inspección visual local de las dos superficies, con funciones existentes conservadas. Alcance y verificación publicados en `docs/DISCOVERY_DESIGN_2026-10-16.md`.
+
+La fuente son las dos últimas referencias móviles del usuario de este turno. El objetivo es su jerarquía y composición, con contenido y servicios reales. Juega agrupa filtros en selectores y reserva la pantalla a partidos; Comunidad presenta compositor y stream con pestañas subrayadas. Blanco, verde #006747, bordes finos, fotos existentes y controles nativos. Las dos primeras capturas del usuario documentan el problema anterior; no se usan como objetivo.
+
+Capturas nuevas de CUA en `output/design/discovery-2026-10-16/`: juega-320, juega-430, comunidad-430, comunidad-comentarios-320, comunidad-busqueda-320 y adaptaciones desktop. Se verifican dimensiones en DOM. Sin desbordamiento del documento en las vistas probadas. Se corrige durante la inspección el espacio del selector Formato a 320 px y la flecha centrada; el botón del compositor mantiene una sola zona de interacción que abarca texto y +.
+
+Se inspeccionan cabecera, escala tipográfica, orden, distancia entre controles, tarjetas con nombres/lugares largos, estados vacíos, selección, modal y retorno de foco. Las tarjetas usan participantes/iniciales e inscripciones reales del evento, nunca las caras/precios del ejemplo. Los accesos a Mensajes/QR/equipos conservan su función sin duplicar filas en la parte superior. No se añade un botón de mapa sin mapa funcional. La búsqueda no promete buscar personas dentro del feed.
+
+Las capturas locales con registros sintéticos se distinguen de las capturas de producción. La diferencia de contenido (ausencia de partidos/posts públicos) no se rellena con ejemplos inventados. Una recomendación de instalación sigue presente en navegador hasta descartarla. Las pruebas físicas de Safari/VoiceOver siguen fuera de este pase.
+
+La valoración previa queda archivada a continuación como historial del pase anterior, no como aceptación del nuevo diseño.
+
+---
+
+# LaCantera — cierre de las correcciones de auditoría
+
+15 de octubre de 2026, Europe/Madrid.
+
+**final result: passed** — revisión visual local del alcance F01–F14. No equivale a una certificación WCAG ni a una prueba física en Safari. La verificación de publicación se registra en `docs/AUDIT_CORRECTIONS_2026-10-15.md`.
+
+## Referencia y fidelidad
+
+Se conserva el diseño aprobado: marca C con balón, verde/blanco/menta, Manrope, fotografías genéricas existentes, tarjetas, cabecera y cinco destinos inferiores. Referencia de acabado: tablero adjunto de once pantallas `codex-clipboard-0485365f-d8a6-4715-ac4b-d21a4ac88a3a.png`. No se generan ni sustituyen imágenes en este pase. Las funciones disponibles, los permisos de eventos privados y el cierre de multimedia hasta patrocinio se conservan.
+
+La referencia inmediata de los defectos es `output/design/product-audit-2026-10-15/`; las capturas posteriores están en `output/design/audit-corrections-2026-10-15/`. Son capturas nuevas de CUA, con dimensiones verificadas en DOM. Escrituras de prueba sólo en localhost/demo o Firebase Emulator `demo-cantera-ux`, con identidades sintéticas. Los datos locales no se publican.
+
+## Comparación visual
+
+- `comparacion-retirada.png`: antes/después a 1280×720. La explicación ya tiene todo el ancho lateral y las dos acciones se apilan, en lugar de comprimirla entre botones. Prueba móvil adicional `23-retirada-movil.png`.
+- `comparacion-registro.png`: antes/después a 1280×720. Cambiar de acceso a registro vuelve al comienzo de la pantalla. Se preservan la franja fotográfica y el retorno interno.
+- `comparacion-feed.png`: antes/después a 320×780. Misma publicación con comentarios abiertos y enlace copiado, conservando tarjeta y formulario; texto auxiliar y nombre accesible más claros. La portada y navegación nueva se comprueban por separado en `28-feed-320.png`. Se conserva la misma escala; el encuadre vertical cambia por el espacio adicional de búsqueda y avisos.
+- `comparacion-resultados.png`: antes/después a 1280×800. Diferentes torneos sintéticos; se compara el estado de resultado futuro, no el contenido. Sin entradas de marcador antes del comienzo.
+
+Se normaliza sólo escala proporcional y rótulos externos. No se retoca el contenido de las pantallas. Los pares se inspeccionan junto a las capturas originales; no se afirma igualdad de píxel con el tablero reducido.
+
+## Hallazgos corregidos durante este pase
+
+| Área | Resultado y evidencia |
+|---|---|
+| Navegación móvil | Mensajes persistente y Perfil abajo; Feed/Personas/Equipos/QR accesibles. `13-bandeja-pendiente-movil.png`, `28-feed-320.png`. |
+| Perfil público | Mensaje como acción principal del contacto y bloqueo en Más opciones. `16-perfil-contacto.png`. |
+| Equipos y Juega | Pestañas visibles y filtros de fechas separados de formatos. `05-equipos-propios.png`, `06-equipos-descubrir.png`, `07-juega.png`, `29-equipos-320.png`, `31-juega-tablet.png`. |
+| Organización | Gestión e invitación/enlace accesibles; recuperación secundaria. Revisión explícita de participantes y sistema antes de cerrar la convocatoria, con foco y margen bajo cabecera. `21-revision-cruces-movil.png`. |
+| Agenda y avisos | Próximos/Historial, cuenta por fecha y cancelación; Avisos como destino de campana. `04-agenda.png`, `32-historial-movil.png`. |
+| Chat | Vistas previas reales, fecha y pendientes; lectura sincronizada entre dos pestañas. `09-bandeja-emulador.png` a `15-lectura-sincronizada.png`. |
+| QR | Entrada QR/código separada; decodificación local de una imagen, identidad previa y conexión aceptada. `25-invitacion-qr-emulador.png` a `27-qr-conexion-aceptada.png`. |
+| Administración | Sólo transición de estado aplicable y búsqueda por nombre, identificador técnico secundario. `17-admin-estado.png`, `18-admin-buscar.png`. No se aplican decisiones a cuentas reales. |
+| Legibilidad | Iniciales consistentes, organizador espaciado, auxiliares aumentados, ubicación con fondo opaco e índice legal con foco. `30-privacidad-indice-320.png`. |
+
+La lectura del CSS efectivo tras publicación detectó además una regla antigua con `!important` que mantenía gris la ubicación sobre verde; se retiró esa prioridad para aplicar blanco sobre fondo opaco. La inspección detectó y corrigió una pestaña de Equipos sin estilo al entrar directamente, un título de confirmación bajo la cabecera y un alcance de búsqueda todavía recortado a 1×1 px por CSS cargado de forma diferida. Las capturas finales sustituyen esas iteraciones. En el build de producción se corrigió también el enlace de vuelta al registro a 320 px: ahora tiene 44 px de altura y no se parte en dos fragmentos, conservando su texto. Sin desbordamiento horizontal en las vistas comprobadas a 320, 390, 768 y 1280 px; no se deduce ausencia de overflow en cada estado imaginable.
+
+## Controles y límites
+
+Se prueban ambos caminos de la retirada local, revisión/cierre del torneo en Firebase SDK emulado, bloqueo de resultado futuro, aceptación QR de imagen entre dos cuentas, envío/respuesta y lectura del chat, cambio de identidad sin contenido anterior, selección administrativa y salto legal con foco. Los tests de reglas cubren accesos ajenos, bloqueos y resultados prematuros.
+
+Pendiente de dispositivo físico: cámara/permiso QR en iPhone, instalación y actualización desde pantalla de inicio, Google OAuth real y teclado virtual/VoiceOver. Se prueba autenticación de identidades sintéticas mediante Auth Emulator; no se presenta como una nueva prueba de OAuth de Google. Multimedia cloud sigue cerrada hasta patrocinio, como condición de operación existente.
+
+## Comprobación publicada
+
+Fuente funcional `83c2a1991fd9d9b4525f40abb38a56c482e26d98`, Hosting `820fd1a828211254`, 55 archivos idénticos al build, reglas e índices verificados. La ubicación publicada usa blanco sobre verde opaco (no gris heredado), y el documento a 390×844 no tiene desbordamiento horizontal. Consola final: cero entradas de error en la consulta realizada.
+
+La sesión real actualiza la PWA y conserva el acceso. La bandeja carga el último mensaje guardado y retira el pendiente al leer; Mensaje del perfil conectado abre el hilo existente. Agenda separa 0 próximos y 2 pasados. Se conservan estado abierto, administración y datos reales. No se envían mensajes ni crean contenidos nuevos en producción. Las capturas `37-inicio-produccion.png` y `39-chat-produccion.png` a `42-juega-produccion.png` están en la carpeta de evidencia. CI final: 432 pruebas aprobadas, sin omisiones, además de TypeScript/build.
