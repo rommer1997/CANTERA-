@@ -1,3 +1,7 @@
+## Publicación de Juega y Comunidad — 16 octubre 2026
+
+Fuente `ab3a063`, CI 38851843424 aprobada: 432 pruebas. Hosting `618738acccf9d446`, release `1792125785946000` (06:43 Madrid); 54 archivos idénticos al build. CUA en producción confirma actualización PWA, tarjetas privadas propias, estado público vacío, recomendaciones reales y compositor con retorno del foco. Comunidad sin desbordamiento a 320 px. No se escribe contenido de prueba en producción. Detalles en `docs/DISCOVERY_DESIGN_2026-10-16.md`.
+
 # LaCantera — Juega y Comunidad según las nuevas referencias
 
 16 de octubre de 2026.
