@@ -1,3 +1,21 @@
+# LaCantera — Juega y Comunidad según las nuevas referencias
+
+16 de octubre de 2026.
+
+**final result: passed** — inspección visual local de las dos superficies, con funciones existentes conservadas. Alcance y verificación publicados en `docs/DISCOVERY_DESIGN_2026-10-16.md`.
+
+La fuente son las dos últimas referencias móviles del usuario de este turno. El objetivo es su jerarquía y composición, con contenido y servicios reales. Juega agrupa filtros en selectores y reserva la pantalla a partidos; Comunidad presenta compositor y stream con pestañas subrayadas. Blanco, verde #006747, bordes finos, fotos existentes y controles nativos. Las dos primeras capturas del usuario documentan el problema anterior; no se usan como objetivo.
+
+Capturas nuevas de CUA en `output/design/discovery-2026-10-16/`: juega-320, juega-430, comunidad-430, comunidad-comentarios-320, comunidad-busqueda-320 y adaptaciones desktop. Se verifican dimensiones en DOM. Sin desbordamiento del documento en las vistas probadas. Se corrige durante la inspección el espacio del selector Formato a 320 px y la flecha centrada; el botón del compositor mantiene una sola zona de interacción que abarca texto y +.
+
+Se inspeccionan cabecera, escala tipográfica, orden, distancia entre controles, tarjetas con nombres/lugares largos, estados vacíos, selección, modal y retorno de foco. Las tarjetas usan participantes/iniciales e inscripciones reales del evento, nunca las caras/precios del ejemplo. Los accesos a Mensajes/QR/equipos conservan su función sin duplicar filas en la parte superior. No se añade un botón de mapa sin mapa funcional. La búsqueda no promete buscar personas dentro del feed.
+
+Las capturas locales con registros sintéticos se distinguen de las capturas de producción. La diferencia de contenido (ausencia de partidos/posts públicos) no se rellena con ejemplos inventados. Una recomendación de instalación sigue presente en navegador hasta descartarla. Las pruebas físicas de Safari/VoiceOver siguen fuera de este pase.
+
+La valoración previa queda archivada a continuación como historial del pase anterior, no como aceptación del nuevo diseño.
+
+---
+
 # LaCantera — cierre de las correcciones de auditoría
 
 15 de octubre de 2026, Europe/Madrid.
