@@ -203,4 +203,7 @@
   .c-app.c-product-shell .cm-contact { gap:8px; }
   .c-app.c-product-shell .team-directory>.c-section-head { flex-direction:row; align-items:center; }
   .c-app.c-product-shell .team-directory>.c-section-head>.c-button { min-width:75px; font-size:13px; padding:9px 10px; }
+  .c-app.c-product-shell .people-row { display:flex; flex-direction:column; align-items:stretch; gap:12px; }
+  .c-app.c-product-shell .people-row>.people-person { width:100%; }
+  .c-app.c-product-shell .people-row>.people-follow,.c-app.c-product-shell .people-row>.people-button { align-self:flex-end; }
 }
