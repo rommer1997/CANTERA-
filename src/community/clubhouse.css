@@ -255,8 +255,12 @@
  .c-app.c-studio .cf-composer { padding:var(--c-space-md); }
  .c-app.c-studio .cf-compose-label { font-size:12px; }
  .c-app.c-studio .cf-social-links { gap:12px; }
- .c-app.c-studio .team-grid { gap:var(--c-space-md); }
- .c-app.c-studio .team-card { padding:20px 12px 12px; }
+ .c-app.c-studio .team-grid { grid-template-columns:minmax(0,1fr); gap:var(--c-space-md); }
+ .c-app.c-studio .team-card { display:grid; grid-template-columns:56px minmax(0,1fr); text-align:left; align-items:start; gap:6px 16px; padding:var(--c-space-xl); }
+ .c-app.c-studio .team-card>.team-monogram { grid-column:1; grid-row:1 / 4; margin:0; }
+ .c-app.c-studio .team-card>:is(h3,.team-card-location,.team-card-level,.team-badge) { grid-column:2; justify-content:flex-start; }
+ .c-app.c-studio .team-card h3 { font-size:18px; }
+ .c-app.c-studio .team-card>.team-card-cta { grid-column:1 / -1; margin-top:var(--c-space-md); }
  .c-app.c-studio .team-monogram { width:56px; height:56px; font-size:22px; }
  .c-app.c-studio .team-profile-head { padding:var(--c-space-xl); }
  .c-app.c-studio :is(.c-own-profile-cover,.people-profile-cover) { height:176px; }
