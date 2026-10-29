@@ -16,6 +16,7 @@ import { eventCover, eventCovers, type EventCoverId } from './eventCovers';
 import { matchesEventDate, type EventDateFilter } from './eventBrowsing';
 import type { EventInput, Fixture, PlayEvent, Rsvp } from './types';
 import './events.css';
+import { ScreenHeading } from './screen-heading';
 import { useClock } from './useClock';
 import { profileInitials } from './experience';
 
@@ -533,10 +534,9 @@ export default function EventsPage() {
   return <div className="ce-events-page ce-discovery">
     <div className="ce-explore-hero">
     <button type="button" className="ce-place-switch" aria-expanded={filtersOpen} aria-controls="ce-event-filters" onClick={() => setFiltersOpen(value => !value)}><MapPin size={17} aria-hidden="true" /><span>{locationSummary === 'Todos los países y ciudades' ? 'Cualquier ubicación' : locationSummary}</span><ChevronDown size={16} aria-hidden="true" /></button>
-    <header className="ce-workspace-header">
-      <div><h1>{view === 'mine' ? 'Tus encuentros' : 'Vamos a jugar'}</h1><p>{view === 'mine' ? 'Tu fútbol, en un solo lugar.' : 'Encuentra tu próximo partido.'}</p></div>
+    <ScreenHeading className="ce-workspace-header" eyebrow="PARTIDOS Y TORNEOS" title={view === 'mine' ? 'Tu agenda.' : 'Juega.'} description={view === 'mine' ? 'Tu fútbol, en un solo lugar.' : 'Tu próximo partido empieza aquí.'}>
       {profile ? <button type="button" className="c-button" onClick={openCreate} aria-label="Organizar un partido o torneo"><Plus size={19} />Crear</button> : <Link className="c-button" to="/profile" aria-label="Crear perfil para organizar un partido o torneo"><Plus size={19} />Crear</Link>}
-    </header>
+    </ScreenHeading>
     <section className="ce-filter-bar" aria-label="Buscar encuentros"><div className="ce-search"><Search size={21} aria-hidden="true" /><input type="search" enterKeyHint="search" aria-label="Buscar por nombre, país, ciudad o campo" placeholder="Partido, campo o ciudad" value={search} onChange={event => setSearch(event.target.value)} /></div><button className="ce-filter-toggle" type="button" aria-label="Más filtros de encuentros" aria-expanded={filtersOpen} aria-controls="ce-event-filters" onClick={() => setFiltersOpen(value => !value)}><SlidersHorizontal size={21} aria-hidden="true" />{activeFilterCount > 0 && <span aria-hidden="true">{activeFilterCount}</span>}</button></section>
     </div>
     <nav className="ce-view-tabs" aria-label="Vista de encuentros"><button type="button" aria-pressed={view === 'explore'} onClick={() => changeView('explore')}>Explorar</button><button type="button" aria-pressed={view === 'mine'} onClick={() => changeView('mine')}>Mis encuentros{profile && myEvents.length > 0 && <span aria-hidden="true">{myEvents.length}</span>}</button></nav>

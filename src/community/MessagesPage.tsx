@@ -7,6 +7,7 @@ import { useConversation, useMessaging } from './MessagingContext';
 import { conversationParticipants, MESSAGE_MAX_LENGTH, safeMessagingError } from './messagingLogic';
 import type { MessagingConversation, MessagingMessage } from './messagingTypes';
 import './messages.css';
+import { ScreenHeading } from './screen-heading';
 import { messageIsAfterRead } from './messagingLogic';
 import { profileInitials } from './experience';
 
@@ -182,7 +183,7 @@ function MessagesContent() {
   if (community.accountModeration?.status === 'suspended') return <MessagesStatus title="Tu cuenta tiene el acceso limitado">Consulta el estado de tu cuenta o contacta con el administrador desde tu perfil.</MessagesStatus>;
   if (!invitations.emailVerified) return <MessagesStatus title="Verifica tu correo">Verifica el correo de tu cuenta antes de enviar o consultar mensajes.</MessagesStatus>;
   if (!messaging.eligible) return <MessagesStatus title="Completa tu cuenta para conversar">Completa tu perfil, ubicación y aceptación de los términos para escribir a tus conexiones.</MessagesStatus>;
-  return <section className={`cm-page ${conversationId ? 'has-conversation' : ''}`}><header className="cm-page-heading"><div><h1>Mensajes</h1><p>Tu gente, a un mensaje.</p></div><Link className="c-button secondary" to="/connect"><Users size={17} aria-hidden="true" />Conexiones</Link></header>{!online ? <p className="cm-notice cm-offline" role="status"><WifiOff size={18} aria-hidden="true" />Sin conexión. Los mensajes se actualizarán al recuperar la conexión; el envío queda pausado.</p> : null}<div className="cm-workspace"><ConversationSidebar selectedId={conversationId} online={online} />{conversationId ? <ConversationThread key={conversationId} conversationId={conversationId} online={online} /> : <div className="cm-welcome"><span className="cm-empty-icon"><MessageCircle size={32} aria-hidden="true" /></span><h2>Hablemos de fútbol</h2><p>Elige una conversación y prepara el próximo encuentro.</p><span className="cm-privacy-note"><LockKeyhole size={15} aria-hidden="true" />Los mensajes no aparecen en el feed.</span></div>}</div></section>;
+  return <section className={`cm-page ${conversationId ? 'has-conversation' : ''}`}><ScreenHeading className="cm-page-heading" eyebrow="EL VESTUARIO" title="Mensajes." description="Una conversación. El próximo plan."><Link className="c-button secondary" to="/connect"><Users size={17} aria-hidden="true" />Conexiones</Link></ScreenHeading>{!online ? <p className="cm-notice cm-offline" role="status"><WifiOff size={18} aria-hidden="true" />Sin conexión. Los mensajes se actualizarán al recuperar la conexión; el envío queda pausado.</p> : null}<div className="cm-workspace"><ConversationSidebar selectedId={conversationId} online={online} />{conversationId ? <ConversationThread key={conversationId} conversationId={conversationId} online={online} /> : <div className="cm-welcome"><span className="cm-empty-icon"><MessageCircle size={32} aria-hidden="true" /></span><h2>Hablemos de fútbol</h2><p>Elige una conversación y prepara el próximo encuentro.</p><span className="cm-privacy-note"><LockKeyhole size={15} aria-hidden="true" />Los mensajes no aparecen en el feed.</span></div>}</div></section>;
 }
 
 export default function MessagesPage() {

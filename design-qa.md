@@ -1,3 +1,11 @@
+## Rediseño con las guías de Expo — 29 octubre 2026
+
+Revisión local: portada editorial, inicio conectado con datos reales, barra lateral de escritorio, navegación móvil flotante y acabado compartido de Juega, Comunidad, Equipos, Mensajes y perfiles. TypeScript, 340 pruebas locales y compilación de revisión correctos. Flujos probados con dos cuentas en emuladores, sin escrituras en producción. Capturas: `output/design/expo-2026-10-29/`. Alcance y límites: `docs/REDESIGN_EXPO_2026-10-29.md`.
+
+**Pendiente de publicación:** el control existente exige renovar el acta del 13 de octubre; no se altera su fecha sin confirmación del responsable. La versión pública permanece intacta. Safari físico, cámara, instalación y teclado pendientes para este diseño.
+
+---
+
 ## Equipos, Mensajes y Perfiles — acabado compartido, 16 octubre 2026
 
 Revisión local completada: superficies blancas, cabeceras y pestañas comunes, filtros agrupados de Equipos, chat con compositor dentro de pantalla y perfiles propios/públicos coherentes. Pruebas en emuladores con dos cuentas sintéticas verifican envío, recepción y respuesta; un equipo sintético verifica creación/edición. 336 pruebas locales aprobadas y TypeScript/build correctos. No se escriben datos de prueba en producción. Publicado: fuente `92d43ee`, CI 38870263401 aprobada (433 pruebas), Hosting `2917c33cae21e8da`, release `1792137484491000`, 54 archivos idénticos al build. Pantallas reales comprobadas sin crear contenido nuevo; consola consultada sin errores. Recibo y límites físicos: `docs/APP_FINISH_2026-10-16.md`.

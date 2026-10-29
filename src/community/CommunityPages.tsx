@@ -1,10 +1,10 @@
 import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useParams } from 'react-router-dom';
-import { ArrowUpRight, Bell, CalendarDays, CheckCircle2, Globe2, House, Image, MessageCircle, Play, Plus, Search, ShieldCheck, Trophy, UserRound, Users, X } from 'lucide-react';
+import { ArrowUpRight, Bell, CalendarDays, CheckCircle2, Globe2, House, Image, MessageCircle, Play, Plus, Search, ShieldCheck, Trophy, UserRound, Users, Settings, QrCode, ArrowRight, X } from 'lucide-react';
 import { friendlyError, TERMS_VERSION, useCommunity } from './CommunityContext';
 import { hostingProvider, legalDocuments, legalReady, operator, PRIVACY_VERSION } from './legal';
 import { AppAvailability } from './AppAvailability';
-import { MobileHome } from './MobileHome';
+import { ClubhouseHome } from './clubhouse-home';
 import BrandMark from '../components/BrandMark';
 import { isPublicEvent } from './eventPrivacy';
 import '@fontsource-variable/manrope';
@@ -18,6 +18,7 @@ import { profileNavigationKey, profileInitials } from './experience';
 import './audit-fixes.css';
 import './discovery-design.css';
 import './app-finish.css';
+import './clubhouse.css';
 
 const routeNames: Record<string, string> = {
   '/': 'Inicio', '/play': 'Juega', '/feed': 'Comunidad', '/profile': 'Tu perfil',
@@ -53,10 +54,13 @@ export function CommunityLayout() {
     if (!createOpen && dialog.open) dialog.close();
   }, [createOpen]);
   const createLink = (destination: string) => profile ? destination : `/profile?returnTo=${encodeURIComponent(destination)}`;
-  return <div className={`c-app${pathname !== '/' ? ' c-product-shell' : ''}${pathname.startsWith('/messages/') ? ' c-chat-shell' : ''}${pathname === '/play' || pathname === '/feed' ? ' c-discovery-shell' : ''}`}><header className="c-header">
+  return <div className={`c-app c-studio c-product-shell${pathname === '/' && !profile ? ' lc-public-home' : ' lc-workspace'}${pathname.startsWith('/messages/') ? ' c-chat-shell' : ''}${pathname === '/play' || pathname === '/feed' ? ' c-discovery-shell' : ''}`}>
+    <button className="lc-skip-link" type="button" onClick={() => mainRef.current?.focus()}>Ir al contenido</button>
+    <aside className="lc-sidebar" aria-label="Tu espacio en LaCantera"><Link className="lc-rail-brand" to="/" aria-label="LaCantera, inicio"><BrandMark /><span>LaCantera<small>EL FÚTBOL NOS ENCUENTRA</small></span></Link><span className="lc-rail-label">TU PUNTO DE ENCUENTRO</span><nav aria-label="Navegación del espacio"><NavLink to="/" end><House size={20} />Inicio<ArrowRight className="lc-rail-arrow" size={16} /></NavLink><NavLink to="/play"><CalendarDays size={20} />Juega<ArrowRight className="lc-rail-arrow" size={16} /></NavLink><NavLink to="/feed"><Users size={20} />Comunidad<ArrowRight className="lc-rail-arrow" size={16} /></NavLink><NavLink to="/teams"><ShieldCheck size={20} />Equipos<ArrowRight className="lc-rail-arrow" size={16} /></NavLink><NavLink to="/messages"><MessageCircle size={20} />Mensajes{messaging.unreadCount > 0 && <span className="lc-rail-count">{messaging.unreadCount}</span>}</NavLink></nav><button className="lc-rail-create" type="button" onClick={() => setCreateOpen(true)} aria-haspopup="dialog" aria-expanded={createOpen}><Plus size={21} />Crear<ArrowUpRight size={18} /></button><div className="lc-rail-bottom"><Link to="/connect"><QrCode size={18} />Conectar por QR</Link><Link to="/about">El proyecto<ArrowUpRight size={17} /></Link>{isAdmin && <Link to="/admin"><ShieldCheck size={18} />Administración</Link>}<div className="lc-rail-account"><Link to="/profile"><span className="c-avatar">{profile ? profileInitials(profile.name) : <UserRound size={18} />}</span><span><strong>{profile?.name || 'Tu sitio está aquí'}</strong><small>{profile ? 'Tu perfil deportivo' : 'Únete a la comunidad'}</small></span></Link>{profile && <Link to="/profile?tab=settings" aria-label="Ajustes de tu cuenta"><Settings size={18} /></Link>}</div><span className="lc-rail-credit">Powered by Rommer Volcanes</span></div></aside>
+    <header className="c-header">
     <Link className="c-brand" to="/" aria-label="LaCantera, inicio"><BrandMark className="c-brand-mark" />LaCantera</Link>
     <nav aria-label="Navegación principal" className="c-nav"><NavLink to="/" end>Inicio</NavLink><NavLink to="/play">Juega</NavLink><NavLink to="/feed">Comunidad</NavLink><NavLink to="/teams">Equipos</NavLink><NavLink to="/messages">Mensajes</NavLink></nav>
-    <div className="c-header-tools">
+    <div className="lc-top-context"><span>EN LACANTERA</span><p>{profile?.city && profile.country ? `${profile.city}, ${profile.country}` : 'Tu fútbol, sin fronteras.'}</p></div><div className="c-header-tools">
       <Link to="/people" className="c-discover-link" aria-label="Buscar personas y clubes"><Search size={20} aria-hidden="true" /></Link>
       {profile ? <>
         <Link to="/activity" className="c-discover-link c-notice-bell" aria-label={`Avisos${eventNotices.some(n => !n.readAt) ? ', hay avisos sin leer' : ''}`}><Bell size={20} aria-hidden="true" />{eventNotices.some(n => !n.readAt) ? <span /> : null}</Link>
@@ -69,9 +73,9 @@ export function CommunityLayout() {
       </>}
     </div>
   </header><AppAvailability />{import.meta.env.DEV && import.meta.env.VITE_FIREBASE_EMULATORS === 'true' ? <div className="c-demo" role="status">Pruebas Firebase locales · ninguna acción se publica en producción.</div> : null}{mode === 'demo' ? <div className="c-demo" role="status"><span className="c-desktop-only">Entorno de prueba local · tus cambios se guardan sólo en este navegador.</span><span className="c-mobile-only">Prueba local · sólo en este dispositivo.</span> <Link to="/profile">Cuenta real</Link></div> : null}
-    {mode === 'cloud' && runtimeConfig.serviceStatus !== 'open' ? <div className="c-service-status" role="status">{runtimeConfig.serviceStatus === 'pilot' ? 'Piloto privado de LaCantera · acceso sólo para cuentas autorizadas.' : runtimeConfig.serviceStatus === 'paused' ? 'Comunidad en mantenimiento.' : 'Estamos preparando la apertura de LaCantera.'} <Link to="/about">Conoce el proyecto</Link></div> : null}{error ? <div className="c-global-error" role="alert">{error} <Link to="/profile">Revisar cuenta</Link></div> : null}
+    {mode === 'cloud' && runtimeConfig.serviceStatus !== 'open' ? <div className="c-service-status" role="status">{!runtimeConfig.updatedAt ? 'Conectando con LaCantera…' : runtimeConfig.serviceStatus === 'pilot' ? 'Piloto privado de LaCantera · acceso sólo para cuentas autorizadas.' : runtimeConfig.serviceStatus === 'paused' ? 'Comunidad en mantenimiento.' : 'Estamos preparando la apertura de LaCantera.'} <Link to="/about">Conoce el proyecto</Link></div> : null}{error ? <div className="c-global-error" role="alert">{error} <Link to="/profile">Revisar cuenta</Link></div> : null}
     <div className="c-route-announcement" role="status" aria-live="polite" aria-atomic="true">{routeName}</div>
-    <main ref={mainRef} className="c-main" tabIndex={-1}><Suspense fallback={<div className="c-app-loading" role="status">Cargando…</div>}><Outlet /></Suspense></main><footer className="c-footer"><div><Link className="c-brand" to="/" aria-label="LaCantera, inicio"><BrandMark className="c-brand-mark" />LaCantera</Link><p>El fútbol nos reúne. En cualquier lugar.</p><p className="c-brand-credit">Powered by Rommer Volcanes</p></div>
+    <main id="lc-main" ref={mainRef} className="c-main" tabIndex={-1}><Suspense fallback={<div className="c-app-loading" role="status">Cargando…</div>}><Outlet /></Suspense></main><footer className="c-footer"><div><Link className="c-brand" to="/" aria-label="LaCantera, inicio"><BrandMark className="c-brand-mark" />LaCantera</Link><p>El fútbol nos reúne. En cualquier lugar.</p><p className="c-brand-credit">Powered by Rommer Volcanes</p></div>
       <nav aria-label="Información"><Link to="/about">Misión y patrocinio</Link><Link to="/legal/terms">Términos</Link><Link to="/legal/privacy">Privacidad</Link><Link to="/legal/cookies">Cookies y almacenamiento</Link></nav><span>Acceso gratuito · sin seguimiento publicitario</span></footer>
     <details className="c-mobile-info"><summary>Sobre LaCantera y privacidad</summary><nav aria-label="Información de LaCantera"><Link to="/connect">Conexiones e invitaciones</Link><Link to="/messages">Mensajes privados</Link><Link to="/people">Personas y clubes</Link><Link to="/teams">Equipos y grupos</Link><Link to="/activity">Avisos</Link><Link to="/about">Misión y patrocinio</Link><Link to="/legal/terms">Términos de uso</Link><Link to="/legal/privacy">Privacidad</Link><Link to="/legal/cookies">Cookies y almacenamiento</Link>{isAdmin ? <Link to="/admin">Administración</Link> : null}</nav><p className="c-brand-credit">Powered by Rommer Volcanes</p></details>
     <nav className="c-bottom-nav" aria-label="Navegación móvil">
@@ -95,23 +99,7 @@ export function CommunityLayout() {
   </div>;
 }
 export function CommunityHome() {
-  const { events, profile } = useCommunity();
-  if (profile) return <div className="c-signed-home"><MobileHome /></div>;
-  const upcoming = events.filter(e => isPublicEvent(e) && e.status === 'open' && Date.parse(e.startAt) > Date.now()).sort((a, b) => Date.parse(a.startAt) - Date.parse(b.startAt)).slice(0, 3);
-  return <><MobileHome /><div className="c-desktop-home"><section className="c-hero"><div className="c-hero-copy"><p className="c-eyebrow"><span className="c-dot" /> UNA COMUNIDAD. TODO EL FÚTBOL.</p>
-    <h1>Del barrio<br />al <em>mundo.</em></h1><p className="c-lead">Organiza tu próximo partido. Crea un torneo. Comparte lo que te hace sentir el fútbol.</p>
-    <div className="c-actions"><Link className="c-button" to="/play">Encuentra tu partido <ArrowUpRight size={18} /></Link><Link className="c-button secondary" to={profile ? '/play?create=1' : '/profile'}>Organiza gratis</Link></div>
-    <div className="c-hero-note"><Globe2 size={17} /> Amateurs, profesionales, equipos y grupos. Primera versión para mayores de 18 años.</div>
-  </div><div className="c-hero-visual">
-    <img className="c-hero-photo" src="/images/design-2026-10/hero-community.webp" alt="Jugador de espaldas con un balón en un campo de barrio al atardecer" width={800} height={1000} loading="lazy" fetchPriority="high" />
-    <Link to="/play?type=tournament" className="c-hero-float c-hero-tournament"><span className="c-hero-float-icon"><Trophy size={25} aria-hidden="true" /></span><div><strong>Tu próximo torneo</strong><span>Organízalo con tu gente</span></div><ArrowUpRight size={18} aria-hidden="true" /></Link>
-    <Link to="/play" className="c-hero-float c-hero-nearby"><img src="/images/design-2026-10/event-day.webp" alt="" width={72} height={72} loading="lazy" /><div><strong>El fútbol, cerca de ti</strong><span>Encuentra tu próximo encuentro</span></div><ArrowUpRight size={18} aria-hidden="true" /></Link>
-    <div className="c-hero-caption"><p>La próxima historia<br /><strong>se juega contigo.</strong></p><BrandMark /></div>
-  </div></section><div className="c-home-values"><div><strong>Gratis</strong><span>El núcleo, sin cuotas</span></div><div><strong>Tu comunidad</strong><span>Amateurs y profesionales</span></div><div><strong>Sin fronteras</strong><span>Ciudad y país en cada encuentro</span></div><p>«El fútbol conecta personas<br />donde otros solo ven distancias.»</p></div><section className="c-section"><div className="c-section-head"><div><p className="c-eyebrow">ENCUENTRA TU GENTE</p><h2>Un balón. Muchas posibilidades.</h2></div><Link to="/play">Explorar encuentros <ArrowUpRight size={17} /></Link></div>
-    <div className="c-pillar-grid"><Link to="/play?type=match" className="c-pillar"><CalendarDays /><span>01</span><h3>Quedamos para jugar</h3><p>Partidos por país, ciudad y nivel. Apúntate o reúne a tu propio grupo.</p><ArrowUpRight /></Link><Link to="/play?type=tournament" className="c-pillar"><Trophy /><span>02</span><h3>Algo más que un partido</h3><p>Torneos con inscripciones, calendario, resultados y clasificación.</p><ArrowUpRight /></Link><Link to="/feed" className="c-pillar"><Play /><span>03</span><h3>Tu fútbol tiene historia</h3><p>Comparte tus logros escritos y el camino que recorres. Fotos y reels pendientes de patrocinio.</p><ArrowUpRight /></Link></div>
-  </section><section className="c-section"><div className="c-section-head"><div><p className="c-eyebrow">EL PRÓXIMO ENCUENTRO</p><h2>Nos vemos en el campo.</h2></div><Link to="/play">Ver todos <ArrowUpRight size={17} /></Link></div>
-    {upcoming.length ? <div className="c-upcoming">{upcoming.map(e => <Link to={`/play/${e.id}`} className="c-upcoming-card" key={e.id}><span className="c-eyebrow">{e.type === 'match' ? 'PARTIDO' : 'TORNEO'} · F{e.format}</span><h3>{e.title}</h3><p>{e.city}, {e.country}</p><time dateTime={e.startAt}>{new Intl.DateTimeFormat('es', { timeZone: e.timeZone, dateStyle: 'medium', timeStyle: 'short' }).format(new Date(e.startAt))}</time><span className="c-event-spaces">{e.capacity - Object.keys(e.participants).length} plazas disponibles <ArrowUpRight size={17} /></span></Link>)}</div> : <div className="c-invitation"><Users size={35} /><div><h3>Todo empieza con alguien que propone jugar.</h3><p>Crea el primer encuentro y comparte la invitación con tu equipo.</p></div><Link to={profile ? '/play?create=1' : '/profile'} className="c-button">Crear un encuentro</Link></div>}
-  </section><section className="c-mission"><p className="c-eyebrow">GRATIS POR CONVICCIÓN</p><h2>El talento no debería<br />depender de una cuota.</h2><p>LaCantera nace como una iniciativa sin ánimo de lucro que busca patrocinadores y aliados para acercar el fútbol a más personas.</p><Link to="/about">Conoce la misión <ArrowUpRight size={18} /></Link></section></div></>;
+  return <ClubhouseHome />;
 }
 export { ProfilePage } from './ProfilePage';
 export function LegalPage() {
