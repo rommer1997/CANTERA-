@@ -4,7 +4,7 @@ Worker independiente de Firebase Functions, con Workers Free y D1. La app sigue 
 
 ## Estado de esta entrega
 
-Servidor desplegado el 8 de noviembre de 2026 en `https://lacantera-push.garitocastizo.workers.dev`, cuenta Cloudflare `1d93ccbf1186b4d835d92df24396a197`, plan Free comprobado en el panel. Base D1 `01055525-2120-4e22-aa12-5d6bf5a0e98e`, migración aplicada, dos secretos VAPID cargados y cron configurado. `/config` devuelve `ready: true`; se comprobaron rechazos 401 sin identidad y 403 desde un origen ajeno. Las reglas e índices de Firestore se han desplegado en la base indicada. **La publicación de la app y la prueba de recepción física siguen pendientes**; esto no acredita notificaciones recibidas por usuarios.
+Servidor desplegado el 8 de noviembre de 2026 en `https://lacantera-push.garitocastizo.workers.dev`, cuenta Cloudflare `1d93ccbf1186b4d835d92df24396a197`, plan Free comprobado en el panel. Base D1 `01055525-2120-4e22-aa12-5d6bf5a0e98e`, migración aplicada, dos secretos VAPID cargados y cron configurado. `/config` devuelve `ready: true`; se comprobaron rechazos 401 sin identidad y 403 desde un origen ajeno. Las reglas e índices de Firestore se han desplegado en la base indicada. La app ya está publicada; **la recepción push no está confirmada**. Las conexiones locales y el iPhone del responsable no alcanzan el endpoint, aunque una comprobación independiente devuelve ready:true. Consultar docs/RELEASE_2026-11-08.md antes de considerar operativos los avisos.
 
 ## Activación
 
@@ -71,3 +71,12 @@ En iPhone con iOS 16.4 o posterior, abrir LaCantera **desde el icono añadido a 
 5. Repetir recepción/clic en Android Chrome. Registrar fecha, versión y resultado, sin datos privados.
 
 Hasta completar despliegue y esta prueba no afirmar que las notificaciones están activadas en producción.
+
+
+## Entrada alternativa de Pages (preparada, sin desplegar)
+
+El paquete HTTP equivalente está en `src/pages.mjs`, con configuración estándar en `pages/wrangler.jsonc`. Se compila desde la raíz con `node scripts/build-push-pages.mjs`, sin publicar nada. El resultado queda en `.audit/push-pages` y no contiene claves privadas. La CI incluye esa compilación.
+
+La autorización original de Wrangler no permite Pages: la API devuelve error 10000. Se ha solicitado al responsable añadir únicamente `pages:write`, conservando los alcances ya autorizados. No ampliar por defecto a todos los permisos de Wrangler. Una vez autorizado: crear el proyecto `lacantera-push` con producción `main`, cargar el mismo par VAPID mediante `wrangler pages secret bulk --cwd pages --project-name lacantera-push` con entrada privada y desplegar mediante `wrangler pages deploy --cwd pages --project-name lacantera-push --branch main`, usando el pnpm/Wrangler fijados de `push-worker`. El Worker existente conserva el cron y comparte D1; no duplicar el programador ni crear otra base.
+
+Comprobar la nueva dirección y sus controles de acceso antes de cambiar `VITE_PUSH_API_URL`. La mera compilación local no demuestra que Pages esté publicado ni que resulte accesible desde una red afectada. No cambiar DNS ni activar un plan de pago para probar esta alternativa.

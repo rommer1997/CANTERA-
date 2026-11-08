@@ -22,9 +22,9 @@ La política completa está en [OPERATING_POLICY.md](OPERATING_POLICY.md) y la a
 
 Las solicitudes de derechos incluyen D1: el operador debe completar su exportación o retirada, además de Firestore, antes de cerrar el expediente. La atención del correo, revisión de conservación y custodia cifrada siguen siendo manuales. No se garantiza entrega instantánea, capacidad ilimitada ni recepción si se agotan las cuotas gratuitas. No se amplía automáticamente a un plan de pago.
 
-## Revisión renovada; publicación en curso
+## Revisión renovada y publicación realizada
 
-El responsable ha respondido expresamente «Renuevo la revisión y autorizo publicar» el 8 de noviembre de 2026. Se registra la renovación en `release-approved.json` conservando las fechas y límites de la evidencia anterior. Autoriza publicar al pasar la CI; no certifica una nueva prueba física de push, cifrado de copias o restauración real. Hosting sigue pendiente hasta registrar su recibo verificado.
+El responsable ha respondido expresamente «Renuevo la revisión y autorizo publicar» el 8 de noviembre de 2026. Se registra la renovación en `release-approved.json` conservando las fechas y límites de la evidencia anterior. Autoriza publicar al pasar la CI; no certifica una nueva prueba física de push, cifrado de copias o restauración real. Hosting se publicó y se verificó contra el build. El estado posterior y la incidencia de conexión de los avisos se detallan en [RELEASE_2026-11-08.md](RELEASE_2026-11-08.md); la recepción física sigue pendiente.
 
 Tras publicar, realizar en iPhone instalado desde Safari y después Android:
 
