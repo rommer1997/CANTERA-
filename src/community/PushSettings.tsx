@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
 import { Bell, BellOff, CheckCircle2 } from 'lucide-react';
 import { auth } from '../firebase';
@@ -114,7 +115,7 @@ function DeviceSettings({uid}:{uid:string}) {
         {enabled?<><label><input type="checkbox" checked={prefs.messages} disabled={busy} onChange={event=>void save({...prefs,messages:event.target.checked})}/>Mensajes nuevos</label><label><input type="checkbox" checked={prefs.invitations} disabled={busy} onChange={event=>void save({...prefs,invitations:event.target.checked})}/>Invitaciones y aceptaciones</label><button className="c-button secondary" disabled={busy} onClick={()=>void disable()}>{busy?'Guardando…':'Desactivar en este dispositivo'}</button></>
           :<button className="c-button" disabled={busy||!configuration?.ready||Notification.permission==='denied'} onClick={()=>void enable()}>{busy?'Activando…':'Activar notificaciones'}</button>}
         {!enabled&&Notification.permission==='denied'?<p>El permiso está bloqueado. Cámbialo en los ajustes de notificaciones de tu navegador o del iPhone.</p>:null}
-        <p className="c-small">Avisos opcionales. La pantalla bloqueada no muestra el texto de tus mensajes. Puedes desactivarlos cuando quieras.</p>
+        <p className="c-small">Avisos opcionales. La pantalla bloqueada no muestra el texto de tus mensajes. Puedes desactivarlos cuando quieras. <Link to="/legal/privacy">Consultar privacidad</Link>.</p>
       </>}
     {error?<div role="alert"><p className="c-error">{error}</p><button className="c-button secondary" disabled={busy} onClick={()=>pendingDisable?void disable():setAttempt(value=>value+1)}>{pendingDisable?'Reintentar desactivación':'Volver a comprobar'}</button></div>:null}
   </section>;
