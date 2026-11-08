@@ -11,18 +11,22 @@ import './push.css';
 
 export function PushSession() {
   useEffect(() => {
+    let revision=0;
     const stop=onAuthStateChanged(auth,user=>{
       const uid=user?.uid||'';
+      const version=++revision;
+      const current=()=>version===revision&&(auth.currentUser?.uid||'')===uid;
       clearOtherPushOutboxes(uid);
       if('indexedDB' in window&&'serviceWorker' in navigator)void (async()=>{
         const binding=await readPushBinding();
+        if(!current())return;
         if(binding?.uid&&binding.uid!==uid){
           discardPendingPush(binding.uid);
           await writePushBinding({uid:'',enabled:false});
           const registration=await navigator.serviceWorker.getRegistration(new URL(import.meta.env.BASE_URL,window.location.href).href);
           const subscription=await registration?.pushManager.getSubscription();
           const latest=await readPushBinding();
-          if(!latest?.enabled){await subscription?.unsubscribe();(await registration?.getNotifications())?.forEach(item=>item.close());}
+          if(current()&&!latest?.enabled){await subscription?.unsubscribe();(await registration?.getNotifications())?.forEach(item=>item.close());}
         }
         if(auth.currentUser?.uid===uid&&uid){void flushPendingPush();void renewPushDevice(uid);}
       })().catch(()=>undefined);
@@ -30,7 +34,7 @@ export function PushSession() {
     const refresh=()=>{if(document.visibilityState==='visible'){void flushPendingPush();const uid=auth.currentUser?.uid;if(uid)void renewPushDevice(uid);}};
     window.addEventListener('online',refresh);document.addEventListener('visibilitychange',refresh);
     const timer=window.setInterval(()=>void flushPendingPush(),30000);
-    return()=>{stop();window.removeEventListener('online',refresh);document.removeEventListener('visibilitychange',refresh);window.clearInterval(timer);};
+    return()=>{revision++;stop();window.removeEventListener('online',refresh);document.removeEventListener('visibilitychange',refresh);window.clearInterval(timer);};
   },[]);
   return null;
 }
