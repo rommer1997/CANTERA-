@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
@@ -82,6 +82,18 @@ test('Firebase JWT exige firma RSA, emisor, audiencia, correo verificado y caduc
   assert.equal(await verifyToken(await token(),'demo-test',{keySet:[key]}),'alice');
   for(const overrides of [{aud:'other'},{iss:'https://evil.test'},{exp:epoch-1},{iat:epoch+600},{email_verified:false},{sub:'../../alice'}])await assert.rejects(verifyToken(await token(overrides),'demo-test',{keySet:[key]}));
   await assert.rejects(verifyToken((await token()).slice(0,-8)+'AAAAAAAA','demo-test',{keySet:[key]}));
+});
+
+test('un fallo interno registra sólo etapa y código, sin credenciales ni detalles privados',async()=>{
+  const warnings=[];const spy=mock.method(console,'warn',(...args)=>warnings.push(args));
+  try{
+    const worker=createWorker({authenticate:async()=> 'alice',read:async()=>{throw Error('PRIVATE TOKEN AND PROFILE');}});
+    const response=await worker.fetch(new Request('https://push.test/events',{method:'POST',headers:{Origin:'https://lacantera.web.app',Authorization:'Bearer PRIVATE TOKEN'}}),
+      {ALLOWED_ORIGINS:'https://lacantera.web.app',DB:{},VAPID_PUBLIC_KEY:'public',VAPID_PRIVATE_KEY:'secret'},{});
+    assert.equal(response.status,503);assert.deepEqual(await response.json(),{error:'temporarily-unavailable'});
+    assert.deepEqual(warnings,[['push-api-unavailable',JSON.stringify({stage:'active-account',code:'internal'})]]);
+    assert.ok(!JSON.stringify(warnings).includes('PRIVATE'));
+  }finally{spy.mock.restore();}
 });
 
 test('el payload Web Push se descifra en el receptor con RFC 8291 y lleva VAPID para el origen correcto',async()=>{

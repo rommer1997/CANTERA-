@@ -70,10 +70,12 @@ export function createWorker(dependencies={}) {
       const url=new URL(request.url);
       if(!allowed)return json({error:'origin-not-allowed'},403);
       if(request.method==='OPTIONS')return new Response(null,{status:204,headers:{'Access-Control-Allow-Origin':origin,Vary:'Origin','Access-Control-Allow-Methods':'GET,POST,DELETE,OPTIONS','Access-Control-Allow-Headers':'Authorization,Content-Type','Access-Control-Max-Age':'600'}});
+      let stage='configuration';
       try{
         if(url.pathname==='/config'&&request.method==='GET')return json({ready:!!(env.DB&&env.VAPID_PUBLIC_KEY&&env.VAPID_PRIVATE_KEY),publicKey:env.VAPID_PUBLIC_KEY||''},200,origin);
         if(!env.DB||!env.VAPID_PUBLIC_KEY||!env.VAPID_PRIVATE_KEY)throw new PushError('not-configured',503);
         const token=request.headers.get('Authorization')?.match(/^Bearer (\S+)$/)?.[1];
+        stage='authentication';
         const uid=await authenticate(token,env.FIREBASE_PROJECT_ID);
         const read=path=>load(path,token,env);
         const db=env.DB;const now=Date.now();
@@ -88,7 +90,9 @@ export function createWorker(dependencies={}) {
           const row=await db.prepare('SELECT messages,invitations,updated_at FROM subscriptions WHERE id=? AND uid=?').bind(id,uid).first();
           return json(row?{enabled:true,messages:!!row.messages,invitations:!!row.invitations,updatedAt:row.updated_at}:{enabled:false},200,origin);
         }
+        stage='active-account';
         await requireActive(uid,read,env.TERMS_VERSION);
+        stage='operation';
         if(url.pathname==='/subscriptions/renew'&&request.method==='POST'){
           await rate(db,`register:${uid}`,20,60_000,now);
           const data=await body(request);
@@ -118,7 +122,11 @@ export function createWorker(dependencies={}) {
           return json({accepted:true,queued:count},202,origin);
         }
         throw new PushError('not-found',404);
-      }catch(error){return json({error:error instanceof PushError?error.code:'temporarily-unavailable'},error instanceof PushError?error.status:503,origin);}
+      }catch(error){
+        const status=error instanceof PushError?error.status:503;
+        if(status>=500)console.warn('push-api-unavailable',JSON.stringify({stage,code:error instanceof PushError?error.code:'internal'}));
+        return json({error:error instanceof PushError?error.code:'temporarily-unavailable'},status,origin);
+      }
     },
     async scheduled(_event,env,ctx){
       const now=Date.now();

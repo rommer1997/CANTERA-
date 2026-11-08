@@ -57,7 +57,12 @@ export async function readFirestore(path, token, env, fetcher = fetch) {
   });
   if(response.status===404)return null;
   if(response.status===403||response.status===401)throw new PushError('unavailable',403);
-  if(!response.ok)throw new PushError('temporarily-unavailable',503);
+  if(!response.ok){
+    // Operational codes only: never tokens, document IDs, response bodies or
+    // profile/message contents. Live tails can diagnose rejected REST reads.
+    console.warn('push-firestore-unavailable',JSON.stringify({status:response.status,resource:path.split('/')[0]}));
+    throw new PushError('temporarily-unavailable',503);
+  }
   return decodeFields((await response.json()).fields);
 }
 export async function requireActive(uid, read, termsVersion) {
