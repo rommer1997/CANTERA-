@@ -22,9 +22,9 @@ La política completa está en [OPERATING_POLICY.md](OPERATING_POLICY.md) y la a
 
 Las solicitudes de derechos incluyen D1: el operador debe completar su exportación o retirada, además de Firestore, antes de cerrar el expediente. La atención del correo, revisión de conservación y custodia cifrada siguen siendo manuales. No se garantiza entrega instantánea, capacidad ilimitada ni recepción si se agotan las cuotas gratuitas. No se amplía automáticamente a un plan de pago.
 
-## Publicación pendiente
+## Revisión renovada; publicación en curso
 
-El acta aceptada por el responsable es del 13 de octubre. `scripts/check-release.mjs` exige que tenga menos de siete días y actualmente rechaza la compilación pública por esa fecha. Esta revisión técnica **no cambia la fecha de aceptación del responsable**. Falta renovar su revisión de la política, los compromisos manuales y el cambio de proveedor opcional para poder publicar la app con el endpoint configurado.
+El responsable ha respondido expresamente «Renuevo la revisión y autorizo publicar» el 8 de noviembre de 2026. Se registra la renovación en `release-approved.json` conservando las fechas y límites de la evidencia anterior. Autoriza publicar al pasar la CI; no certifica una nueva prueba física de push, cifrado de copias o restauración real. Hosting sigue pendiente hasta registrar su recibo verificado.
 
 Tras publicar, realizar en iPhone instalado desde Safari y después Android:
 

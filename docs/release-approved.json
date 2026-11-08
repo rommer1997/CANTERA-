@@ -1,6 +1,6 @@
 {
   "approvedBy": "Rommer Volcanes",
-  "approvedAt": "2026-10-13T21:36:34.538Z",
+  "approvedAt": "2026-11-08T15:12:44.397Z",
   "projectId": "gen-lang-client-0853130215",
   "databaseId": "ai-studio-647af55f-499b-43f3-9268-9bf5f62701bb",
   "checks": {
@@ -15,11 +15,12 @@
     "accountRights": true
   },
   "evidence": {
-    "operatorReview": "Confirmación explícita del responsable el 13 de octubre: Revisado y aceptado; correo probado. Propuesta PUBLIC_OPENING_REVIEW y OPERATING_POLICY aceptada.",
-    "twoAccounts": "Google: conexión recíproca confirmada por GET; chat QA enviado y respuesta Recibido recibida; admisión privada y retirada verificadas en Firestore. Safari físico e instalación confirmados por el responsable.",
+    "operatorReview": "Renovación explícita del responsable el 8 de noviembre de 2026: «Renuevo la revisión y autorizo publicar». Confirma los compromisos de atención, conservación y copias cifradas y acepta la ampliación de privacidad opcional Cloudflare/D1 de PUSH_ACTIVATION_2026-11-08.md. Aprobación anterior: 2026-10-13T21:36:34.538Z.",
+    "twoAccounts": "Google: conexión recíproca confirmada por GET; chat QA enviado y respuesta Recibido recibida; admisión privada y retirada verificadas en Firestore. Safari físico e instalación confirmados por el responsable. Las pruebas físicas anteriores corresponden al núcleo previo; el 8 de noviembre se verificaron envío directo y plaza por aceptación con dos cuentas sintéticas en emuladores. La recepción push real y el clic en iPhone/Android siguen pendientes; no se certifican mediante esta renovación.",
     "backupRestore": "Siete documentos reales restaurados y verificados en emulador vacío. No se restauró producción ni Auth.",
-    "accountRights": "Integración real Auth Emulator y Firestore Emulator con cuentas sintéticas y gracia de 65 minutos mediante reloj de ensayo; revisión de operación manual aceptada.",
-    "custody": "Custodia cifrada y conservación son compromisos manuales aceptados. La herramienta local de cifrado conserva la entrada; no se afirma que copias históricas estén ya cifradas.",
-    "activation": "Acta de revisión previa. El estado público sólo se acredita mediante el recibo posterior de Hosting y lectura de runtime abierto."
+    "accountRights": "Integración real Auth Emulator y Firestore Emulator con cuentas sintéticas y gracia de 65 minutos mediante reloj de ensayo; revisión de operación manual aceptada. La renovación del 8 de noviembre acepta también la operación manual de exportación y baja de D1 descrita en push-worker/README.md.",
+    "custody": "Custodia cifrada y conservación son compromisos manuales aceptados. La herramienta local de cifrado conserva la entrada; no se afirma que copias históricas estén ya cifradas. El responsable renueva el compromiso manual el 8 de noviembre; la renovación no acredita un nuevo cifrado o ensayo de restauración de copias reales.",
+    "activation": "Acta de revisión previa. El estado público sólo se acredita mediante el recibo posterior de Hosting y lectura de runtime abierto.",
+    "cloudReview": "Preflight GET-only del 8 de noviembre de 2026, 14:39:24 UTC: diez GET HTTP 200; reglas coincidentes, 33 índices READY, dominio Auth, Google y administrador existente verificados. Worker en Workers Free, configuración ready:true, 401 sin identidad y 403 para origen ajeno."
   }
 }
