@@ -20,3 +20,6 @@ __pycache__/
 *.pyc
 push-worker/.wrangler/
 push-worker/.dev.vars*
+
+push-worker/pages/.wrangler/
+push-worker/pages/.dev.vars*
