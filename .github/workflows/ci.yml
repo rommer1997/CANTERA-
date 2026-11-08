@@ -31,6 +31,7 @@ jobs:
       - run: pnpm --dir push-worker --ignore-workspace check
       - run: pnpm --dir push-worker --ignore-workspace test
       - run: pnpm --dir push-worker --ignore-workspace exec wrangler deploy --dry-run
+      - run: node scripts/build-push-pages.mjs
 
   checks:
     name: TypeScript, dominio, build y reglas

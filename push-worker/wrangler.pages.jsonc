@@ -1,0 +1,20 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "lacantera-push",
+  "account_id": "1d93ccbf1186b4d835d92df24396a197",
+  "pages_build_output_dir": "../.audit/push-pages",
+  "compatibility_date": "2026-11-08",
+  "vars": {
+    "FIREBASE_PROJECT_ID": "gen-lang-client-0853130215",
+    "FIREBASE_DATABASE_ID": "ai-studio-647af55f-499b-43f3-9268-9bf5f62701bb",
+    "APP_ORIGIN": "https://lacantera.web.app",
+    "ALLOWED_ORIGINS": "https://lacantera.web.app",
+    "VAPID_SUBJECT": "mailto:rommer@garitocastizo.com",
+    "TERMS_VERSION": "2026-10-08"
+  },
+  "d1_databases": [{
+    "binding": "DB",
+    "database_name": "lacantera-push",
+    "database_id": "01055525-2120-4e22-aa12-5d6bf5a0e98e"
+  }]
+}
