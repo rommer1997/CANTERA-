@@ -104,9 +104,10 @@ function InstallationGuide({ device, setDevice, close, dismiss, trigger, error }
     };
   }, [trigger]);
 
-  return <dialog ref={dialog} className="c-install-dialog" aria-labelledby={title} onCancel={event => { event.preventDefault(); close(); }}>
+  const help = <a className="c-install-help" href={helpUrls[device]} target="_blank" rel="noopener noreferrer">{device === 'ios' ? 'Ayuda de Safari' : 'Ayuda del navegador'} <ArrowUpRight size={15} aria-hidden="true" /></a>;
+  return <dialog ref={dialog} className={`c-install-dialog${device === 'ios' ? ' c-install-dialog-visual' : ''}`} aria-labelledby={title} onCancel={event => { event.preventDefault(); close(); }}>
     <header><div><img src={`${import.meta.env.BASE_URL}cantera-mark.svg`} width="48" height="48" alt="" /><h2 id={title}>Instala LaCantera</h2></div><button type="button" className="c-install-close" aria-label="Cerrar guía de instalación" onClick={close}><X size={20} aria-hidden="true" /></button></header>
-    <p>Añádela a tu pantalla de inicio para abrir tu comunidad de fútbol como una app.</p>
+    <p>Añade LaCantera a tu pantalla de inicio.</p>
     <div className="c-install-devices" role="group" aria-label="Dispositivo para instalar LaCantera">{(Object.keys(deviceNames) as InstallationDevice[]).map(value => <button type="button" key={value} aria-pressed={device === value} onClick={() => setDevice(value)}>{deviceNames[value]}</button>)}</div>
     {error ? <p className="c-error" role="alert">{error}</p> : null}
     {device === 'ios' ? <InstallationTutorial /> : device === 'android' ? <>
@@ -121,7 +122,7 @@ function InstallationGuide({ device, setDevice, close, dismiss, trigger, error }
       <li><strong>Busca el icono de instalación.</strong><span>Puede estar en la barra de direcciones o en el menú del navegador, como “Instalar LaCantera” o “Instalar esta página como aplicación”.</span></li>
       <li><strong>Confirma la instalación.</strong><span>LaCantera aparecerá entre tus aplicaciones. Si la opción no está disponible, puedes seguir usando la web.</span></li>
     </ol>}
-    <a className="c-install-help" href={helpUrls[device]} target="_blank" rel="noopener noreferrer">Ayuda del navegador <ArrowUpRight size={15} aria-hidden="true" /></a>
-    <footer><span>Instalación gratuita.</span><button type="button" className="c-button" onClick={dismiss}>Entendido</button></footer>
+    {device !== 'ios' && help}
+    <footer>{device === 'ios' ? help : <span>Instalación gratuita.</span>}<button type="button" className="c-button" onClick={dismiss}>Entendido</button></footer>
   </dialog>;
 }

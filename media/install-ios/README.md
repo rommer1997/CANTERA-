@@ -1,6 +1,6 @@
 # Tutorial de instalación de LaCantera
 
-Composición editable de 36 segundos, vertical (1080 × 1920, 30 fps), creada con HyperFrames 0.9.19. Los recursos y la tipografía son locales; la composición no carga servicios externos ni añade música o voz.
+Composición editable de 36 segundos, cuadrada (1080 × 1080, 30 fps), adaptada al reproductor integrado en móvil, creada con HyperFrames 0.9.19. Los recursos y la tipografía son locales; la composición no carga servicios externos ni añade música o voz.
 
 ## Editar y exportar
 
@@ -10,8 +10,8 @@ Desde esta carpeta, con Node 24+, pnpm, FFmpeg/FFprobe y Chrome de HyperFrames d
 pnpm dlx hyperframes@0.9.19 browser ensure
 pnpm dlx hyperframes@0.9.19 check
 pnpm dlx hyperframes@0.9.19 snapshot --at 1.5,5.5,11,17,23,28.5,34 --output ../../output/tutorial/frames
-pnpm dlx hyperframes@0.9.19 render --quality high --fps 30 --workers 1 --output ../../output/tutorial/instalar-lacantera-master.mp4
-ffmpeg -i ../../output/tutorial/instalar-lacantera-master.mp4 -c copy -movflags +faststart ../../public/tutorial/ios/instalar-lacantera-iphone.mp4
+pnpm dlx hyperframes@0.9.19 render --quality high --fps 30 --workers 1 --output ../../output/tutorial/instalar-lacantera-compacto-master.mp4
+ffmpeg -i ../../output/tutorial/instalar-lacantera-compacto-master.mp4 -c copy -movflags +faststart ../../public/tutorial/ios/instalar-lacantera-iphone-compacto.mp4
 ```
 
 `index.html` contiene los textos, la composición y la línea de tiempo pausada registrada en `window.__timelines.main`. `DESIGN.md` define la identidad. Revisa los fotogramas después de cambiar tiempos, texto o recortes, y actualiza también los subtítulos VTT y la transcripción de la app.

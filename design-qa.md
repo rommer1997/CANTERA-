@@ -2,7 +2,7 @@
 
 Fecha: 8 de noviembre de 2026. **final result: passed**.
 
-La guía visual de instalación añadida después de este pase tiene verificación independiente en [INSTALLATION_TUTORIAL_2026-11-08.md](docs/INSTALLATION_TUTORIAL_2026-11-08.md): MP4 de 36 segundos, cinco pasos con las capturas reales de Safari, reproducción y adaptación móvil verificadas. La nueva guía requiere confirmación física de reproducción en iPhone.
+La guía visual de instalación añadida después de este pase tiene verificación independiente en [INSTALLATION_TUTORIAL_2026-11-08.md](docs/INSTALLATION_TUTORIAL_2026-11-08.md): MP4 cuadrado de 36 segundos adaptado al móvil, cinco pasos con las capturas reales de Safari, reproducción y adaptación móvil verificadas. La nueva guía requiere confirmación física de reproducción en iPhone.
 
 ## Fuentes y normalización
 
