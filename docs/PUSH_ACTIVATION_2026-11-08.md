@@ -1,5 +1,11 @@
 # Activación de mensajes e invitaciones con avisos gratuitos
 
+## Resultado actual del ensayo físico
+
+El 8 de noviembre de 2026, después de actualizar la app, el responsable confirmó el ensayo solicitado con LaCantera cerrada y el iPhone bloqueado: «ahora si aparecen las notificaciones ya he hecho la prueba». La recepción de mensajes en segundo plano queda confirmada por el responsable para ese dispositivo. Fuente publicada: `ce1d803fdf52bb6f8976cd4e8066decae86ef617`, shell `db268469f05dc620`, con [460 pruebas aprobadas](https://github.com/rommer1997/CANTERA-/actions/runs/42514558622).
+
+No se extiende ese resultado a otros dispositivos ni al clic del aviso, a la invitación privada o al aviso de aceptación: esos recorridos físicos siguen pendientes. Las secciones posteriores conservan el historial de las incidencias y sus comprobaciones.
+
 ## Cambios preparados
 
 Invitación directa a una cuenta conectada, bandeja de recibidas/enviadas, rechazo y cancelación, aceptación con plaza atómica y aviso al organizador. Las directas caducan a los siete días; los QR/códigos existentes siguen durando diez minutos. Los avisos de mensajes e invitaciones son opcionales por dispositivo, con preferencias separadas y baja al cerrar sesión. La pantalla bloqueada no muestra el texto del chat.
@@ -24,7 +30,7 @@ Las solicitudes de derechos incluyen D1: el operador debe completar su exportaci
 
 ## Revisión renovada y publicación realizada
 
-El responsable ha respondido expresamente «Renuevo la revisión y autorizo publicar» el 8 de noviembre de 2026. Se registra la renovación en `release-approved.json` conservando las fechas y límites de la evidencia anterior. Autoriza publicar al pasar la CI; no certifica una nueva prueba física de push, cifrado de copias o restauración real. Hosting se publicó y se verificó contra el build. El estado posterior y la incidencia de conexión de los avisos se detallan en [RELEASE_2026-11-08.md](RELEASE_2026-11-08.md); la recepción física sigue pendiente.
+El responsable ha respondido expresamente «Renuevo la revisión y autorizo publicar» el 8 de noviembre de 2026. Se registra la renovación en `release-approved.json` conservando las fechas y límites de la evidencia anterior. Autoriza publicar al pasar la CI; esa autorización por sí sola no certifica pruebas físicas, cifrado de copias o restauración real. Hosting se publicó y se verificó contra el build. La confirmación física posterior de mensajes se recoge al inicio de este documento; el historial de la incidencia está en [RELEASE_2026-11-08.md](RELEASE_2026-11-08.md).
 
 Tras publicar, realizar en iPhone instalado desde Safari y después Android:
 
@@ -51,4 +57,4 @@ Tras el despliegue se confirmó un dispositivo de Apple para la cuenta de prueba
 
 Se encontró una lectura de IndexedDB sin plazo en el receptor del service worker. Se prepara un límite de 750 ms con cierre de conexiones tardías y aviso genérico si el almacenamiento no responde. El clic vuelve a comprobar la cuenta: permite abrir el destino interno si el almacenamiento se ha recuperado; si falla la comprobación, abre Perfil sin revelar conversación o invitación. Un payload ilegible también produce un aviso genérico en vez de una notificación silenciosa. La nueva prueba bloquea IndexedDB, fuerza un fallo de apertura y datos ilegibles: debe mostrarse un aviso sin necesitar abrir la app y recuperar la navegación al estar disponible el almacenamiento. Esta mitigación debe pasar su CI y probarse de nuevo con el iPhone cerrado; aún no se atribuye la causa física a IndexedDB como hecho demostrado.
 
-La mitigación se publicó tras su [CI aprobada](https://github.com/rommer1997/CANTERA-/actions/runs/42514558622), con 460 pruebas, fuente `ce1d803fdf52bb6f8976cd4e8066decae86ef617` y shell `db268469f05dc620`. Se verificaron los bytes de Hosting y la versión de la UI. La prueba adicional con IndexedDB completamente ausente también muestra el aviso genérico. Se pidió al responsable actualizar desde el icono instalado, salir de la app y bloquear el iPhone para coordinar el siguiente envío. La recepción en ese estado continúa pendiente.
+La mitigación se publicó tras su [CI aprobada](https://github.com/rommer1997/CANTERA-/actions/runs/42514558622), con 460 pruebas, fuente `ce1d803fdf52bb6f8976cd4e8066decae86ef617` y shell `db268469f05dc620`. Se verificaron los bytes de Hosting y la versión de la UI. La prueba adicional con IndexedDB completamente ausente también muestra el aviso genérico. Se pidió al responsable actualizar desde el icono instalado, salir de la app y bloquear el iPhone. Su respuesta posterior confirmó que ya aparecen las notificaciones al realizar ese ensayo; el resultado se registra al inicio.
