@@ -10,7 +10,7 @@ function decode(value) {
 async function googleKeys(fetcher,force=false) {
   if (!force && keys && Date.now()-loadedAt < 3600_000) return keys;
   if (!loading) loading = (async()=>{
-    const response = await fetcher(JWKS,{signal:AbortSignal.timeout(6000)});
+    const response = await fetcher(JWKS,{signal:AbortSignal.timeout(6000),redirect:'manual'});
     if (!response.ok) throw new PushError('temporarily-unavailable',503);
     const payload = await response.json();
     if (!Array.isArray(payload.keys)) throw new PushError('temporarily-unavailable',503);
@@ -53,7 +53,7 @@ export async function readFirestore(path, token, env, fetcher = fetch) {
             :path.startsWith('communityEvents/')?['ownerId','visibility','status','startAtMs']:['id','participantIds','createdAt'];
   fields.forEach(field=>target.searchParams.append('mask.fieldPaths',field));
   const response=await fetcher(target,{
-    headers:{Authorization:`Bearer ${token}`},signal:AbortSignal.timeout(6000),redirect:'error',
+    headers:{Authorization:`Bearer ${token}`},signal:AbortSignal.timeout(6000),redirect:'manual',
   });
   if(response.status===404)return null;
   if(response.status===403||response.status===401)throw new PushError('unavailable',403);

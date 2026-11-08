@@ -34,3 +34,13 @@ Tras publicar, realizar en iPhone instalado desde Safari y después Android:
 4. Desactivar mensajes, conservar invitaciones; después desactivar el dispositivo. Comprobar cierre/cambio de cuenta y bloqueo sin abrir datos ajenos.
 
 Hasta comprobar la recepción física, mantenerla explícitamente pendiente en el recibo de entrega. No renovar de forma ficticia pruebas antiguas ni afirmar que los avisos ya llegan a usuarios.
+
+## Incidencia posterior: alta del dispositivo
+
+El responsable autorizó la prueba a `rommer@garitocastizo.com`, pero al revisar el estado real confirmó «No pudimos conectar las notificaciones. Inténtalo de nuevo». D1 seguía con cero dispositivos: no se envió un mensaje sin posibilidad de entrega.
+
+La traza de Pages confirmó GET de configuración y suscripción 200, y POST de suscripción 503 con 1–2 ms de CPU. Se encontró `redirect: 'error'` en la consulta de Firestore y el envío Web Push, incompatible con workerd. Se cambia a `manual`: cualquier 3xx sigue rechazándose, sin reenviar credenciales al destino de una redirección. La documentación primaria confirma la incompatibilidad: [Request de Cloudflare Workers](https://developers.cloudflare.com/workers/runtime-apis/request/).
+
+La prueba nueva ejecuta la consulta real de `readFirestore` dentro de workerd/Miniflare y comprueba tanto el éxito como el rechazo de una redirección. Al reintroducir temporalmente la opción anterior, la prueba falla; con la corrección pasa. Esto cubre un hueco que las pruebas anteriores de HTTP sobre Node y la comprobación pública de `/config` no detectaban. Los diagnósticos del servidor contienen sólo etapa, código y tipo de recurso; no registran tokens, IDs ni cuerpos privados. Se solicita además seleccionar la cuenta de Google al entrar, para permitir alternar las dos cuentas de prueba.
+
+La corrección requiere su propia CI y despliegue en Pages y en el Worker que procesa reintentos. La activación y recepción en iPhone permanecen pendientes hasta verificarse después de ese despliegue.

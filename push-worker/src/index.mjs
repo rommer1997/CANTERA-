@@ -47,7 +47,7 @@ export async function drain(db,env,{now=Date.now(),send}={}) {
       const response=send?await send(subscription,row.payload):await fetch(subscription.endpoint,{
         ...await buildPushPayload({data:row.payload,options:{ttl:Math.max(1,Math.ceil((row.expires_at-now)/1000))}},subscription,
           {subject:env.VAPID_SUBJECT,publicKey:env.VAPID_PUBLIC_KEY,privateKey:env.VAPID_PRIVATE_KEY}),
-        redirect:'error',signal:AbortSignal.timeout(8000),
+        redirect:'manual',signal:AbortSignal.timeout(8000),
       });
       if(response.ok){await db.prepare("UPDATE deliveries SET state='sent',payload='',lease_until=0 WHERE id=?").bind(row.id).run();}
       else if(response.status===404||response.status===410){await db.prepare('DELETE FROM subscriptions WHERE id=?').bind(device.id).run();}

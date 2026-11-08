@@ -53,6 +53,7 @@ if (useLocalEmulators) {
   connectFirestoreEmulator(db, '127.0.0.1', 8080);
 }
 export const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: 'select_account' });
 
 export const signInWithGoogle = async () => {
   try {
