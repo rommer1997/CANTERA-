@@ -37,3 +37,25 @@
   .c-install-dialog { position: fixed; inset: auto 0 0; width: 100%; max-width: none; margin: 0; max-height: calc(100dvh - 16px - env(safe-area-inset-top, 0px)); padding: 20px 16px calc(20px + env(safe-area-inset-bottom, 0px)); border-radius: 20px 20px 0 0; }
   .c-install-dialog > header h2 { font-size: 20px; }
 }
+.c-install-tutorial { margin-bottom:16px; }
+.c-install-player { position:relative; }
+.c-install-play { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; width:100%; border:1px solid var(--c-line); border-radius:12px; overflow:hidden; background:var(--c-bg,#f7f9f7); cursor:pointer; }
+.c-install-play>img { width:100%; height:100%; object-fit:contain; }
+.c-install-play-label { position:absolute; bottom:24px; display:flex; align-items:center; gap:10px; min-height:48px; padding:10px 18px; border-radius:28px; background:var(--c-green); color:#fff; font-size:14px; font-weight:700; box-shadow:0 4px 18px #071b1726; }
+.c-install-play-label small { font-size:12px; font-weight:400; opacity:.85; }
+.c-install-play:focus-visible { outline:3px solid var(--c-green); outline-offset:3px; }
+.c-install-play:disabled { cursor:progress; }
+.c-install-tutorial .c-install-video-label { font-size:12px; line-height:1.5; color:var(--c-muted); margin:0 0 12px; }
+.c-install-video { display:block; width:100%; height:min(54dvh,440px); aspect-ratio:9/16; background:var(--c-bg,#f7f9f7); border:1px solid var(--c-line); border-radius:12px; object-fit:contain; }
+.c-install-download { display:inline-flex; align-items:center; gap:8px; min-height:44px; font-size:13px; color:var(--c-green); text-decoration:underline; text-underline-offset:3px; }
+.c-install-image-steps { border-top:1px solid var(--c-line); margin-top:6px; }
+.c-install-image-steps>summary,.c-install-menu-context>summary { display:flex; align-items:center; min-height:44px; font-size:14px; font-weight:700; color:var(--c-green); cursor:pointer; }
+.c-install-image-steps>summary::after,.c-install-menu-context>summary::after { content:'+'; margin-left:auto; font-size:20px; font-weight:400; }
+.c-install-image-steps[open]>summary::after,.c-install-menu-context[open]>summary::after { content:'−'; }
+.c-install-image-steps .c-install-steps { margin-top:12px; }
+.c-install-image-steps li>img { display:block; width:100%; height:auto; border-radius:10px; margin-top:12px; border:1px solid var(--c-line); }
+.c-install-menu-context { margin-top:6px; }
+.c-install-menu-context>summary { font-size:12px; font-weight:500; }
+.c-install-menu-context>img { display:block; width:min(100%,280px); height:auto; border-radius:10px; }
+.c-install-tutorial .c-install-tutorial-note { font-size:12px; line-height:1.6; color:var(--c-muted); margin:12px 0 0; }
+@media(prefers-reduced-motion:reduce) { .c-install-tutorial * { scroll-behavior:auto; } }

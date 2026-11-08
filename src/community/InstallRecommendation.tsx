@@ -1,7 +1,8 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
-import { ArrowUpRight, Download, Share, X } from 'lucide-react';
+import { ArrowUpRight, Download, X } from 'lucide-react';
 import { installedDisplayModes, installationDevice, isInstalledExperience, nativeInstallation, type InstallationDevice, type NativeInstallPrompt } from './installation';
 import './installation.css';
+import { InstallationTutorial } from './InstallationTutorial';
 
 function appExperience() {
   return isInstalledExperience({
@@ -108,12 +109,7 @@ function InstallationGuide({ device, setDevice, close, dismiss, trigger, error }
     <p>Añádela a tu pantalla de inicio para abrir tu comunidad de fútbol como una app.</p>
     <div className="c-install-devices" role="group" aria-label="Dispositivo para instalar LaCantera">{(Object.keys(deviceNames) as InstallationDevice[]).map(value => <button type="button" key={value} aria-pressed={device === value} onClick={() => setDevice(value)}>{deviceNames[value]}</button>)}</div>
     {error ? <p className="c-error" role="alert">{error}</p> : null}
-    {device === 'ios' ? <ol className="c-install-steps">
-      <li><strong>Abre LaCantera en Safari.</strong><span>Si estás en otra app o navegador, abre esta misma dirección en Safari.</span></li>
-      <li><strong>Toca Compartir <Share size={16} aria-hidden="true" />.</strong><span>Según tu versión, está en la barra o dentro del menú de página.</span></li>
-      <li><strong>Elige “Añadir a pantalla de inicio”.</strong><span>Si no aparece, revisa “Editar acciones” al final de la lista.</span></li>
-      <li><strong>Confirma con “Añadir”.</strong><span>Activa “Abrir como app web” si aparece. Después abre LaCantera desde su icono.</span></li>
-    </ol> : device === 'android' ? <>
+    {device === 'ios' ? <InstallationTutorial /> : device === 'android' ? <>
       <ol className="c-install-steps">
         <li><strong>Abre LaCantera en Chrome.</strong><span>Si estás dentro de otra app, abre esta misma dirección en el navegador.</span></li>
         <li><strong>Abre el menú de los tres puntos.</strong><span>Busca “Instalar y crear acceso directo” → “Instalar”, o “Añadir a pantalla de inicio”, según tu versión.</span></li>
