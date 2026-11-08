@@ -1,7 +1,6 @@
 {
   "$schema": "../node_modules/wrangler/config-schema.json",
   "name": "lacantera-push",
-  "account_id": "1d93ccbf1186b4d835d92df24396a197",
   "pages_build_output_dir": "../../.audit/push-pages",
   "compatibility_date": "2026-11-08",
   "vars": {
