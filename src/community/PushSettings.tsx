@@ -6,6 +6,7 @@ import { auth } from '../firebase';
 import { useCommunity } from './CommunityContext';
 import { installedDisplayModes, installationDevice, isInstalledExperience } from './installation';
 import { readPushBinding, writePushBinding } from './pushDevice';
+import { withinPushDeadline } from './pushTimeout';
 import { clearOtherPushOutboxes, disablePushDevice, discardPendingPush, flushPendingPush, publicKeyBytes, pushConfigured, pushRegistration, pushRequest, renewPushDevice, subscriptionId, type PushConfiguration, type PushPreferences } from './pushApi';
 import './push.css';
 
@@ -53,33 +54,45 @@ function DeviceSettings({uid}:{uid:string}) {
   const [enabled,setEnabled]=useState(false);const [loading,setLoading]=useState(pushConfigured&&supported()&&!needsInstallation());
   const [busy,setBusy]=useState(false);const [error,setError]=useState('');const [attempt,setAttempt]=useState(0);
   const [pendingDisable,setPendingDisable]=useState(false);
+  const [phase,setPhase]=useState('Conectando con los avisos…');
   const current=useRef(true);useEffect(()=>{current.current=true;return()=>{current.current=false;};},[]);
   const ready=()=>current.current&&auth.currentUser?.uid===uid;
   useEffect(()=>{
-    let active=true;const controller=new AbortController();
-    const current=()=>active&&auth.currentUser?.uid===uid;
+    let active=true;let expired=false;const controller=new AbortController();
+    const mounted=()=>active&&auth.currentUser?.uid===uid;
+    const current=()=>mounted()&&!expired;
     if(!pushConfigured||!supported()||needsInstallation())return()=>{active=false;};
-    setLoading(true);setError('');
-    void (async()=>{
+    setLoading(true);setError('');setPhase('Conectando con los avisos…');
+    const check=(async()=>{
       const config=await pushRequest<PushConfiguration>('/config',{public:true,signal:controller.signal});
       if(!current())return;setConfiguration(config);
       if(!config.ready)return;
+      // First-time users have no subscription to inspect. In particular, avoid
+      // querying Safari PushManager until permission has actually been granted.
+      if(Notification.permission!=='granted'){setEnabled(false);return;}
+      setPhase('Comprobando permiso del dispositivo…');
       const registration=await navigator.serviceWorker.getRegistration(new URL(import.meta.env.BASE_URL,window.location.href).href);
+      if(!current())return;
       const subscription=await registration?.pushManager.getSubscription();
+      if(!current())return;
       if(!subscription||Notification.permission!=='granted'){if(current())setEnabled(false);return;}
+      setPhase('Consultando tus preferencias…');
       const [state,binding]=await Promise.all([
         pushRequest<PushPreferences&{enabled:boolean}>(`/subscriptions?id=${await subscriptionId(subscription)}`,{uid,signal:controller.signal}),readPushBinding(),
       ]);
       if(!current())return;
       setEnabled(state.enabled&&!!binding?.enabled&&binding.uid===uid);
       if(state.enabled)setPrefs({messages:state.messages,invitations:state.invitations});
-    })().catch(()=>{if(current())setError('No pudimos comprobar las notificaciones. Revisa tu conexión y vuelve a intentarlo.');}).finally(()=>{if(current())setLoading(false);});
+    })();
+    void withinPushDeadline(check,12000,'La comprobación del dispositivo no terminó. Cierra y vuelve a abrir LaCantera para reintentarlo.',()=>{expired=true;controller.abort();})
+      .catch(failure=>{if(mounted())setError(failure instanceof Error?failure.message:'No pudimos comprobar las notificaciones. Revisa tu conexión y vuelve a intentarlo.');})
+      .finally(()=>{if(mounted())setLoading(false);});
     return()=>{active=false;controller.abort();};
   },[uid,attempt]);
   async function save(next:PushPreferences) {
     if(busy)return;setBusy(true);setError('');
     try{
-      const registration=await pushRegistration();const subscription=await registration.pushManager.getSubscription();
+      const registration=await pushRegistration();const subscription=await withinPushDeadline(registration.pushManager.getSubscription(),8000,'El dispositivo no responde. Cierra y vuelve a abrir LaCantera.');
       if(!subscription)throw new Error('Activa de nuevo las notificaciones en este dispositivo.');
       await pushRequest('/subscriptions',{method:'POST',data:{subscription:subscription.toJSON(),preferences:next},uid});
       if(ready())setPrefs(next);
@@ -94,7 +107,7 @@ function DeviceSettings({uid}:{uid:string}) {
       const permission=Notification.requestPermission();
       if(await permission!=='granted')throw new Error('No has permitido las notificaciones. Puedes cambiarlo en los ajustes del navegador o del iPhone.');
       const registration=await pushRegistration();
-      const subscription=await registration.pushManager.getSubscription()||await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:publicKeyBytes(configuration.publicKey)});
+      const subscription=await withinPushDeadline(registration.pushManager.getSubscription(),8000,'El dispositivo no responde. Cierra y vuelve a abrir LaCantera.')||await withinPushDeadline(registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:publicKeyBytes(configuration.publicKey)}),20000,'El navegador no pudo activar los avisos. Revisa tu conexión y vuelve a intentarlo.');
       if(!ready()){await subscription.unsubscribe();return;}
       await writePushBinding({uid,enabled:true});
       await pushRequest('/subscriptions',{method:'POST',data:{subscription:subscription.toJSON(),preferences:prefs},uid});
@@ -114,7 +127,7 @@ function DeviceSettings({uid}:{uid:string}) {
     {install?<div><p>Instala LaCantera y ábrela desde su icono para activar los avisos en iPhone.</p><button className="c-button secondary" onClick={()=>window.dispatchEvent(new Event('cantera-open-install-guide'))}>Ver cómo instalar</button></div>
       :!compatible?<p>Este navegador no permite notificaciones web. Puedes consultar tus avisos dentro de LaCantera.</p>
       :!pushConfigured||configuration&&!configuration.ready?<p>Las notificaciones del móvil están en preparación. Tus mensajes e invitaciones siguen disponibles dentro de LaCantera.</p>
-      :loading?<p role="status">Comprobando este dispositivo…</p>
+      :loading?<p role="status">{phase}</p>
       :<><p className="cpush-state" role="status">{enabled?<><CheckCircle2 size={18}/>Activadas en este dispositivo</>:<><BellOff size={18}/>Desactivadas en este dispositivo</>}</p>
         {enabled?<><label><input type="checkbox" checked={prefs.messages} disabled={busy} onChange={event=>void save({...prefs,messages:event.target.checked})}/>Mensajes nuevos</label><label><input type="checkbox" checked={prefs.invitations} disabled={busy} onChange={event=>void save({...prefs,invitations:event.target.checked})}/>Invitaciones y aceptaciones</label><button className="c-button secondary" disabled={busy} onClick={()=>void disable()}>{busy?'Guardando…':'Desactivar en este dispositivo'}</button></>
           :<button className="c-button" disabled={busy||!configuration?.ready||Notification.permission==='denied'} onClick={()=>void enable()}>{busy?'Activando…':'Activar notificaciones'}</button>}

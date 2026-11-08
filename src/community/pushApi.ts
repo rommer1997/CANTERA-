@@ -1,5 +1,6 @@
 import { auth } from '../firebase';
 import { readPushBinding, writePushBinding } from './pushDevice';
+import { withinPushDeadline } from './pushTimeout';
 
 export interface PushPreferences { messages: boolean; invitations: boolean }
 export type PushEvent = { kind: 'message'; conversationId: string; messageId: string } | { kind: 'invitation' | 'invitation-accepted'; code: string };
@@ -23,21 +24,30 @@ const messages: Record<string, string> = {
 };
 export async function pushRequest<T>(path: string, options: { method?: string; data?: unknown; uid?: string; signal?: AbortSignal; public?: boolean } = {}): Promise<T> {
   if (!endpoint) throw new Error('Las notificaciones todavía no están configuradas.');
-  const user = auth.currentUser;
-  if (!options.public && (!user || user.uid !== options.uid)) throw new Error(messages.unauthorized);
-  const headers: Record<string, string> = {};
-  if (!options.public) headers.Authorization = `Bearer ${await user!.getIdToken()}`;
-  if (options.data !== undefined) headers['Content-Type'] = 'application/json';
-  if (!options.public && auth.currentUser?.uid !== options.uid) throw new Error(messages.unauthorized);
-  const response = await fetch(`${endpoint}${path}`, { method: options.method || 'GET', headers,
-    ...(options.data !== undefined ? { body: JSON.stringify(options.data) } : {}),
-    signal: options.signal ? AbortSignal.any([options.signal, AbortSignal.timeout(8000)]) : AbortSignal.timeout(8000),
-    credentials: 'omit', cache: 'no-store', keepalive: options.method === 'POST',
-  });
-  if (!options.public && auth.currentUser?.uid !== options.uid) throw new Error(messages.unauthorized);
-  const value = await response.json().catch(() => null);
-  if (!response.ok) throw new PushRequestError(messages[value?.error] || 'No pudimos conectar las notificaciones. Inténtalo de nuevo.',response.status);
-  return value as T;
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  if (options.signal?.aborted) abort();
+  options.signal?.addEventListener('abort', abort, { once: true });
+  try {
+    return await withinPushDeadline((async () => {
+      const user = auth.currentUser;
+      if (!options.public && (!user || user.uid !== options.uid)) throw new Error(messages.unauthorized);
+      const headers: Record<string, string> = {};
+      if (!options.public) headers.Authorization = `Bearer ${await user!.getIdToken()}`;
+      if (options.data !== undefined) headers['Content-Type'] = 'application/json';
+      if (controller.signal.aborted) throw new Error('Comprobación cancelada.');
+      if (!options.public && auth.currentUser?.uid !== options.uid) throw new Error(messages.unauthorized);
+      const response = await fetch(`${endpoint}${path}`, { method: options.method || 'GET', headers,
+        ...(options.data !== undefined ? { body: JSON.stringify(options.data) } : {}),
+        signal: controller.signal, credentials: 'omit', cache: 'no-store', keepalive: options.method === 'POST',
+      });
+      if (!options.public && auth.currentUser?.uid !== options.uid) throw new Error(messages.unauthorized);
+      const value = await response.json().catch(() => null);
+      if (!response.ok) throw new PushRequestError(messages[value?.error] || 'No pudimos conectar las notificaciones. Inténtalo de nuevo.',response.status);
+      if (!value || typeof value !== 'object' || Array.isArray(value)) throw new PushRequestError('El servidor de avisos no devolvió una respuesta válida.',503);
+      return value as T;
+    })(), 8000, 'El servidor de avisos no responde. Revisa tu conexión y vuelve a intentarlo.', abort);
+  } finally { options.signal?.removeEventListener('abort', abort); }
 }
 export async function subscriptionId(subscription: PushSubscription): Promise<string> {
   return [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(subscription.endpoint)))].map(value => value.toString(16).padStart(2, '0')).join('');
@@ -47,19 +57,19 @@ export function publicKeyBytes(value: string): Uint8Array<ArrayBuffer> {
 }
 export async function pushRegistration(): Promise<ServiceWorkerRegistration> {
   const url = new URL(`${import.meta.env.BASE_URL}sw.js`, window.location.href);
-  const registration = await navigator.serviceWorker.register(url, { scope: new URL('./', url).pathname, updateViaCache: 'none' });
+  const registration = await withinPushDeadline(navigator.serviceWorker.register(url, { scope: new URL('./', url).pathname, updateViaCache: 'none' }),10000,'La instalación de la app está tardando. Actualiza e inténtalo de nuevo.');
   if (registration.active) return registration;
-  return Promise.race([navigator.serviceWorker.ready, new Promise<never>((_, reject) => window.setTimeout(() => reject(new Error('La instalación de la app está tardando. Actualiza e inténtalo de nuevo.')), 10000))]);
+  return withinPushDeadline(navigator.serviceWorker.ready,10000,'La instalación de la app está tardando. Actualiza e inténtalo de nuevo.');
 }
 export async function disablePushDevice() {
   const uid = auth.currentUser?.uid;
   if (!('serviceWorker' in navigator)) return;
   // Remove the local binding first, including when the backend is unreachable.
   await writePushBinding({ uid: '', enabled: false }).catch(() => undefined);
-  const registration = await navigator.serviceWorker.getRegistration(new URL(import.meta.env.BASE_URL, window.location.href).href);
-  const subscription = await registration?.pushManager.getSubscription();
+  const registration = await withinPushDeadline(navigator.serviceWorker.getRegistration(new URL(import.meta.env.BASE_URL, window.location.href).href),8000,'El dispositivo no responde. Cierra y vuelve a abrir LaCantera.');
+  const subscription = registration ? await withinPushDeadline(registration.pushManager.getSubscription(),8000,'El dispositivo no responde. Cierra y vuelve a abrir LaCantera.') : null;
   const id = subscription ? await subscriptionId(subscription) : null;
-  if (subscription) await subscription.unsubscribe();
+  if (subscription) await withinPushDeadline(subscription.unsubscribe(),8000,'No pudimos retirar los avisos del dispositivo. Vuelve a intentarlo.');
   const notifications = await registration?.getNotifications(); notifications?.forEach(notification => notification.close());
   if (uid && id && pushConfigured) await pushRequest('/subscriptions', { method: 'DELETE', data: { id }, uid });
 }

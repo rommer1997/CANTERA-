@@ -1,0 +1,21 @@
+name: Push endpoint connectivity
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/push-connectivity.yml'
+permissions:
+  contents: read
+jobs:
+  public-health:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - name: Check the public configuration from an independent network
+        shell: bash
+        run: |
+          curl --fail --silent --show-error --connect-timeout 10 --max-time 25 \
+            -H 'Origin: https://lacantera.web.app' \
+            https://lacantera-push.garitocastizo.workers.dev/config \
+            -o "$RUNNER_TEMP/push-config.json"
+          node -e 'const v=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));if(v.ready!==true||typeof v.publicKey!=="string"||v.publicKey.length!==87)process.exit(1);console.log("Public push configuration ready; no user identity or private data requested.")' "$RUNNER_TEMP/push-config.json"
