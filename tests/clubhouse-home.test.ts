@@ -13,7 +13,7 @@ function home(extra: Record<string, unknown> = {}) {
   const jsx = (type: unknown, props: unknown) => ({ type, props });
   const modules: Record<string, unknown> = {
     'react/jsx-runtime':{ jsx, jsxs:jsx }, 'react-router-dom':{ Link:'Link' }, 'lucide-react':{},
-    './CommunityContext':{ useCommunity:()=>api, TERMS_VERSION }, './eventPrivacy':privacy, './eventCovers':covers, './useClock':{ useClock:()=>now },
+    './TeamsContext':{ useTeams:()=>({ownTeams:[]}) }, './CommunityContext':{ useCommunity:()=>api, TERMS_VERSION }, './eventPrivacy':privacy, './eventCovers':covers, './useClock':{ useClock:()=>now },
   };
   const source = readFileSync(new URL('../src/community/clubhouse-home.tsx', import.meta.url),'utf8');
   const compiled = ts.transpileModule(source,{ compilerOptions:{ target:ts.ScriptTarget.ES2022, module:ts.ModuleKind.CommonJS, jsx:ts.JsxEmit.ReactJSX } }).outputText;

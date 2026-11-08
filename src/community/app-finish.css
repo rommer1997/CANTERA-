@@ -1,22 +1,22 @@
 /* Shared semantic tokens and component defaults; clubhouse.css composes the redesigned app. */
 .c-app.c-product-shell {
   /* One semantic palette and scale for the web adaptation of Expo's design-system guidance. */
-  --c-green:#174a37;
-  --c-ink:#17271f;
-  --c-muted:#686f64;
-  --c-line:#dedfd5;
-  --c-surface:#e9ede3;
-  --c-bg:#f4f2eb;
-  --c-paper:#fffefa;
-  --c-accent:#d5f48c;
-  --c-on-accent:#173d2d;
-  --c-on-brand:#fffefa;
+  --c-green:#006747;
+  --c-ink:#071b17;
+  --c-muted:#627078;
+  --c-line:#d7dfdd;
+  --c-surface:#e5f1ea;
+  --c-bg:#f7f9f7;
+  --c-paper:#ffffff;
+  --c-accent:#d6f65c;
+  --c-on-accent:#0c2d20;
+  --c-on-brand:#ffffff;
   --c-space-xs:4px; --c-space-sm:8px; --c-space-md:12px; --c-space-lg:16px;
   --c-space-xl:24px; --c-space-2xl:32px; --c-space-3xl:48px; --c-space-4xl:64px;
   --c-radius-sm:8px; --c-radius-md:12px; --c-radius-lg:20px; --c-radius-xl:28px;
   --c-type-caption:0.75rem; --c-type-small:0.875rem; --c-type-body:1rem;
   --c-type-title:1.5rem; --c-type-heading:2.5rem; --c-type-display:3.5rem;
-  --c-shadow-card:0 4px 24px #17271f06;
+  --c-shadow-card:0 4px 24px #071b1706;
   --c-motion-fast:120ms; --c-motion-sheet:180ms; --c-ease-out:cubic-bezier(.23,1,.32,1);
   background:var(--c-bg);
 }
