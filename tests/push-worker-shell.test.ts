@@ -8,7 +8,7 @@ function shell(binding:{uid:string;enabled:boolean}|null,storage:'ready'|'stalle
   const indexedDB={open:()=>{if(storage==='throws')throw Error('storage-unavailable');const request:any={};if(storage==='stalled')return request;queueMicrotask(()=>{const database={close(){},transaction(){const transaction:any={objectStore:()=>({get(){const read:any={result:binding};queueMicrotask(()=>{read.onsuccess?.();transaction.oncomplete?.();});return read;}})};return transaction;}};request.result=database;request.onsuccess?.();});return request;}};
   runInNewContext(pushServiceWorkerSource(),{self,indexedDB,URL,Promise,setTimeout,clearTimeout});
   const dispatch=async(name:string,data:any)=>{let task:Promise<any>|undefined;listeners[name]({...data,waitUntil:(value:Promise<any>)=>{task=value;}});await task;};
-  return{notifications,navigations,dispatch};
+  return{notifications,navigations,dispatch,setStorage:(value:typeof storage)=>{storage=value;}};
 }
 test('push muestra un aviso genérico sin el texto del chat y abre solo rutas internas autorizadas',async()=>{
   const api=shell({uid:'bob',enabled:true});
@@ -34,7 +34,9 @@ test('un despertar sin IndexedDB o con datos ilegibles muestra un aviso seguro s
     const api=shell({uid:'bob',enabled:true},storage);
     await api.dispatch('push',{data:{json:()=>({kind:'message',recipientId:'bob',route:'/#/messages/alice%3Abob'})}});
     assert.equal(api.notifications.length,1);assert.equal(api.notifications[0].body,'Abre LaCantera para consultar tus avisos.');
-    assert.equal(api.notifications[0].data.route,'/#/profile');assert.equal(api.notifications[0].data.recipientId,'');
+    api.setStorage('ready');
+    await api.dispatch('notificationclick',{notification:{close(){},data:api.notifications[0].data}});
+    assert.deepEqual(api.navigations,['https://lacantera.web.app/#/messages/alice%3Abob']);
   }
   const malformed=shell(null);
   await malformed.dispatch('push',{data:{json:()=>{throw Error('invalid-json');}}});

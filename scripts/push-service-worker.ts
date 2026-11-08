@@ -30,10 +30,13 @@ self.addEventListener('push',event=>event.waitUntil((async()=>{
  // An in-flight push after logout must never expose a conversation or invite.
  const mine=valid&&binding?.enabled&&binding.uid===data.recipientId;
  const bodies={message:'Tienes un mensaje nuevo.',invitation:'Te han invitado a un encuentro privado.','invitation-accepted':'Han aceptado tu invitación.'};
- const route=mine?pushRoute(data.route):'/#/profile';
+ // Keep only a sanitized target in notification data. The click checks the
+ // current binding again, so a recovered store can open the right conversation
+ // without trusting the account that was active when the push arrived.
+ const route=valid?pushRoute(data.route):'/#/profile';
  await self.registration.showNotification('LaCantera',{body:mine?bodies[data.kind]:'Abre LaCantera para consultar tus avisos.',icon:new URL('icon-192.png',self.location).href,
  tag:valid&&typeof data.tag==='string'&&/^[a-f0-9]{64}$/.test(data.tag)?data.tag:undefined,
- data:{route,recipientId:mine?data.recipientId:''}});
+ data:{route,recipientId:valid?data.recipientId:''}});
 })()));
 self.addEventListener('notificationclick',event=>{
  event.notification.close();event.waitUntil((async()=>{
