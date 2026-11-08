@@ -2,11 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { runInNewContext } from 'node:vm';
 import { pushServiceWorkerSource } from '../scripts/push-service-worker.ts';
-function shell(binding:{uid:string;enabled:boolean}|null) {
+function shell(binding:{uid:string;enabled:boolean}|null,storage:'ready'|'stalled'|'throws'='ready') {
   const listeners:Record<string,Function>={};const notifications:any[]=[];const navigations:string[]=[];
   const self={location:new URL('https://lacantera.web.app/sw.js'),addEventListener:(name:string,fn:Function)=>{listeners[name]=fn;},registration:{showNotification:async(title:string,options:any)=>{notifications.push({title,...options});}},clients:{matchAll:async()=>[],openWindow:async(url:string)=>{navigations.push(url);}}};
-  const indexedDB={open:()=>{const request:any={};queueMicrotask(()=>{const database={close(){},transaction(){const transaction:any={objectStore:()=>({get(){const read:any={result:binding};queueMicrotask(()=>{read.onsuccess?.();transaction.oncomplete?.();});return read;}})};return transaction;}};request.result=database;request.onsuccess?.();});return request;}};
-  runInNewContext(pushServiceWorkerSource(),{self,indexedDB,URL,Promise});
+  const indexedDB={open:()=>{if(storage==='throws')throw Error('storage-unavailable');const request:any={};if(storage==='stalled')return request;queueMicrotask(()=>{const database={close(){},transaction(){const transaction:any={objectStore:()=>({get(){const read:any={result:binding};queueMicrotask(()=>{read.onsuccess?.();transaction.oncomplete?.();});return read;}})};return transaction;}};request.result=database;request.onsuccess?.();});return request;}};
+  runInNewContext(pushServiceWorkerSource(),{self,indexedDB,URL,Promise,setTimeout,clearTimeout});
   const dispatch=async(name:string,data:any)=>{let task:Promise<any>|undefined;listeners[name]({...data,waitUntil:(value:Promise<any>)=>{task=value;}});await task;};
   return{notifications,navigations,dispatch};
 }
@@ -27,4 +27,16 @@ test('cambio de cuenta y rutas externas nunca abren una conversación ni una inv
   const api=shell({uid:'bob',enabled:true});
   await api.dispatch('notificationclick',{notification:{close(){},data:{recipientId:'bob',route:'https://evil.test'}}});
   assert.deepEqual(api.navigations,['https://lacantera.web.app/#/activity']);
+});
+
+test('un despertar sin IndexedDB o con datos ilegibles muestra un aviso seguro sin esperar a abrir la app',{timeout:2500},async()=>{
+  for(const storage of ['stalled','throws'] as const){
+    const api=shell({uid:'bob',enabled:true},storage);
+    await api.dispatch('push',{data:{json:()=>({kind:'message',recipientId:'bob',route:'/#/messages/alice%3Abob'})}});
+    assert.equal(api.notifications.length,1);assert.equal(api.notifications[0].body,'Abre LaCantera para consultar tus avisos.');
+    assert.equal(api.notifications[0].data.route,'/#/profile');assert.equal(api.notifications[0].data.recipientId,'');
+  }
+  const malformed=shell(null);
+  await malformed.dispatch('push',{data:{json:()=>{throw Error('invalid-json');}}});
+  assert.equal(malformed.notifications.length,1);assert.equal(malformed.notifications[0].data.route,'/#/profile');
 });
