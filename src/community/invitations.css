@@ -80,3 +80,5 @@
  .ci-entry-code { font-size: 17px; }
 }
 @media(prefers-reduced-motion:reduce) { .ci-dialog::backdrop { backdrop-filter: none; } }
+
+.ci-event-invite-options{display:flex;flex-wrap:wrap;gap:12px;align-items:center}.ci-direct-invitations{margin:24px 0}.ci-direct-invitations h2{font-size:21px;margin-bottom:16px}.ci-direct-card{display:flex;align-items:flex-start;gap:14px;padding:18px 0;border-bottom:1px solid var(--c-line)}.ci-direct-card>svg{color:var(--c-green);flex-shrink:0;margin-top:3px}.ci-direct-card>div{min-width:0;flex:1}.ci-direct-card h3{font-size:17px;margin:0 0 6px}.ci-direct-card p,.ci-direct-card small{font-size:13px;color:var(--c-muted);line-height:1.6}.ci-direct-card .c-actions{margin-top:12px;gap:10px}.ci-direct-outgoing{display:flex;align-items:center;flex-wrap:wrap;gap:12px;padding:14px 0;border-bottom:1px solid var(--c-line);font-size:14px}.ci-direct-outgoing strong{margin-left:auto;color:var(--c-green)}.c-direct-notice{display:block;margin:20px 0;color:var(--c-green)}

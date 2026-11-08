@@ -3,6 +3,7 @@ import { onAuthStateChanged, type User } from 'firebase/auth';
 import { collection, deleteDoc, getCountFromServer, serverTimestamp, doc, getDoc, getDocs, limit, onSnapshot, orderBy, query, runTransaction, setDoc, startAfter, updateDoc, where, writeBatch, type DocumentData, type DocumentSnapshot, type QueryDocumentSnapshot } from 'firebase/firestore';
 import { deleteObject, getDownloadURL, ref, uploadBytesResumable } from 'firebase/storage';
 import { auth, db, logout, signInWithGoogle, storage } from '../firebase';
+import { disablePushDevice, discardPendingPush } from './pushApi';
 import { useAppStore } from '../store/useAppStore';
 import { deleteLocalMedia, getLocalMedia, readDemo, saveLocalMedia, writeDemo, type DemoData } from './local';
 import { createLocalMediaCache, publishLocalPosts } from './localMediaCache';
@@ -843,7 +844,7 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
     }
   }
   async function loginAdmin() { setError(''); const user = await signInWithGoogle(); const token = await user.getIdTokenResult(true); if (token.claims.admin !== true) { await logout(); throw new Error('Esta cuenta no tiene el permiso de administración.'); } }
-  async function signOut() { await logout(); localStorage.removeItem('cantera-demo-active'); setFirebaseUser(null); setPilotIdentity(null); setProfile(null); setLegacyUser(null); setMode('cloud'); }
+  async function signOut() { const uid=auth.currentUser?.uid; await disablePushDevice().catch(()=>undefined); if(uid)discardPendingPush(uid); await logout(); localStorage.removeItem('cantera-demo-active'); setFirebaseUser(null); setPilotIdentity(null); setProfile(null); setLegacyUser(null); setMode('cloud'); }
   async function beginDemo(name: string) {
     if (!demoEnabled) throw new Error('El modo de prueba no está disponible en producción.');
     if (auth.currentUser) await logout();

@@ -804,6 +804,45 @@ describe('Cruces canónicos con validación individual', { concurrency: false },
 });
 
 const invitation = (id = '23456789ABCDEFGH', overrides = {}) => ({ id, ownerId: 'alice', kind: 'connection', eventId: '', status: 'active', createdAt: stamp(), usedBy: '', usedAt: '', ...overrides });
+describe('Invitaciones directas a conexiones', {concurrency:false},()=>{
+  const code='23456789ABCDEFGH';
+  const direct=(extra={})=>invitation(code,{kind:'event',eventId:'direct-private',recipientId:'bob',...extra});
+  async function setup(){
+    await seed('communityEvents/direct-private',event('direct-private',{visibility:'private',participants:{}}));
+    await seed('communityConnections/alice/members/bob',{ownerId:'alice',peerId:'bob',inviteId:code,createdAt:stamp()});
+    await seed('communityConnections/bob/members/alice',{ownerId:'bob',peerId:'alice',inviteId:code,createdAt:stamp()});
+  }
+  test('solo el organizador invita a una conexión; el destinatario consulta su bandeja sin ver el evento privado',async()=>{
+    await setup();const alice=verifiedDb('alice');const bob=verifiedDb('bob');const carol=verifiedDb('carol');
+    await assertSucceeds(setDoc(doc(alice,'communityInvitations',code),direct()));
+    await assertSucceeds(getDoc(doc(bob,'communityInvitations',code)));
+    await assertSucceeds(getDocs(query(collection(bob,'communityInvitations'),where('recipientId','==','bob'),orderBy('createdAt','desc'),limit(100))));
+    await assertFails(getDocs(collection(bob,'communityInvitations')));
+    await assertFails(getDoc(doc(carol,'communityInvitations',code)));
+    await assertFails(getDoc(doc(bob,'communityEvents/direct-private')));
+    await assertFails(setDoc(doc(alice,'communityInvitations/23456789ABCDEFGJ'),{...direct(),id:'23456789ABCDEFGJ',recipientId:'carol'}));
+    await assertFails(updateDoc(doc(alice,'communityInvitations',code),{recipientId:'carol'}));
+  });
+  test('admisión directa acepta a la cuenta elegida después de diez minutos y rechaza un tercero',async()=>{
+    await setup();await seed(`communityInvitations/${code}`,direct({createdAt:Timestamp.fromMillis(Date.now()-3600_000)}));
+    await assertFails(admitWithCode(verifiedDb('carol'),'carol',code));
+    await assertSucceeds(admitWithCode(verifiedDb('bob'),'bob',code));
+    await assertSucceeds(getDoc(doc(verifiedDb('bob'),'communityEvents/direct-private')));
+    await assertFails(getDoc(doc(verifiedDb('carol'),'communityEvents/direct-private')));
+  });
+  test('siete días, bloqueo y rechazo cierran el acceso sin consumir una plaza',async()=>{
+    await setup();const bob=verifiedDb('bob');const alice=verifiedDb('alice');
+    await assertSucceeds(setDoc(doc(alice,'communityInvitations',code),direct()));
+    await assertSucceeds(updateDoc(doc(bob,'communityInvitations',code),{status:'declined'}));
+    await assertFails(admitWithCode(bob,'bob',code));
+    await assertFails(updateDoc(doc(bob,'communityInvitations',code),{status:'active'}));
+    await seed(`communityInvitations/${code}`,direct({createdAt:Timestamp.fromMillis(Date.now()-7*86400000-1)}));
+    await assertFails(admitWithCode(bob,'bob',code));
+    await seed(`communityInvitations/${code}`,direct());await seed('communityBlocks/alice_bob',{ownerId:'alice',blockedId:'bob',createdAt:stamp()});
+    await assertFails(admitWithCode(bob,'bob',code));
+    await assertFails(setDoc(doc(alice,'communityInvitations/23456789ABCDEFGJ'),{...direct(),id:'23456789ABCDEFGJ'}));
+  });
+});
 async function connectWithCode(client, uid, code = '23456789ABCDEFGH') {
   return runTransaction(client, async tx => {
     const token = doc(client, 'communityInvitations', code); const current = (await tx.get(token)).data();

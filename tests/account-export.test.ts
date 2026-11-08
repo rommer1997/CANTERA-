@@ -12,6 +12,13 @@ const timestamp = { toDate: () => new Date('2026-10-06T12:00:00.000Z') };
 const row = (id: string, data: Record<string, unknown>): ExportRecord => ({ id, data });
 const source = (extra: Partial<AccountExportSource> = {}): AccountExportSource => ({ uid, projectId: 'demo-cantera', databaseId: 'test', startedAt: '2026-10-06T12:00:00.000Z', completedAt: '2026-10-06T12:01:00.000Z', ...extra });
 
+test('la exportación incluye invitaciones directas recibidas sin exponer al remitente ni el código',()=>{
+  const result=buildAccountExport(source({collections:{communityInvitations:[row('23456789ABCDEFGH',{ownerId:'SECRET_SENDER',recipientId:uid,kind:'event',eventId:'private-event',status:'active',createdAt:timestamp,usedBy:'',usedAt:''})]}}));
+  assert.equal(result.counts.communityInvitations,1);
+  assert.equal(result.collections.communityInvitations[0].recipientId,uid);
+  assert.ok(!JSON.stringify(result).includes('SECRET_SENDER'));assert.ok(!JSON.stringify(result).includes('23456789ABCDEFGH'));
+});
+
 test('identidad Auth mantiene datos propios y excluye contraseñas, claims y credenciales OAuth', () => {
   const auth = projectAuthIdentity({ uid, email: 'propio@example.invalid', emailVerified: true, disabled: false, customClaims: { admin: true }, passwordHash: 'SECRET_HASH', passwordSalt: 'SECRET_SALT', refreshToken: 'SECRET_REFRESH', metadata: { creationTime: 'date', lastSignInTime: 'date2', credential: 'SECRET_METADATA' }, providerData: [{ uid: 'provider-id', providerId: 'google.com', email: 'propio@example.invalid', accessToken: 'SECRET_OAUTH' }], multiFactor: { enrolledFactors: [{ uid: 'factor-id', factorId: 'phone', phoneNumber: '+100000000', secret: 'SECRET_FACTOR' }] } }, uid)!;
   assert.equal(auth.email, 'propio@example.invalid');
@@ -249,7 +256,8 @@ test('lecturas por UID paginan toda la colección y recuperan mapas antiguos con
   assert.equal(result.counts.communityEventAdmissions, 205);
   assert.equal(reads.filter(collection => collection === `communityConnections/${uid}/members`).length, 2);
   assert.equal(reads.filter(collection => collection === '**/members').length, 2);
-  assert.equal(reads.filter(collection => collection === 'communityInvitations').length, 2);
+  assert.equal(reads.filter(collection => collection === 'communityInvitations').length, 3);
+  assert.ok(filters.some(entry=>entry.collection==='communityInvitations'&&entry.conditions.some(condition=>condition.field==='recipientId'&&condition.value===uid)));
   for (const query of filters.filter(entry => entry.collection === '**/members')) assert.deepEqual(query.conditions, [{ field: 'userId', op: '==', value: uid }]);
   for (const query of filters.filter(entry => entry.collection === `communityConnections/${uid}/members`)) assert.deepEqual(query.conditions, [{ field: 'ownerId', op: '==', value: uid }]);
   assert.ok(!reads.includes('communityConnections')); assert.ok(!reads.includes('communityEventAdmissions'));

@@ -83,7 +83,7 @@ const collectionPolicies: Record<ExportCollection, { owner: string; fields: stri
 export const accountQueryPolicies = Object.fromEntries(exportCollections.map(collection => [collection, collectionPolicies[collection].owner])) as Record<ExportCollection, string>;
 
 function privateRecordBelongs(record: ExportRecord, collection: ExportCollection, uid: string): boolean {
-  if (collection === 'communityInvitations') return record.data.ownerId === uid || record.data.usedBy === uid;
+  if (collection === 'communityInvitations') return record.data.ownerId === uid || record.data.usedBy === uid || record.data.recipientId === uid;
   if (collection === 'communityConnections') {
     if (record.data.ownerId !== uid) return false;
     if (record.path === undefined) return true;
@@ -184,6 +184,7 @@ export function buildAccountExport(source: AccountExportSource) {
           result.exportReference = invitationReferences.get(record.id);
           result.createdBySelf = record.data.ownerId === source.uid;
           result.usedBySelf = record.data.usedBy === source.uid;
+          if(record.data.recipientId===source.uid)result.recipientId=source.uid;
           if (result.createdBySelf) result.ownerId = source.uid;
           if (result.usedBySelf) result.usedBy = source.uid;
           const peerId = result.createdBySelf ? record.data.usedBy : record.data.ownerId;

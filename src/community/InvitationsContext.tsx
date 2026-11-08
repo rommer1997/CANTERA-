@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { arrayUnion, collection, doc, FieldPath, getDoc, limit, onSnapshot, orderBy, query, runTransaction, serverTimestamp, setDoc, where } from 'firebase/firestore';
 import { auth, db } from '../firebase';
+import { notifyPush } from './pushApi';
 import { useCommunity, TERMS_VERSION } from './CommunityContext';
 import { isPublicEvent } from './eventPrivacy';
 import { joinParticipants, requireText } from './logic';
@@ -11,9 +12,10 @@ import { acceptDemoConnection, commitDemoEventInvitation, createDemoInvitation, 
 import type { CommunityConnection, CommunityInvitation, InvitationKind } from './invitationTypes';
 
 interface InvitationsAPI {
-  connections: CommunityConnection[]; ownInvitations: CommunityInvitation[]; loading: boolean; error: string;
+  connections: CommunityConnection[]; ownInvitations: CommunityInvitation[]; incomingInvitations: CommunityInvitation[]; loading: boolean; error: string;
   eligible: boolean; emailVerified: boolean;
-  createInvitation(kind: InvitationKind, eventId?: string): Promise<CommunityInvitation>;
+  createInvitation(kind: InvitationKind, eventId?: string, recipientId?: string): Promise<CommunityInvitation>;
+  declineInvitation(code: string): Promise<void>;
   revokeInvitation(code: string): Promise<void>;
   lookupInvitation(code: string): Promise<CommunityInvitation>;
   acceptInvitation(code: string, participantName?: string): Promise<CommunityInvitation>;
@@ -30,6 +32,17 @@ export function InvitationsProvider({ children }: { children: React.ReactNode })
   const [state, setState] = useState<{ scope: string; connections: CommunityConnection[]; invitations: CommunityInvitation[]; loading: boolean; error: string }>({ scope, connections: [], invitations: [], loading: false, error: '' });
   const eligible = !!profile?.adultConfirmed && profile.acceptedTermsVersion === TERMS_VERSION && !!profile.city.trim() && !!profile.country.trim();
   const emailVerified = mode === 'demo' || auth.currentUser?.uid === uid && auth.currentUser.emailVerified;
+  const [incoming, setIncoming] = useState<{scope:string;items:CommunityInvitation[];loading:boolean;error:string}>({scope,items:[],loading:false,error:''});
+  useEffect(() => {
+    let active=true;const current=()=>active&&currentScope.current===scope&&auth.currentUser?.uid===uid;
+    setIncoming({scope,items:[],loading:false,error:''});
+    if(mode!=='cloud'||!uid||!eligible||!emailVerified||!serviceAvailable||accountModeration?.status==='suspended')return()=>{active=false;};
+    setIncoming({scope,items:[],loading:true,error:''});
+    const stop=onSnapshot(query(collection(db,'communityInvitations'),where('recipientId','==',uid),orderBy('createdAt','desc'),limit(100)),snapshot=>{
+      if(current())setIncoming({scope,items:snapshot.docs.map(record=>normalizeInvitation(record.data(),record.id)).filter((item):item is CommunityInvitation=>!!item),loading:false,error:''});
+    },()=>{if(current())setIncoming({scope,items:[],loading:false,error:'No se pudieron cargar las invitaciones recibidas. Vuelve a intentarlo.'});});
+    return()=>{active=false;stop();};
+  },[scope,uid,mode,eligible,emailVerified,serviceAvailable,accountModeration?.status]);
 
   useEffect(() => {
     let active = true;
@@ -71,8 +84,9 @@ export function InvitationsProvider({ children }: { children: React.ReactNode })
     validateInvitationAcceptance(invitation, { userId: uid, emailVerified });
     return invitation!;
   }
-  async function createInvitation(kind: InvitationKind, eventId = '') {
+  async function createInvitation(kind: InvitationKind, eventId = '', recipientId = '') {
     actor();
+    if(recipientId&&(mode!=='cloud'||kind!=='event'||recipientId===uid||api.blockedIds.includes(recipientId)||!state.connections.some(item=>item.ownerId===uid&&item.peerId===recipientId)))throw new InvitationError('unavailable');
     if (kind === 'event') {
       const event = mode === 'demo' ? normalizeDemoData(readDemo()).events.find(item => item.id === eventId) : await getDoc(doc(db, 'communityEvents', eventId)).then(record => record.exists() ? record.data() : null);
       actor();
@@ -81,10 +95,17 @@ export function InvitationsProvider({ children }: { children: React.ReactNode })
     if (mode === 'demo') return createDemoInvitation(uid, kind, eventId);
     const id = generateInvitationCode();
     const target = doc(db, 'communityInvitations', id);
-    await setDoc(target, { id, kind, ownerId: uid, eventId: kind === 'connection' ? '' : eventId, status: 'active', createdAt: serverTimestamp(), usedBy: '', usedAt: '' });
+    await setDoc(target, { id, kind, ownerId: uid, eventId: kind === 'connection' ? '' : eventId, status: 'active', createdAt: serverTimestamp(), usedBy: '', usedAt: '', ...(recipientId?{recipientId}:{}) });
     const snapshot = await getDoc(target); actor();
     const invitation = normalizeInvitation(snapshot.data(), id);
-    if (!invitation) throw new InvitationError('unavailable'); return invitation;
+    if (!invitation) throw new InvitationError('unavailable');
+    if(recipientId)notifyPush({kind:'invitation',code:id});
+    return invitation;
+  }
+  async function declineInvitation(raw:string){
+    actor();const code=codeOf(raw);if(mode!=='cloud')throw new InvitationError('unavailable');
+    await runTransaction(db,async transaction=>{const target=doc(db,'communityInvitations',code);const record=await transaction.get(target);actor();const invitation=record.exists()?normalizeInvitation(record.data(),code):null;
+      if(!invitation||invitation.recipientId!==uid||invitation.status!=='active')throw new InvitationError('unavailable');transaction.update(target,{status:'declined'});});
   }
   async function revokeInvitation(raw: string) {
     actor(false); const code = codeOf(raw);
@@ -113,7 +134,7 @@ export function InvitationsProvider({ children }: { children: React.ReactNode })
         writeDemo({ ...latest, events: latest.events.map(item => item.id === current.id ? { ...current, participants, participantIds: Object.keys(participants), rsvps: { ...(current.rsvps || {}), [uid]: 'yes' } } : item) });
       });
     }
-    return runTransaction(db, async tx => {
+    const accepted = await runTransaction(db, async tx => {
       const target = doc(db, 'communityInvitations', code); const record = await tx.get(target); actor();
       const invitation = record.exists() ? normalizeInvitation(record.data(), code) : null;
       if (!invitation) throw new InvitationError('unavailable');
@@ -141,6 +162,8 @@ export function InvitationsProvider({ children }: { children: React.ReactNode })
       tx.update(target, { status: 'used', usedBy: uid, usedAt: serverTimestamp() });
       return { ...invitation, status: 'used', usedBy: uid, usedAt: new Date().toISOString() };
     });
+    notifyPush({kind:'invitation-accepted',code});
+    return accepted as CommunityInvitation;
   }
   async function removeConnection(peerId: string) {
     actor(false); if (!validUid(peerId) || peerId === uid) throw new InvitationError('unavailable');
@@ -152,6 +175,6 @@ export function InvitationsProvider({ children }: { children: React.ReactNode })
     });
   }
   const visible = state.scope === scope ? state : { connections: [], invitations: [], loading: !!uid, error: '' };
-  return <Context.Provider value={{ connections: visible.connections, ownInvitations: visible.invitations, loading: visible.loading, error: visible.error, eligible, emailVerified, createInvitation, revokeInvitation, lookupInvitation, acceptInvitation, removeConnection }}>{children}</Context.Provider>;
+  return <Context.Provider value={{ connections: visible.connections, ownInvitations: visible.invitations, incomingInvitations: incoming.scope===scope?incoming.items.filter(item=>!api.blockedIds.includes(item.ownerId)):[], loading: visible.loading || incoming.scope===scope&&incoming.loading, error: visible.error || (incoming.scope===scope?incoming.error:''), eligible, emailVerified, createInvitation, declineInvitation, revokeInvitation, lookupInvitation, acceptInvitation, removeConnection }}>{children}</Context.Provider>;
 }
 export function useInvitations() { const api = useContext(Context); if (!api) throw new Error('InvitationsProvider requerido.'); return api; }

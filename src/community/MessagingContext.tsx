@@ -5,6 +5,7 @@ import { TERMS_VERSION, useCommunity } from './CommunityContext';
 import { useInvitations } from './InvitationsContext';
 import { conversationIdFor, conversationParticipants, mergeMessagePages, MESSAGE_PAGE_SIZE, messageText, MessagingError, normalizeConversation, normalizeMessage, normalizeMessageRead, messageIsAfterRead, safeMessagingError, validMessagingUid } from './messagingLogic';
 import type { ConversationState, MessagingConversation, MessagingMessage, ConversationPreview, MessageRead } from './messagingTypes';
+import { notifyPush } from './pushApi';
 
 interface MessagingAPI {
   conversations: MessagingConversation[];
@@ -247,6 +248,7 @@ export function useConversation(conversationId = ''): ConversationState {
     const text = messageText(raw);
     const target = doc(collection(db, 'communityConversations', conversationId, 'messages'));
     await setDoc(target, { id: target.id, senderId: api.uid, text, createdAt: serverTimestamp() });
+    if(auth.currentUser?.uid===api.uid&&scopeRef.current===scope)notifyPush({ kind: 'message', conversationId, messageId: target.id });
   }
   async function deleteMessage(id: string) {
     api.actor(false);

@@ -7,6 +7,7 @@ import { formatInvitationCode, formatInvitationCountdown, invitationExpiresAt, i
 import type { CommunityInvitation, InvitationKind } from './invitationTypes';
 import type { PlayEvent } from './types';
 import './invitations.css';
+import { DirectInviteButton } from './DirectInvitations';
 
 export function InvitationDialog({ initial, onClose }: { initial: CommunityInvitation; onClose(): void }) {
   const api = useInvitations(); const { mode } = useCommunity();
@@ -65,7 +66,7 @@ function InvitationControl({ kind = 'connection', eventId = '', label = 'Invitar
 export function EventInviteButton({ event }: { event: PlayEvent }) {
   const { profile } = useCommunity();
   if (event.visibility !== 'private' || event.ownerId !== profile?.id || event.status !== 'open' || Date.parse(event.startAt) <= Date.now() || event.fixtures.length || event.fixtureIds?.length || Object.keys(event.participants).length >= event.capacity) return null;
-  return <InvitationButton kind="event" eventId={event.id} label="Invitar por código" />;
+  return <div className="ci-event-invite-options"><DirectInviteButton eventId={event.id}/><InvitationButton kind="event" eventId={event.id} label="Invitar por código" /></div>;
 }
 
 export function InvitationButton(props: { kind?: InvitationKind; eventId?: string; label?: string }) {

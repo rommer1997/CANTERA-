@@ -12,6 +12,26 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  push:
+    name: Worker gratuito de notificaciones
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/setup@v3
+        with:
+          runtime: node@24
+          working-directory: push-worker
+          install: false
+      - run: pnpm --dir push-worker --ignore-workspace install --frozen-lockfile --ignore-scripts
+      - run: pnpm --dir push-worker --ignore-workspace check
+      - run: pnpm --dir push-worker --ignore-workspace test
+      - run: pnpm --dir push-worker --ignore-workspace exec wrangler deploy --dry-run
+
   checks:
     name: TypeScript, dominio, build y reglas
     runs-on: ubuntu-24.04
@@ -40,6 +60,9 @@ jobs:
       - name: Instalar herramientas del operador para las pruebas de derechos
         run: pnpm --dir functions --ignore-workspace install --frozen-lockfile --ignore-scripts
 
+      - name: Instalar el servidor de avisos para integración HTTP local
+        run: pnpm --dir push-worker --ignore-workspace install --frozen-lockfile --ignore-scripts
+
       - name: Comprobar TypeScript
         run: pnpm lint
 
@@ -51,7 +74,7 @@ jobs:
 
       - name: Probar reglas en Firestore y Storage emulados
         # Los tests exigen un ID demo-* y hosts loopback de Auth/Firestore/Storage.
-        run: pnpm exec firebase emulators:exec --non-interactive --project demo-cantera --only auth,firestore,storage "node --test tests/*security.test.mjs"
+        run: pnpm exec firebase emulators:exec --non-interactive --project demo-cantera --only auth,firestore,storage "node --test tests/*security.test.mjs && RUN_PUSH_EMULATOR_TESTS=true node --test push-worker/tests/firebase-http.test.mjs"
 
   cleanup:
     name: Limpieza de publicaciones (Node 22)

@@ -59,7 +59,7 @@ function harness(initial: Record<string, Record<string, any>> = {}, identity: an
   const source = () => {
     const all = rows(), collections: any = {};
     for (const [name, field] of Object.entries(policies)) collections[name] = all.filter(record => record.path.split('/').length === 2 && record.path.split('/')[0] === name && record.data[field] === uid);
-    collections.communityInvitations = all.filter(record => record.path.startsWith('communityInvitations/') && (record.data.ownerId === uid || record.data.usedBy === uid));
+    collections.communityInvitations = all.filter(record => record.path.startsWith('communityInvitations/') && (record.data.ownerId === uid || record.data.usedBy === uid || record.data.recipientId === uid));
     collections.communityConnections = all.filter(record => record.path.startsWith(`communityConnections/${uid}/members/`) && record.data.ownerId === uid);
     collections.communityEventAdmissions = all.filter(record => record.path.startsWith('communityEventAdmissions/') && record.path.split('/').length === 4 && record.data.userId === uid);
     const direct = (name: string) => all.find(record => record.path === `${name}/${uid}`) || null;
@@ -476,4 +476,17 @@ test('baja retira los dos cursores de la conversación cerrada sin afectar otras
   assert.ok(plan.operations.some(op => op.path === `communityMessageReads/${uid}:peer:${uid}` && op.kind === 'delete'));
   assert.ok(plan.operations.some(op => op.path === `communityMessageReads/peer:peer:${uid}` && op.kind === 'delete'));
   assert.ok(!plan.operations.some(op => op.path === 'communityMessageReads/peer:other:peer'));
+});
+
+
+test('baja retira una invitación directa recibida y conserva invitaciones ajenas', async () => {
+  const h=harness({
+    [`communityInvitations/${incoming}`]:{id:incoming,ownerId:peer,recipientId:uid,kind:'event',eventId:'private',status:'active',createdAt:'old',usedBy:'',usedAt:''},
+    [`communityInvitations/${code}`]:{id:code,ownerId:peer,recipientId:'another',kind:'event',eventId:'private',status:'active',createdAt:'old',usedBy:'',usedAt:''},
+  });
+  const plan=buildErasurePlan(h.source());assert.deepEqual(plan.blockers,[]);
+  assert.ok(plan.operations.some(op=>op.path===`communityInvitations/${incoming}`));
+  assert.ok(!plan.operations.some(op=>op.path===`communityInvitations/${code}`));
+  await h.run(plan);h.advance();assert.equal((await h.run(plan)).phase,'completed');
+  assert.ok(!h.records.has(`communityInvitations/${incoming}`));assert.ok(h.records.has(`communityInvitations/${code}`));
 });

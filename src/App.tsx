@@ -4,6 +4,7 @@ import { TeamsProvider } from './community/TeamsContext';
 import { CommunityProvider } from './community/CommunityContext';
 import { InvitationsProvider } from './community/InvitationsContext';
 import { MessagingProvider } from './community/MessagingContext';
+import { PushSession } from './community/PushSettings';
 import { AboutPage, AdminPage, CommunityHome, CommunityLayout, LegalPage, ProfilePage } from './community/CommunityPages';
 const EventsPage = lazy(() => import('./community/EventsPage'));
 const FeedPage = lazy(() => import('./community/FeedPage'));
@@ -14,7 +15,7 @@ const ConnectionsPage = lazy(() => import('./community/ConnectionsPage'));
 const MessagesPage = lazy(() => import('./community/MessagesPage'));
 
 export default function App() {
-  return <HashRouter><CommunityProvider><InvitationsProvider><MessagingProvider><TeamsProvider><Suspense fallback={<div className="c-empty" role="status">Cargando LaCantera…</div>}><Routes><Route element={<CommunityLayout />}>
+  return <HashRouter><CommunityProvider><PushSession/><InvitationsProvider><MessagingProvider><TeamsProvider><Suspense fallback={<div className="c-empty" role="status">Cargando LaCantera…</div>}><Routes><Route element={<CommunityLayout />}>
     <Route index element={<CommunityHome />} />
     <Route path="play" element={<EventsPage />} /><Route path="play/:eventId" element={<EventsPage />} />
     <Route path="feed" element={<FeedPage />} /><Route path="profile" element={<ProfilePage />} />

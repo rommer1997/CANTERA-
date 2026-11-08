@@ -42,6 +42,7 @@ function profileHarness(initial: any, returnTo = '') {
   const modules: Record<string, any> = { react, 'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
     'react-router-dom': { Link: 'Link', useNavigate: () => navigate, useSearchParams: () => [routeParams, (next: URLSearchParams) => { routeParams = new URLSearchParams(next); dirty = true; }] },
     '../components/BrandMark': { default: 'BrandMark' },
+    './PushSettings': { PushSettings: () => null },
     'lucide-react': {}, './CommunityContext': { useCommunity: () => api, TERMS_VERSION, friendlyError: (error: Error) => error.message },
     './experience': experience, './useClock': { useClock: () => Date.now() }, './TeamsContext': { useTeams: () => ({ ownTeams: [] }) }, './teamLogic': { safeReturnTo }, './GeographyFields': { CountryInput: 'CountryInput' },
     './geography': { canonicalCountry }, './legal': { legalReady: true, operator: { email: 'support@example.test' } } };

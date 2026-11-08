@@ -121,7 +121,7 @@ async function collectAccountSource({ db, auth, uid, projectId, databaseId, Fiel
   collections.communityEventPromotions = [...(collections.communityEventPromotions || []), ...await readAll(db.collection('communityEventPromotions').where('recipientId', '==', uid))];
   // Invitations consumed by the requester are personal records even when
   // another person created the code. Do not read all invitations or accounts.
-  collections.communityInvitations = [...(collections.communityInvitations || []), ...await readAll(db.collection('communityInvitations').where('usedBy', '==', uid))];
+  collections.communityInvitations = [...(collections.communityInvitations || []), ...await readAll(db.collection('communityInvitations').where('usedBy', '==', uid)), ...await readAll(db.collection('communityInvitations').where('recipientId', '==', uid))];
   collections.communityConnections = await readAll(db.collection('communityConnections').doc(uid).collection('members').where('ownerId', '==', uid));
   // A group named "members" may also contain contacts or future team records.
   // The equality query is personal; this exact path gate admits only receipts

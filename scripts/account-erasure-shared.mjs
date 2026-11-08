@@ -22,7 +22,7 @@ const ownKeys = {
   communityTeamMembers: ['id', 'teamId', 'userId', 'name', 'role', 'joinedAt'],
   communityTeamJoinRequests: ['id', 'teamId', 'userId', 'name', 'inviteId', 'status', 'createdAt', 'reviewedAt'],
   communityTeamInvites: ['id', 'teamId', 'createdBy', 'revoked', 'expiresAt', 'createdAt'],
-  communityInvitations: ['id', 'ownerId', 'kind', 'eventId', 'status', 'createdAt', 'usedBy', 'usedAt'],
+  communityInvitations: ['id', 'ownerId', 'kind', 'eventId', 'status', 'createdAt', 'usedBy', 'usedAt', 'recipientId'],
   communityMessageReads: ['userId', 'conversationId', 'lastReadAt', 'lastReadMessageId', 'updatedAt'],
   communityConnections: ['ownerId', 'peerId', 'inviteId', 'createdAt'],
   communityEventAdmissions: ['eventId', 'userId', 'inviteId', 'createdAt'],

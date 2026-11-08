@@ -18,3 +18,5 @@ output/launch/
 output/tutorial/
 __pycache__/
 *.pyc
+push-worker/.wrangler/
+push-worker/.dev.vars*

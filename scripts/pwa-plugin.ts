@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import type { Plugin } from 'vite';
+import { pushServiceWorkerSource } from './push-service-worker.ts';
 
 // Only compiled shell files enter these caches. Account data, Firebase traffic
 // and user media are outside both the current and historical fetch policies.
@@ -95,7 +96,7 @@ self.addEventListener('fetch',event=>{
   const hit=ABS.has(target)?await (await caches.open(CACHE)).match(target):null;
   return hit||(historical?await historicalAsset(target):null)||fetch(req);
  })());
-});`;
+});` + pushServiceWorkerSource();
 }
 
 export function canteraShell(): Plugin {
@@ -103,6 +104,7 @@ export function canteraShell(): Plugin {
   const staticFiles = ['cantera-mark.svg', 'cantera-maskable.svg', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'icon-touch-180.png', 'manifest.webmanifest'];
   const paths = ['index.html', ...staticFiles, ...Object.keys(bundle).filter(path => path.startsWith('assets/'))];
   const digest = createHash('sha256');
+  digest.update(pushServiceWorkerSource());
   for (const [name, output] of Object.entries(bundle).sort(([a], [b]) => a.localeCompare(b))) digest.update(name).update(output.type === 'chunk' ? output.code : output.source);
   for (const file of staticFiles) digest.update(file).update(readFileSync(`public/${file}`));
   const version = digest.digest('hex').slice(0, 16);
@@ -112,4 +114,14 @@ export function canteraShell(): Plugin {
   index.source = html.replace('</head>', `<meta name="cantera-shell-version" content="${version}"></head>`);
   this.emitFile({ type: 'asset', fileName: 'sw.js', source: shellServiceWorkerSource(paths, version) });
  } } };
+}
+
+export function canteraPushDevWorker(): Plugin {
+ return { name:'cantera-push-dev-worker',apply:'serve',configureServer(server) {
+  server.middlewares.use((request,response,next)=>{
+   if(request.url!=='/sw.js')return next();
+   response.setHeader('Content-Type','application/javascript');response.setHeader('Cache-Control','no-store');
+   response.end("self.addEventListener('install',event=>event.waitUntil(self.skipWaiting()));self.addEventListener('activate',event=>event.waitUntil(self.clients.claim()));"+pushServiceWorkerSource());
+  });
+ } };
 }

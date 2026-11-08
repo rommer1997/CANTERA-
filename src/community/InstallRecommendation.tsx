@@ -42,6 +42,8 @@ export function InstallRecommendation() {
       setInstaller(nativeInstallation(candidate));
     };
     const installed = () => { setRunningAsApp(true); setInstaller(null); setGuideOpen(false); };
+    const openGuide = () => { setDismissed(false); setGuideOpen(true); };
+    window.addEventListener('cantera-open-install-guide', openGuide);
     window.addEventListener('beforeinstallprompt', prompt);
     window.addEventListener('appinstalled', installed);
     modes.forEach(mode => {
@@ -52,6 +54,7 @@ export function InstallRecommendation() {
       mounted.current = false;
       window.removeEventListener('beforeinstallprompt', prompt);
       window.removeEventListener('appinstalled', installed);
+      window.removeEventListener('cantera-open-install-guide', openGuide);
       modes.forEach(mode => {
         if (mode.removeEventListener) mode.removeEventListener('change', changedMode);
         else mode.removeListener(changedMode);

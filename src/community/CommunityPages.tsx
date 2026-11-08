@@ -2,6 +2,8 @@ import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useParams } from 'react-router-dom';
 import { ArrowUpRight, ChevronDown, MapPin, Bell, CalendarDays, CheckCircle2, Globe2, House, Image, MessageCircle, Play, Plus, Search, ShieldCheck, Trophy, UserRound, Users, Settings, QrCode, ArrowRight, X } from 'lucide-react';
 import { friendlyError, TERMS_VERSION, useCommunity } from './CommunityContext';
+import { useInvitations } from './InvitationsContext';
+import { invitationExpiresAt } from './invitations';
 import { hostingProvider, legalDocuments, legalReady, operator, PRIVACY_VERSION } from './legal';
 import { AppAvailability } from './AppAvailability';
 import { ClubhouseHome } from './clubhouse-home';
@@ -28,6 +30,8 @@ const routeNames: Record<string, string> = {
 
 export function CommunityLayout() {
   const { profile, mode, error, isAdmin, mediaUploadsEnabled, eventNotices, runtimeConfig } = useCommunity();
+  const invitations=useInvitations();
+  const unreadNotices=eventNotices.some(notice=>!notice.readAt)||invitations.incomingInvitations.some(invitation=>invitation.status==='active'&&Date.parse(invitationExpiresAt(invitation.createdAt,true))>Date.now());
   const { pathname, search } = useLocation();
   const messaging = useMessaging();
   const mainRef = useRef<HTMLElement>(null);
@@ -64,7 +68,7 @@ export function CommunityLayout() {
     <div className="lc-top-context"><span>EN LACANTERA</span><p>{profile?.city && profile.country ? `${profile.city}, ${profile.country}` : 'Tu fútbol, sin fronteras.'}</p></div><div className="c-header-tools">
       <Link to="/people" className="c-discover-link" aria-label="Buscar personas y clubes"><Search size={20} aria-hidden="true" /></Link>
       {profile ? <>
-        <Link to="/activity" className="c-discover-link c-notice-bell" aria-label={`Avisos${eventNotices.some(n => !n.readAt) ? ', hay avisos sin leer' : ''}`}><Bell size={20} aria-hidden="true" />{eventNotices.some(n => !n.readAt) ? <span /> : null}</Link>
+        <Link to="/activity" className="c-discover-link c-notice-bell" aria-label={`Avisos${unreadNotices ? ', hay avisos sin leer' : ''}`}><Bell size={20} aria-hidden="true" />{unreadNotices ? <span /> : null}</Link>
         {isAdmin ? <Link to="/admin" className="c-discover-link c-admin-link" aria-label="Administración"><ShieldCheck size={20} aria-hidden="true" /></Link> : null}
         <Link to="/messages" className={`c-discover-link c-mobile-messages${pathname.startsWith('/messages') ? ' is-current' : ''}`} aria-label={`Mensajes${messaging.unreadCount ? `, ${messaging.unreadCount} ${messaging.unreadCount === 1 ? 'conversación pendiente' : 'conversaciones pendientes'}` : ''}`}><MessageCircle size={20} aria-hidden="true" />{messaging.unreadCount > 0 && <span className="c-message-badge" aria-hidden="true">{messaging.unreadCount > 9 ? '9+' : messaging.unreadCount}</span>}</Link><Link to="/profile" className="c-account" aria-label={`Tu perfil: ${profile.name}`}><span className="c-avatar">{profileInitials(profile.name)}</span></Link>
       </> : <>

@@ -56,18 +56,41 @@ service cloud.firestore {
     function freshInvitationState(data) {
       return data.status == 'active' && data.ownerId != request.auth.uid
         && data.createdAt is timestamp && data.createdAt <= request.time
-        && data.createdAt + duration.value(10, 'm') > request.time && pilotPeerAllowed(data.ownerId) && notBlocked(data.ownerId);
+        && (data.get('recipientId', '') == '' ? data.createdAt + duration.value(10, 'm') > request.time
+          : data.recipientId == request.auth.uid && data.createdAt + duration.value(7, 'd') > request.time)
+        && pilotPeerAllowed(data.ownerId) && notBlocked(data.ownerId);
     }
     function freshInvitation(data) { return verifiedActor() && freshInvitationState(data); }
     function validInvitation(data, id) {
       return id.matches('[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{16}')
-        && data.keys().hasAll(['id', 'ownerId', 'kind', 'eventId', 'status', 'createdAt', 'usedBy', 'usedAt'])
-        && data.keys().hasOnly(['id', 'ownerId', 'kind', 'eventId', 'status', 'createdAt', 'usedBy', 'usedAt'])
+        // Every required field is accessed and checked below. hasOnly rejects
+        // extras; missing fields fail closed without a duplicate hasAll scan.
+        && data.keys().hasOnly(['id', 'ownerId', 'kind', 'eventId', 'status', 'createdAt', 'usedBy', 'usedAt', 'recipientId'])
         && data.id == id && text(data.ownerId, 1, 128) && data.kind in ['connection', 'event']
-        && data.status in ['active', 'used', 'revoked'] && data.createdAt is timestamp
+        && data.status in ['active', 'used', 'revoked', 'declined'] && data.createdAt is timestamp
+        && ('recipientId' in data ? text(data.recipientId, 1, 128) && data.recipientId != data.ownerId && data.kind == 'event' : data.status != 'declined')
         && text(data.eventId, 0, 128) && text(data.usedBy, 0, 128)
         && (data.usedAt == '' || data.usedAt is timestamp)
         && (data.kind == 'connection' && data.eventId == '' || data.kind == 'event' && data.eventId != '');
+    }
+    function directInvitationAllowed(data) {
+      let recipient = data.get('recipientId', '');
+      // active() has already checked the sender. Repeating its full profile
+      // predicate here would exceed Firestore's expression budget on creates.
+      return recipient == '' || request.auth.token.get('email_verified', false) == true
+        && recipient.matches('[A-Za-z0-9_-]{1,128}') && request.auth.uid.matches('[A-Za-z0-9_-]{1,128}')
+        && recipient != request.auth.uid && pilotPeerAllowed(recipient)
+        && completedProfile(get(/databases/$(database)/documents/communityProfiles/$(recipient)).data)
+        && messagingAccountAllowed(recipient)
+        && get(/databases/$(database)/documents/communityConnections/$(request.auth.uid)/members/$(recipient)).data.peerId == recipient
+        && get(/databases/$(database)/documents/communityConnections/$(recipient)/members/$(request.auth.uid)).data.peerId == request.auth.uid
+        && notBlocked(recipient);
+    }
+    function invitationCreatorActive() {
+      // Missing profiles fail closed in completedProfile. One get per profile
+      // and moderation record leaves room for both blocks, edges and the event.
+      return signed() && runtimeAvailable() && messagingAccountAllowed(request.auth.uid)
+        && completedProfile(actorProfile());
     }
     function consumedInvitation(code, kind, eventId) {
       let before = get(/databases/$(database)/documents/communityInvitations/$(code)).data;
@@ -78,8 +101,7 @@ service cloud.firestore {
         && after.status == 'used' && after.usedBy == request.auth.uid && after.usedAt == request.time;
     }
     function validConnection(data, ownerUid, peerUid) {
-      return data.keys().hasAll(['ownerId', 'peerId', 'inviteId', 'createdAt'])
-        && data.keys().hasOnly(['ownerId', 'peerId', 'inviteId', 'createdAt'])
+      return data.keys().hasOnly(['ownerId', 'peerId', 'inviteId', 'createdAt'])
         && data.ownerId == ownerUid && data.peerId == peerUid && ownerUid != peerUid
         && text(ownerUid, 1, 128) && text(peerUid, 1, 128)
         && text(data.inviteId, 16, 16) && data.createdAt == request.time;
@@ -197,18 +219,23 @@ service cloud.firestore {
     match /communityInvitations/{code} {
       // No public lookup or listing. A recipient must know the exact random code.
       allow get: if owner(resource.data.ownerId) || admin()
+        || verifiedActor() && resource.data.get('recipientId', '') == request.auth.uid
         || freshInvitation(resource.data)
         || verifiedActor() && resource.data.status == 'used' && owner(resource.data.usedBy);
-      allow list: if owner(resource.data.ownerId) || admin();
-      allow create: if active() && validInvitation(request.resource.data, code)
+      allow list: if owner(resource.data.ownerId) || admin()
+        || verifiedActor() && resource.data.recipientId == request.auth.uid;
+      allow create: if invitationCreatorActive() && validInvitation(request.resource.data, code)
         && request.resource.data.ownerId == request.auth.uid && request.resource.data.status == 'active'
         && request.resource.data.createdAt == request.time && request.resource.data.usedBy == '' && request.resource.data.usedAt == ''
+        && directInvitationAllowed(request.resource.data)
         && (request.resource.data.kind == 'connection'
           || owner(get(/databases/$(database)/documents/communityEvents/$(request.resource.data.eventId)).data.ownerId)
             && get(/databases/$(database)/documents/communityEvents/$(request.resource.data.eventId)).data.get('visibility', 'public') == 'private');
       allow update: if validInvitation(request.resource.data, code)
         && (owner(resource.data.ownerId) && resource.data.status == 'active'
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']) && request.resource.data.status == 'revoked'
+          || verifiedActor() && resource.data.get('recipientId', '') == request.auth.uid && resource.data.status == 'active'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']) && request.resource.data.status == 'declined'
           || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'usedBy', 'usedAt'])
             && request.resource.data.status == 'used' && request.resource.data.usedBy == request.auth.uid && request.resource.data.usedAt == request.time
             && (resource.data.kind == 'connection' && freshInvitation(resource.data) && connectionPair(code, resource.data.ownerId)
