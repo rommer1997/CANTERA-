@@ -4,7 +4,7 @@ Worker independiente de Firebase Functions, con Workers Free y D1. La app sigue 
 
 ## Estado de esta entrega
 
-Implementación y pruebas locales preparadas. La configuración conserva `REPLACE_AFTER_DATABASE_CREATION`: **no acredita un servidor desplegado**. La activación requiere acceso del responsable a Cloudflare, crear D1, cargar los secretos, desplegar y configurar `VITE_PUSH_API_URL` en la compilación de la app. La autorización OAuth anterior puede caducar y necesitar repetirse.
+Servidor desplegado el 8 de noviembre de 2026 en `https://lacantera-push.garitocastizo.workers.dev`, cuenta Cloudflare `1d93ccbf1186b4d835d92df24396a197`, plan Free comprobado en el panel. Base D1 `01055525-2120-4e22-aa12-5d6bf5a0e98e`, migración aplicada, dos secretos VAPID cargados y cron configurado. `/config` devuelve `ready: true`; se comprobaron rechazos 401 sin identidad y 403 desde un origen ajeno. Las reglas e índices de Firestore se han desplegado en la base indicada. **La publicación de la app y la prueba de recepción física siguen pendientes**; esto no acredita notificaciones recibidas por usuarios.
 
 ## Activación
 

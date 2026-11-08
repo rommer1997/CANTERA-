@@ -1,6 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "lacantera-push",
+  "account_id": "1d93ccbf1186b4d835d92df24396a197",
   "main": "src/index.mjs",
   "compatibility_date": "2026-11-08",
   "workers_dev": true,
@@ -14,6 +15,6 @@
     "VAPID_SUBJECT": "mailto:rommer@garitocastizo.com",
     "TERMS_VERSION": "2026-10-08"
   },
-  "d1_databases": [{ "binding": "DB", "database_name": "lacantera-push", "database_id": "REPLACE_AFTER_DATABASE_CREATION", "migrations_dir": "migrations" }],
+  "d1_databases": [{ "binding": "DB", "database_name": "lacantera-push", "database_id": "01055525-2120-4e22-aa12-5d6bf5a0e98e", "migrations_dir": "migrations" }],
   "triggers": { "crons": ["* * * * *"] }
 }
