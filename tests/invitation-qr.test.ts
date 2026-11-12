@@ -8,6 +8,7 @@ import { decodeInvitationQrImage, parseInvitationQr } from '../src/community/inv
 const code = 'DME2M8Z4PFA6GF89';
 const production = 'https://lacantera.web.app';
 const link = `${production}/#/invite/${code}`;
+const customOrigin = 'https://lacantera.com.es';
 
 // qrcode.react produces axis-aligned horizontal module strips. Rasterize that
 // generated SVG only in tests, avoiding DOM, image downloads and new libraries.
@@ -40,6 +41,20 @@ test('lector acepta códigos legibles y sólo enlaces exactos de Cantera o su or
   assert.equal(parseInvitationQr(`http://localhost:3000/#/invite/${code}`, 'http://localhost:3000'), code);
   assert.equal(parseInvitationQr(`https://cantera-preview.example.test/#/invite/${code}`, 'https://cantera-preview.example.test'), code);
   assert.equal(parseInvitationQr(link, 'http://localhost:3000'), code);
+});
+
+test('los QR del dominio propio y del anterior funcionan entre ambas instalaciones', () => {
+  const customLink = `${customOrigin}/#/invite/${code}`;
+  assert.equal(parseInvitationQr(customLink, production), code);
+  assert.equal(parseInvitationQr(link, customOrigin), code);
+  assert.equal(parseInvitationQr(customLink), code);
+  const image = qrPixels(customLink);
+  const decoded = decodeInvitationQrImage(image.data, image.width, image.height);
+  assert.equal(decoded, customLink);
+  assert.equal(parseInvitationQr(decoded!, production), code);
+  for (const origin of ['http://lacantera.com.es', 'https://lacantera.com.es.evil.test', 'https://lacantera.com.es:444', 'https://lacantera.com.es.']) {
+    assert.equal(parseInvitationQr(`${origin}/#/invite/${code}`, production), null, origin);
+  }
 });
 
 test('rechaza QR de otros dominios, puertos, protocolos, credenciales y orígenes aparentes', () => {

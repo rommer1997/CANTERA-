@@ -19,6 +19,26 @@ async function device(db,uid='bob',suffix='one',prefs={messages:true,invitations
 }
 const event=(id='message:a:b:abcdefghijklmnopqrst')=>({id,actorId:'alice',recipientId:'bob',category:'messages',kind:'message',route:'/#/messages/alice%3Abob'});
 
+test('las configuraciones de producción admiten ambos dominios exactos sin ampliar CORS',async()=>{
+  for(const config of ['../wrangler.jsonc','../pages/wrangler.jsonc']){
+    const {vars}=JSON.parse(readFileSync(new URL(config,import.meta.url),'utf8'));
+    const env={...vars,DB:{},VAPID_PUBLIC_KEY:'public',VAPID_PRIVATE_KEY:'private'};
+    const worker=createWorker();
+    for(const origin of ['https://lacantera.com.es','https://lacantera.web.app']){
+      const response=await worker.fetch(new Request('https://push.test/config',{headers:{Origin:origin}}),env,{});
+      assert.equal(response.status,200);assert.equal(response.headers.get('Access-Control-Allow-Origin'),origin);
+      assert.equal((await response.json()).ready,true);
+      const preflight=await worker.fetch(new Request('https://push.test/subscriptions',{method:'OPTIONS',headers:{Origin:origin,'Access-Control-Request-Method':'POST','Access-Control-Request-Headers':'Authorization,Content-Type'}}),env,{});
+      assert.equal(preflight.status,204);assert.equal(preflight.headers.get('Access-Control-Allow-Origin'),origin);
+      assert.equal((await worker.fetch(new Request('https://push.test/events',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:'{}'}),env,{})).status,401);
+    }
+    for(const origin of ['http://lacantera.com.es','https://lacantera.com.es.evil.test','https://lacantera.com.es:444','https://unrelated.test','']){
+      const response=await worker.fetch(new Request('https://push.test/config',{headers:{Origin:origin}}),env,{});
+      assert.equal(response.status,403);assert.equal(response.headers.get('Access-Control-Allow-Origin'),null);
+    }
+  }
+});
+
 test('rechaza endpoints SSRF, sufijos falsos, claves malformadas y credenciales en URL',()=>{
   assert.equal(normalizeSubscription(subscription()).endpoint,subscription().endpoint);
   for(const endpoint of ['http://fcm.googleapis.com/fcm/send/x','https://127.0.0.1/x','https://fcm.googleapis.com.evil.test/x','https://user:pass@fcm.googleapis.com/x','https://fcm.googleapis.com:8443/x','https://push.apple.com.evil.test/x'])assert.throws(()=>normalizeSubscription({...subscription(),endpoint}),PushError);

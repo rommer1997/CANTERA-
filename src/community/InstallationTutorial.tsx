@@ -5,7 +5,7 @@ const assets = `${import.meta.env.BASE_URL}tutorial/ios/`;
 const video = `${assets}instalar-lacantera-iphone-compacto.mp4`;
 const poster = `${assets}poster-compacto.webp`;
 const steps = [
-  { title: 'Abre el menú de Safari.', text: 'En lacantera.web.app, toca el botón de las líneas junto a la dirección.', image: 'safari-menu.webp', alt: 'Barra de Safari: el menú de página está a la izquierda de lacantera.web.app.' },
+  { title: 'Abre el menú de Safari.', text: 'Con LaCantera abierta en Safari, toca el botón de las líneas junto a la dirección.', image: 'safari-menu.webp', alt: 'Barra de Safari: el menú de página está a la izquierda de la dirección.' },
   { title: 'Toca «Compartir».', text: 'En otros diseños de Safari, Compartir aparece directamente en la barra.', image: 'share-action.webp', alt: 'Acción Compartir en el menú de página de Safari.' },
   { title: 'Elige «Añadir a pantalla de inicio».', text: 'Busca entre las acciones. Si no aparece, revisa «Ver más» o «Editar acciones».', image: 'add-to-home.webp', alt: 'Menú Compartir con la opción Añadir a pantalla de inicio.' },
   { title: 'Activa «Abrir como app web».', text: 'Si aparece esta opción, deja el interruptor en verde.', image: 'open-as-app.webp', alt: 'Interruptor Abrir como app web activado.' },

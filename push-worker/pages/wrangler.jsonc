@@ -6,8 +6,8 @@
   "vars": {
     "FIREBASE_PROJECT_ID": "gen-lang-client-0853130215",
     "FIREBASE_DATABASE_ID": "ai-studio-647af55f-499b-43f3-9268-9bf5f62701bb",
-    "APP_ORIGIN": "https://lacantera.web.app",
-    "ALLOWED_ORIGINS": "https://lacantera.web.app",
+    "APP_ORIGIN": "https://lacantera.com.es",
+    "ALLOWED_ORIGINS": "https://lacantera.com.es,https://lacantera.web.app",
     "VAPID_SUBJECT": "mailto:rommer@garitocastizo.com",
     "TERMS_VERSION": "2026-10-08"
   },
