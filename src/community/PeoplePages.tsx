@@ -70,19 +70,20 @@ function BlockedAccountRow({ id }: { id: string }) {
   return <li><Link to={`/people/${encodeURIComponent(id)}`}>{person?.name || 'Cuenta bloqueada'}</Link><BlockButton id={id} name={person?.name || 'esta cuenta'} /></li>;
 }
 export function PeoplePage() {
-  const { mode, runtimeConfig, serviceAvailable, profiles, publicProfiles, peopleLoading, peopleError, peopleHasMore, searchPeople, blockedIds } = useCommunity();
+  const { mode, runtimeConfig, serviceAvailable, profiles, publicProfiles, peopleLoading, peopleError, peopleHasMore, searchPeople, blockedIds, peopleAvailable, profile } = useCommunity();
   const serviceUnavailable = mode === 'cloud' && !serviceAvailable;
   const [search, setSearch] = useState(''); const [field, setField] = useState<'name' | 'city' | 'country'>('name');
   const [applied, setApplied] = useState({ value: '', field: 'name' as 'name' | 'city' | 'country' });
   const [entity, setEntity] = useState('all');
   const [searchError, setSearchError] = useState('');
-  useEffect(() => { setSearch(''); setApplied({ value: '', field: 'name' }); if (!serviceUnavailable) void searchPeople('', 'name', true).catch(err => setSearchError(friendlyError(err))); }, [mode, serviceUnavailable, searchPeople]);
+  useEffect(() => { setSearch(''); setApplied({ value: '', field: 'name' }); if (peopleAvailable) void searchPeople('', 'name', true).catch(err => setSearchError(friendlyError(err))); }, [mode, peopleAvailable, searchPeople]);
   const loaded = profiles.map(item => publicProfiles[item.id] || item).filter(item => !blockedIds.includes(item.id));
   const matches = loaded.filter(item => entity === 'all' || item.entityType === entity);
   const fields = { name: 'nombre', city: 'ciudad', country: 'país' };
   async function runSearch() { const value = search.trim(); setApplied({ value, field }); setSearchError(''); try { await searchPeople(value, field, true); } catch (err) { setSearchError(friendlyError(err)); } }
   async function more() { setSearchError(''); try { await searchPeople(applied.value, applied.field, false); } catch (err) { setSearchError(friendlyError(err)); } }
   if (serviceUnavailable) return <PeopleUnavailable paused={runtimeConfig.serviceStatus === 'paused'} />;
+  if (!peopleAvailable) return <section className="people-page"><header className="people-heading"><h1>Personas y equipos</h1></header><div className="people-empty"><Users size={30} aria-hidden="true" /><h2>Conecta con tu comunidad</h2><p>{profile ? 'Completa tu cuenta para descubrir personas y equipos.' : 'Entra o crea tu cuenta para descubrir personas y equipos.'}</p><Link className="people-button" to="/profile?returnTo=%2Fpeople">{profile ? 'Completar mi cuenta' : 'Entrar o crear cuenta'}<ArrowRight size={18} aria-hidden="true" /></Link></div></section>;
   return <section className="people-page"><header className="people-heading"><h1 id="people-page-heading" tabIndex={-1}>Personas y equipos</h1><p>Busca cuentas de la comunidad.</p></header><CommunityNav />
     <form className="people-search" onSubmit={event => { event.preventDefault(); void runSearch(); }}><label htmlFor="people-search"><Search size={20} aria-hidden="true" /><span className="people-sr-only">Buscar por {fields[field]}</span><input id="people-search" type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder={`Busca por ${fields[field]}`} maxLength={100} /></label><label className="people-type-label" htmlFor="people-field">Buscar por<select id="people-field" value={field} onChange={event => setField(event.target.value as typeof field)}><option value="name">Nombre</option><option value="city">Ciudad</option><option value="country">País</option></select></label><button className="people-button" disabled={peopleLoading}>Buscar</button></form>
     <div className="people-filter-row"><label className="people-type-label" htmlFor="people-type">Tipo en las páginas cargadas<select id="people-type" value={entity} onChange={event => setEntity(event.target.value)}><option value="all">Todos</option><option value="individual">Personas</option><option value="group">Grupos</option><option value="club">Clubes y equipos</option></select></label><p className="people-window" role="status">{applied.value ? `Resultados por comienzo de ${fields[applied.field]}: «${applied.value}».` : 'Directorio de cuentas públicas.'} {matches.length} perfiles mostrados. Puedes cargar las siguientes páginas.</p></div>

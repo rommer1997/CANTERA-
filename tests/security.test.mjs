@@ -65,6 +65,16 @@ beforeEach(async () => {
 after(async () => { await env?.cleanup(); });
 
 describe('Identidad, consentimiento y datos privados', { concurrency: false }, () => {
+  test('el directorio no se enumera antes de completar registro ni con correo sin verificar', async () => {
+    const directory = client => query(collection(client, 'communityPublicProfiles'), orderBy('createdAt', 'desc'), limit(20));
+    for (const client of [db(), db('alice'), verifiedDb('newcomer'), verifiedDb('inactive'), verifiedDb('minor')]) {
+      await assertFails(getDocs(directory(client)));
+      await assertFails(getCountFromServer(directory(client)));
+    }
+    await assertSucceeds(getDocs(directory(verifiedDb('alice'))));
+    await seed('communityAccountModeration/alice', { status: 'suspended' });
+    await assertFails(getDocs(directory(verifiedDb('alice'))));
+  });
   test('perfil deportivo, eventos y publicaciones son públicos; visitante no escribe', async () => {
     await seed('communityEvents/event', event('event', { participants: { alice: 'alice', bob: 'bob' } }));
     await seed('communityPosts/post', post());

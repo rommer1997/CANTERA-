@@ -318,7 +318,10 @@ service cloud.firestore {
       allow delete: if false;
     }
     match /communityPublicProfiles/{uid} {
-      allow read: if runtimeAvailable();
+      allow get: if runtimeAvailable();
+      // Individual sporting profiles can be shared publicly. Enumerating the
+      // directory and recommending accounts requires completed registration.
+      allow list: if verifiedActor();
       allow create, update: if (owner(uid) && pilotReadAllowed() || admin())
         && completedProfile(getAfter(/databases/$(database)/documents/communityProfiles/$(uid)).data)
         && publicProjection(request.resource.data, getAfter(/databases/$(database)/documents/communityProfiles/$(uid)).data);

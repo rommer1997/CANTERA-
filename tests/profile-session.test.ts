@@ -132,6 +132,36 @@ function providerHarness({ buildOpen = true, pilotBuild = false, existing = new 
   };
 }
 
+test('el directorio no consulta personas para visitantes ni cuentas con registro incompleto', async () => {
+  const h = providerHarness();
+  try {
+    await h.runtime('open');
+    assert.equal(h.render().peopleAvailable, false);
+    await h.render().searchPeople('', 'name', true);
+    await h.identify('alpha', { emailVerified: true, provider: 'google.com' });
+    assert.equal(h.render().peopleAvailable, false);
+    await h.render().searchPeople('', 'name', true);
+    assert.equal(h.queries.some(item => item.path === 'communityPublicProfiles'), false);
+    assert.deepEqual(h.render().profiles, []);
+  } finally { h.cleanup(); }
+});
+
+test('la búsqueda permite cuentas completas y descarta resultados tardíos al cambiar a una cuenta incompleta', async () => {
+  const complete = fixture('alpha', { adultConfirmed: true, acceptedTermsVersion: TERMS_VERSION, acceptedTermsAt: time, city: 'Madrid', country: 'España' });
+  const h = providerHarness({ existing: new Map([['communityProfiles/alpha', complete]]) });
+  try {
+    await h.identify('alpha', { emailVerified: true, provider: 'google.com' }); await h.runtime('open'); h.emitProfile('alpha', complete);
+    assert.equal(h.render().peopleAvailable, true);
+    h.deferQuery(); const pending = h.render().searchPeople('', 'name', true);
+    assert.equal(h.queries.at(-1)?.path, 'communityPublicProfiles');
+    await h.identify('newcomer', { emailVerified: true, provider: 'google.com' });
+    h.releaseQuery('communityPublicProfiles', [{ ...complete, id: 'beta', name: 'Private suggestion' }]);
+    await pending; await h.settle();
+    assert.equal(h.render().peopleAvailable, false); assert.deepEqual(h.render().profiles, []);
+    assert.equal(h.render().publicProfiles.beta, undefined);
+  } finally { h.cleanup(); }
+});
+
 test('Auth restaurada antes de runtime abierto crea después un único borrador privado sin consentimiento ficticio', async () => {
   const h = providerHarness();
   try {

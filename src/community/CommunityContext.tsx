@@ -44,7 +44,7 @@ interface CommunityAPI {
   verificationRequests: VerificationRequest[]; reports: ContentReport[]; hiddenPostIds: string[];
   profiles: PublicProfile[]; publicProfiles: Record<string, PublicProfile>;
   publicProfileStates: Record<string, 'loading' | 'ready' | 'missing' | 'error'>;
-  followingIds: string[]; peopleLoading: boolean; peopleError: string; peopleHasMore: boolean;
+  followingIds: string[]; peopleAvailable: boolean; peopleLoading: boolean; peopleError: string; peopleHasMore: boolean;
   linkedPostStates: Record<string, 'loading' | 'ready' | 'missing' | 'error'>; watchPost(id: string): () => void;
   loadMorePeople(reset?: boolean): Promise<void>; watchPublicProfile(id: string): () => void; retryPublicProfile(id: string): void; toggleFollow(id: string): Promise<void>;
   login(): Promise<void>; loginAdmin(): Promise<void>; signOut(): Promise<void>; beginDemo(name: string): Promise<void>;
@@ -149,6 +149,12 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
   const readReady = dataReadScope.current === readScope && (mode === 'demo' || auth.currentUser?.uid === firebaseUser?.uid);
   const privateReadReady = identityMatches && readReady;
   const adminReadReady = privateReadReady && mode === 'cloud' && isAdmin;
+  const peopleAvailable = serviceOpen && identityMatches && Boolean(profile?.adultConfirmed
+    && profile.acceptedTermsVersion === TERMS_VERSION && Number.isFinite(Date.parse(profile.acceptedTermsAt))
+    && profile.city.trim() && profile.country.trim()) && accountModeration?.status !== 'suspended'
+    && (mode === 'demo' || firebaseUser?.emailVerified === true);
+  const peopleScope = JSON.stringify([mode, firebaseUser?.uid || '', peopleAvailable]);
+  const currentPeopleScope = useRef(peopleScope); currentPeopleScope.current = peopleScope;
   const eventViewer = mode === 'demo' ? profile?.id : firebaseUser?.uid;
   const currentEventViewer = useRef(eventViewer); currentEventViewer.current = eventViewer;
   const fixtureWatches = useRef(new Map<string, symbol>());
@@ -244,7 +250,8 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => () => { postWatches.current.forEach(entry => entry.stop()); postWatches.current.clear(); }, []);
 
   const loadMorePeople = useCallback(async (reset = false) => {
-    if (mode === 'cloud' && !serviceOpen) { setPeoplePage({ mode, profiles: [], loading: false, error: '', hasMore: false }); return; }
+    const scope = peopleScope; const uid = firebaseUser?.uid;
+    if (!peopleAvailable || mode === 'cloud' && auth.currentUser?.uid !== uid) { setPeoplePage({ mode, profiles: [], loading: false, error: '', hasMore: false }); return; }
     if (reset || peopleCursor.current.mode !== mode) peopleCursor.current = { mode, cursor: null, offset: 0, sequence: peopleCursor.current.sequence + 1, busy: false };
     const paging = peopleCursor.current;
     if (paging.busy) return;
@@ -264,12 +271,18 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
         records = snapshot.docs.map(item => normalizePublicProfile(item.data(), item.id)).filter((item): item is PublicProfile => item !== null);
         paging.cursor = snapshot.docs.at(-1) || paging.cursor; hasMore = snapshot.size === peoplePageSize;
       }
-      if (currentMode.current !== mode || peopleCursor.current.sequence !== sequence) return;
+      if (currentMode.current !== mode || currentPeopleScope.current !== scope || mode === 'cloud' && auth.currentUser?.uid !== uid || peopleCursor.current.sequence !== sequence) return;
       setPeoplePage(previous => ({ mode, profiles: [...new Map([...(previous.mode === mode ? previous.profiles : []), ...records].map(item => [item.id, item])).values()], loading: false, error: '', hasMore }));
       setPublicCaches(previous => ({ ...previous, [mode]: { ...previous[mode], ...Object.fromEntries(records.map(item => [item.id, item])) } }));
-    } catch (err) { if (currentMode.current === mode && peopleCursor.current.sequence === sequence) setPeoplePage(previous => ({ ...previous, mode, loading: false, error: friendlyError(err) })); }
+    } catch (err) { if (currentMode.current === mode && currentPeopleScope.current === scope && peopleCursor.current.sequence === sequence) setPeoplePage(previous => ({ ...previous, mode, loading: false, error: friendlyError(err) })); }
     finally { if (peopleCursor.current === paging) paging.busy = false; }
-  }, [mode, serviceOpen]);
+  }, [mode, peopleAvailable, peopleScope, firebaseUser?.uid]);
+
+  useEffect(() => {
+    if (peopleAvailable) return;
+    peopleCursor.current = { mode, cursor: null, offset: 0, sequence: peopleCursor.current.sequence + 1, busy: false };
+    setPeoplePage({ mode, profiles: [], loading: false, error: '', hasMore: peopleAvailable });
+  }, [mode, peopleScope, peopleAvailable]);
 
   const searchPeople = useCallback(async (value: string, field: PeopleSearchField, reset = true) => { peopleSearch.current = { value: searchText(value), field }; await loadMorePeople(reset); }, [loadMorePeople]);
 
@@ -1077,8 +1090,8 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
     await updateDoc(doc(db, 'communityReports', id), { status: 'resolved' });
   }
   const value: CommunityAPI = { profile, accountEmail: identityMatches && mode === 'cloud' && firebaseUser?.uid === profile?.id ? firebaseUser?.email || null : null, mode, loading, error, isAdmin: identityMatches && mode === 'cloud' && isAdmin, demoEnabled, pilotEnabled, serviceAvailable: serviceOpen, accountModeration: privateReadReady ? accountModeration : null, mediaUploadsEnabled: mode === 'demo', runtimeConfig: mode === 'demo' ? { serviceStatus: 'open', mediaUploadsEnabled: true, contactEmail: '', updatedAt: '' } : { ...runtimeConfig, serviceStatus: runtimeConfig.serviceStatus === 'pilot' ? 'pilot' : serviceOpen ? 'open' : runtimeConfig.serviceStatus === 'paused' ? 'paused' : 'setup' }, adminRightsRequests: adminReadReady ? adminRightsRequests : [], adminQueueHasMore, adminQueueLoading, loadMoreAdminQueue, suspendAccount, reviewRightsRequest, updateRuntimeStatus, ownEvents: privateReadReady ? readableOwnEvents : [], ownEventsHasMore: false, ownEventsLoading: loading, loadMoreOwnEvents, ...pages, loadMoreEvents, loadMorePosts, fixtureData: readReady ? fixtureData : {}, fixtureStates: readReady ? fixtureStates : {}, watchFixtureData, eventHistories: readReady ? eventHistories : {}, watchEventHistory, eventNotices: privateReadReady ? eventNotices.filter(notice => notice.recipientId === profile?.id) : [], rightsRequests: privateReadReady ? rightsRequests.filter(request => request.userId === profile?.id) : [], blockedIds: privateReadReady ? blockedIds : [], toggleBlock, markNoticeRead, requestRights, retryEventNotices, postInteractionStates, watchPostInteractions, loadMoreComments, deleteComment, reportComment, searchPeople, events: serviceOpen ? availableEvents : [], posts: serviceOpen ? availablePosts : [], likes, comments, verificationRequests: privateReadReady ? (adminReadReady ? verificationRequests : verificationRequests.filter(request => request.userId === profile?.id)) : [], reports: adminReadReady ? reports : [], hiddenPostIds: privateReadReady ? hiddenPostIds : [],
-    profiles: serviceOpen && peoplePage.mode === mode ? peoplePage.profiles : [], publicProfiles: serviceOpen ? publicCaches[mode] : {}, publicProfileStates: profileStates[mode], followingIds: privateReadReady ? followingIds : [],
-    peopleLoading: peoplePage.mode === mode && peoplePage.loading, peopleError: peoplePage.mode === mode ? peoplePage.error : '', peopleHasMore: peoplePage.mode !== mode || peoplePage.hasMore,
+    profiles: peopleAvailable && peoplePage.mode === mode ? peoplePage.profiles : [], publicProfiles: serviceOpen ? publicCaches[mode] : {}, publicProfileStates: profileStates[mode], followingIds: privateReadReady ? followingIds : [],
+    peopleAvailable, peopleLoading: peopleAvailable && peoplePage.mode === mode && peoplePage.loading, peopleError: peopleAvailable && peoplePage.mode === mode ? peoplePage.error : '', peopleHasMore: peopleAvailable && (peoplePage.mode !== mode || peoplePage.hasMore),
     loadMorePeople, watchPublicProfile, retryPublicProfile, toggleFollow, watchPost, linkedPostStates: linkedStates[mode],
     login, loginAdmin, signOut, beginDemo, saveProfile, createEvent, createEventSeries, updateEvent, removeGuest, setRsvp, joinWaitlist, leaveWaitlist, saveMatchResult, scheduleFixture, joinEvent, leaveEvent, addGuest, setEventStatus, generateFixtures, saveScore,
     createPost, deletePost, toggleLike, addComment, reportPost, hidePost, requestVerification, reviewVerification, resolveReport };
