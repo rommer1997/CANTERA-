@@ -20,7 +20,9 @@ Entradas de 0.4–0.6s y disoluciones de 0.45s. Acercamientos discretos. Marcado
 
 ## What NOT to Do
 - No inventar una pantalla de iPhone instalado.
-- No cambiar la interfaz de Safari ni reemplazar su texto.
+- Conservar los controles de Safari. Por petición expresa del responsable, cubrir únicamente el dominio anterior con una capa de texto editable que muestre lacantera.com.es, sin modificar las capturas originales.
 - No música, voz o servicios de pago añadidos sin petición.
 - No mostrar saludos personales, estado del teléfono ni extensiones.
 - No transiciones bruscas, destellos o movimiento continuo sin pausa.
+
+Esta versión conserva su formato de 1080 × 1080.

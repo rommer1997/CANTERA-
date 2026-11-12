@@ -1,5 +1,11 @@
 # Tutorial de instalación — 8 de noviembre de 2026
 
+## Actualización de dominio — 13 de noviembre de 2026
+
+El responsable solicitó actualizar todos los vídeos a `lacantera.com.es`. Se actualizan las variantes cuadrada y vertical, tanto en el texto de la guía como en las direcciones visibles de Safari mediante capas editables sobre las capturas originales. Se mantienen los controles, los siete estados, los 36 segundos y la ausencia de audio. La variante cuadrada sigue siendo la utilizada en la app; la vertical se conserva como descarga histórica con la dirección actualizada.
+
+Se revisan los fotogramas de los pasos 1 y 5, donde se muestran las direcciones, y las exportaciones H.264 de 1080 × 1080 y 1080 × 1920 a 30 fps. Las portadas se extraen de los nuevos MP4. Esta modificación no acredita una nueva instalación física de Safari ni la activación del DNS del dominio. Las secciones posteriores conservan el historial de la entrega original.
+
 ## Entrega
 
 - Vídeo cuadrado `public/tutorial/ios/instalar-lacantera-iphone-compacto.mp4`: 36 segundos, 1080 × 1080, 30 fps, H.264/yuv420p, sin audio, 2.870 KB aproximadamente. Metadatos MP4 antes de los fotogramas (`moov` antes de `mdat`) para reproducción progresiva.

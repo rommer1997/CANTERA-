@@ -14,11 +14,11 @@ pnpm dlx hyperframes@0.9.19 render --quality high --fps 30 --workers 1 --output 
 ffmpeg -i ../../output/tutorial/instalar-lacantera-compacto-master.mp4 -c copy -movflags +faststart ../../public/tutorial/ios/instalar-lacantera-iphone-compacto.mp4
 ```
 
-`index.html` contiene los textos, la composición y la línea de tiempo pausada registrada en `window.__timelines.main`. `DESIGN.md` define la identidad. Revisa los fotogramas después de cambiar tiempos, texto o recortes, y actualiza también los subtítulos VTT y la transcripción de la app.
+`index.html` contiene los textos, la composición y la línea de tiempo pausada registrada en `window.__timelines.main`. `vertical.html` conserva la variante de 1080 × 1920. `DESIGN.md` define la identidad. Revisa los fotogramas después de cambiar tiempos, texto o recortes, y actualiza también los subtítulos VTT y la transcripción de la app.
 
 ## Procedencia
 
-Las cinco capturas IMG_9622–IMG_9626 fueron aportadas por el propietario de LaCantera. `scripts/prepare-installation-images.py`, desde la raíz del repositorio, reproduce sus seis recortes con Pillow. Se excluyen hora, batería, saludo personal, teclado y extensiones. No se redibuja la interfaz de Safari. El icono provisional «L» que aparece en la confirmación pertenece a la captura original.
+Las cinco capturas IMG_9622–IMG_9626 fueron aportadas por el propietario de LaCantera. `scripts/prepare-installation-images.py`, desde la raíz del repositorio, reproduce sus seis recortes con Pillow. Se excluyen hora, batería, saludo personal, teclado y extensiones. Por petición del responsable el 13 de noviembre, el texto y las capas editables de dirección muestran `lacantera.com.es`, también sobre el dominio anterior en la barra y la confirmación de Safari. Los archivos originales de captura y los controles se conservan. No se presenta como una nueva grabación del iPhone. El icono provisional «L» que aparece en la confirmación pertenece a la captura original.
 
 Recursos: marca existente `public/cantera-mark.svg`; Manrope Variable de la dependencia existente `@fontsource-variable/manrope` (licencia OFL incluida); GSAP 3.15.0 distribuido con HyperFrames (aviso de licencia conservado en el archivo, [licencia del proveedor](https://gsap.com/standard-license)). No se añade GSAP al paquete de la app: solo se sirve el MP4 y sus imágenes.
 
