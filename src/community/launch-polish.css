@@ -112,3 +112,6 @@
 
 /* E2/E3: un único separador entre identificación e información de acceso. */
 .c-app.c-studio .c-auth-note { border:0; background:transparent; padding:0; }
+
+/* E2/E3: anula el margen heredado de la hoja de autenticación anterior. */
+.c-app.c-studio .c-auth-content .c-auth-switch { margin:0!important; }
