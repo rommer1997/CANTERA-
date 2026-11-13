@@ -8,7 +8,7 @@
     "node": ">=24"
   },
   "scripts": {
-    "dev": "vite --port=3000 --host=0.0.0.0",
+    "dev": "vite --port=3000 --host=127.0.0.1",
     "build": "node scripts/check-build.mjs && vite build",
     "build:hosting": "node scripts/build-firebase-hosting.mjs",
     "hosting:deploy": "firebase deploy --project gen-lang-client-0853130215 --only hosting:cantera",

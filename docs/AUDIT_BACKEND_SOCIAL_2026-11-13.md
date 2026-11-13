@@ -34,6 +34,7 @@ El preflight final de apertura en modo `--dry-run` devuelve `unchanged`, servici
 5. Enlaces inexistentes muestran una pantalla de recuperación y conservan la URL; antes se redirigían silenciosamente al inicio.
 6. Cabeceras contra enmarcado y detección incorrecta de tipos, política de referencias, restricción de objetos/base y permisos de cámara/geolocalización propios, sin micrófono. Esta CSP parcial no equivale a una política estricta completa de scripts.
 7. Dependencias de producción: 13 avisos iniciales en la app y seis en las herramientas de Functions; tras actualizaciones y parches compatibles, las tres auditorías de producción (app, Functions y push) devuelven cero avisos conocidos. No implica que todos fueran explotables en los flujos actuales. Se añade a CI un bloqueo de avisos altos/críticos de producción.
+8. El servidor de desarrollo escucha por defecto sólo en `127.0.0.1`. El acceso LAN, si se necesita para una prueba concreta, debe activarse expresamente; no confundir Vite con un servidor de producción. El servidor temporal de esta auditoría se detuvo al terminar.
 
 Parches: DOMPurify 3.4.17 o superior por la dependencia de jsPDF; Vite 6.4.6; Firebase Admin 14.5.1; Firebase CLI 15.36.0 y dependencias transitivas compatibles. Los overrides de gRPC y body-parser quedan documentados para retirarlos cuando los padres incluyan el arreglo. No se ignoran los avisos en el auditor.
 
