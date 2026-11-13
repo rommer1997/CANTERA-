@@ -40,3 +40,8 @@
 .lc-social-links>span { border-style:dashed; color:var(--c-muted); }
 .c-app.c-studio .lc-social-note { font-size:12px; line-height:1.5; color:var(--c-muted); margin:8px 0 12px; }
 .lc-feedback-link { display:inline-flex; align-items:center; min-height:44px; font-size:14px; font-weight:650; color:var(--c-green); text-decoration:underline; text-underline-offset:3px; }
+
+/* E1: botón claro de Google, independiente de la acción principal de marca. */
+.c-app.c-studio .c-auth-content .c-google-login { background:#fff; color:#1f1f1f; border:1.5px solid #cfd8d3; min-height:52px; border-radius:14px; font-weight:700; }
+.c-app.c-studio .c-auth-content .c-google-login:hover { background:#f8faf9; color:#1f1f1f; border-color:#8c9d93; }
+.c-app.c-studio .c-auth-content .c-google-login:focus-visible { outline:3px solid var(--c-green); outline-offset:4px; }
