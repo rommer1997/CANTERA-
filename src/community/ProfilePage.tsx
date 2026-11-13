@@ -2,7 +2,6 @@ import { trackAnalytics } from './analytics';
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowUpRight, ChevronRight, CalendarDays, CheckCircle2, MapPin, Settings, ShieldCheck, Users } from 'lucide-react';
-import BrandMark from '../components/BrandMark';
 import { friendlyError, TERMS_VERSION, useCommunity } from './CommunityContext';
 import { useTeams } from './TeamsContext';
 import { safeReturnTo } from './teamLogic';
@@ -56,21 +55,20 @@ function ProfileAccount() {
     const loginLink = `/profile?${new URLSearchParams({ intent: 'login', ...(returnTo ? { returnTo } : {}) })}`;
     return <section className="c-auth-layout">
       <div className={`c-auth-art ${returning ? 'c-auth-art--login' : ''}`}>
-        <img src={returning ? '/images/design-2026-10/profile-football.webp' : '/images/design-2026-10/auth-goal.webp'} alt="" />
-        <div><span className="c-eyebrow">TU SITIO EN LACANTERA</span><p>El fútbol nos une.</p></div>
+        <img src="/images/design-2026-10/hero-community.webp" alt="" width={800} height={1000} loading="eager" fetchPriority="high" />
+        <div><span className="c-eyebrow">DEL BARRIO AL MUNDO</span><p>El fútbol nos une.</p></div>
       </div>
       <div className="c-auth-content">
-        <Link className="c-brand" to="/"><BrandMark className="c-brand-mark" />LaCantera</Link>
-        <div className="c-auth-heading"><h1>{pilotAccess ? 'Piloto privado' : returning ? 'Bienvenido de vuelta' : 'Únete a la comunidad'}</h1><p>{returning ? 'Tu comunidad te está esperando.' : 'Crea tu cuenta y empieza a vivir el fútbol de una forma diferente.'}</p></div>
+        <div className="c-auth-heading"><h1>{pilotAccess ? 'Piloto privado' : returning ? 'Bienvenido de vuelta' : 'Únete a la comunidad'}</h1><p>{returning ? 'Tu comunidad te está esperando.' : 'Crea tu cuenta en 30 segundos y apúntate a tu primer partido.'}</p></div>
         {returnTo ? <p className="c-profile-return">Después de completar tu cuenta volverás a la pantalla que estabas abriendo.</p> : null}
         {mode === 'cloud' && !api.runtimeConfig.updatedAt ? <p role="status">Comprobando acceso a LaCantera…</p> : realAccess ? <>
           <button disabled={busy} className="c-button c-google-login" onClick={() => { trackAnalytics('GoogleLoginClick'); void action(api.login); }}>
             <img src="/images/google-signin.png" alt="" width={18} height={18} />
             {busy ? 'Conectando…' : pilotAccess ? 'Entrar en el piloto con Google' : 'Continuar con Google'}
           </button>
-          <p className="c-small">{pilotAccess ? 'Accede con la cuenta autorizada por el administrador.' : 'Una cuenta de Google. Después eliges tu nombre público y completas tu perfil deportivo.'}</p>
+          <p className="c-small">{pilotAccess ? 'Accede con la cuenta autorizada por el administrador.' : 'Usamos Google solo para identificarte. Tu nombre público lo eliges tú.'}</p>
         </> : <div className="c-access-status" role="status"><ShieldCheck size={24} /><p>El registro real está en preparación.</p><p className="c-small">Estamos completando la configuración antes de abrir la comunidad.</p>{operator.email ? <a href={`mailto:${operator.email}`}>Contactar con el responsable</a> : null}</div>}
-        <div className="c-auth-note"><ShieldCheck size={17} aria-hidden="true" /><p>Acceso gratuito para mayores de 18 años. Consulta los <Link to="/legal/terms" target="_blank" rel="noopener">términos</Link> y la <Link to="/legal/privacy" target="_blank" rel="noopener">privacidad</Link>.</p></div>
+        <hr className="c-auth-divider" /><div className="c-auth-note"><ShieldCheck size={17} aria-hidden="true" /><p>Gratis y para mayores de 18 años. Consulta los <Link to="/legal/terms" target="_blank" rel="noopener">términos</Link> y la <Link to="/legal/privacy" target="_blank" rel="noopener">privacidad</Link>.</p></div>
         {api.demoEnabled ? <details className="c-auth-demo" open={Boolean(returnTo)}><summary>Probar en este dispositivo</summary><p className="c-small">Entorno aislado. Los datos no se publican ni se sincronizan con otros usuarios.</p><label>Tu nombre<input className="c-input" value={name} onChange={e => setName(e.target.value)} maxLength={100} placeholder="Tu nombre" autoComplete="nickname" /></label><button disabled={busy || !name.trim()} className="c-button secondary" onClick={() => void action(() => api.beginDemo(name))}>Abrir entorno de prueba</button></details> : null}
         {error ? <p className="c-error" role="alert">{error}</p> : null}
         <p className="c-auth-switch">{returning ? <>¿No tienes una cuenta? <Link to={registrationLink} data-analytics-event="JoinClick">Únete gratis</Link></> : <>¿Ya tienes cuenta? <Link to={loginLink}>Inicia sesión</Link></>}</p>
