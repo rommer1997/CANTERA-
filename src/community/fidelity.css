@@ -39,7 +39,7 @@
 .c-app .c-profile-information { border-top: 0; margin-top: 0; padding-top: 16px; }
 .c-app .c-profile-information p { font-size: 12px; margin-bottom: 12px; }
 .c-app .c-own-profile-body .c-profile-links { gap: 4px 12px; padding-top: 8px; }
-.c-app .c-own-profile-body .c-profile-links a { font-size: 11px; }
+.c-app .c-own-profile-body .c-profile-links a { font-size: 12px; }
 .c-app .c-account-agenda { margin-top: 18px; }
 .c-app .c-profile--settings .c-section-head { margin-bottom: 20px; }
 .c-app .c-settings-list { border: 1px solid var(--c-line); background: #fff; border-radius: 12px; overflow: hidden; }
@@ -104,7 +104,7 @@
 .c-app .ce-detail-cover { height: 250px; }
 .c-app .ce-detail-header-content { padding: 18px; }
 .c-app .ce-detail-title h1 { font-size: 28px; line-height: 1.2; }
-.c-app .ce-detail-tags>span { padding: 3px 7px; border-radius: 5px; font-size: 10px; }
+.c-app .ce-detail-tags>span { padding: 3px 7px; border-radius: 5px; font-size: 12px; }
 .c-app .ce-organizer { padding-top: 12px; margin-top: 12px; }
 .c-app .ce-main-action { margin-left: auto; font-size: 12px !important; }
 .c-app .people-profile-card { border-radius: 12px; }
@@ -128,11 +128,11 @@
 .c-app .ce-type-choice small { display: none; }
 .c-app .ce-choice-field legend { font-size: 12px; margin-bottom: 7px; }
 .c-app .ce-form-section { padding-top: 12px; }
-.c-app .ce-helper { font-size: 11px; line-height: 1.5; }
+.c-app .ce-helper { font-size: 12px; line-height: 1.5; }
 .c-app .ce-cover-disclosure { padding: 12px 0; border-block: 1px solid var(--c-line); }
 .c-app .ce-cover-disclosure>summary { min-height: 44px; cursor: pointer; font-size: 12px; font-weight: 650; }
 .c-app .ce-cover-disclosure .ce-cover-field { margin-top: 10px; }
-.c-app .ce-location-disclosure>summary { min-height: 44px; display: flex; align-items: center; gap: 7px; cursor: pointer; padding: 8px 10px; border: 1px solid var(--c-line); border-radius: 7px; font-size: 11px; color: var(--c-muted); }
+.c-app .ce-location-disclosure>summary { min-height: 44px; display: flex; align-items: center; gap: 7px; cursor: pointer; padding: 8px 10px; border: 1px solid var(--c-line); border-radius: 7px; font-size: 12px; color: var(--c-muted); }
 .c-app .ce-location-disclosure>summary>svg { flex-shrink: 0; color: var(--c-green); }
 .c-app .ce-location-disclosure>summary>svg:last-child { margin-left: auto; }
 .c-app .ce-location-disclosure[open]>summary>svg:last-child { transform: rotate(90deg); }
@@ -167,8 +167,8 @@
   .c-app .cf-community-cover h1 { font-size: 25px; }
   .c-app .cf-community-cover p { font-size: 12px; }
   .c-app .cf-layout { margin-top: 0; }
-  .c-app .cf-filters button { font-size: 11px; padding-inline: 8px; }
-  .c-app .cf-source-select select { font-size: 11px; max-width: 106px; padding-inline: 6px; }
+  .c-app .cf-filters button { font-size: 12px; padding-inline: 8px; }
+  .c-app .cf-source-select select { font-size: 12px; max-width: 106px; padding-inline: 6px; }
   .c-app .cf-community-shortcuts { gap: 8px; }
   .c-app .ce-detail-cover { height: 170px; }
   .c-app .ce-explore-hero { margin-top: 14px; padding-inline: 14px; }
@@ -177,7 +177,7 @@
   .c-app .ce-explore-hero .ce-workspace-header>.c-button { font-size: 0 !important; width: 44px; min-width: 44px; padding: 10px; min-height: 44px; }
   .c-app .ce-quick-filters { flex-wrap: nowrap; overflow-x: auto; gap: 6px; max-width: 100%; }
   .c-app .ce-quick-filters>div { display: contents; }
-  .c-app .ce-quick-filters button { min-height: 44px; font-size: 11px; padding: 7px 9px; }
+  .c-app .ce-quick-filters button { min-height: 44px; font-size: 12px; padding: 7px 9px; }
   .c-app .ce-results-row { margin-top: 12px; }
   .c-app .ce-results-row h2 { font-size: 19px; }
   .c-app .ce-card-cover { min-height: 102px; max-height: 120px; }
@@ -201,7 +201,7 @@
   .c-app .ce-form { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px 12px; }
   .c-app .ce-type-choice { padding: 8px 10px; }
   .c-app .ce-form-footer { margin-top: 8px; }
-  .c-app .ce-form-footer>span { display: flex; max-width: none; font-size: 10px; margin-bottom: 7px; }
+  .c-app .ce-form-footer>span { display: flex; max-width: none; font-size: 12px; margin-bottom: 7px; }
   .c-app .cm-workspace { border-radius: 0; }
 }
 @media(max-width:359px) {
@@ -209,5 +209,5 @@
   .c-app .cf-feed-controls { gap: 4px; }
   .c-app .cf-source-select select { max-width: 97px; }
   .c-app .cf-filters { gap: 4px; }
-  .c-app .cf-filters button { padding-inline: 6px; font-size: 10px; }
+  .c-app .cf-filters button { padding-inline: 6px; font-size: 12px; }
 }

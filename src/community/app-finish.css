@@ -3,7 +3,7 @@
   /* One semantic palette and scale for the web adaptation of Expo's design-system guidance. */
   --c-green:#006747;
   --c-ink:#071b17;
-  --c-muted:#627078;
+  --c-muted:#4d5e56;
   --c-line:#d7dfdd;
   --c-surface:#e5f1ea;
   --c-bg:#f7f9f7;
@@ -86,7 +86,7 @@
 .c-app.c-product-shell .cm-contact-copy strong { font-size:14px; }
 .c-app.c-product-shell .cm-contact-copy small { font-size:12px; }
 .c-app.c-product-shell .cm-contact-meta { max-width:80px; }
-.c-app.c-product-shell .cm-contact-meta time { font-size:10px; text-align:right; }
+.c-app.c-product-shell .cm-contact-meta time { font-size:12px; text-align:right; }
 .c-app.c-product-shell .cm-contact>svg { display:none; }
 .c-app.c-product-shell .cm-contact>svg.cm-spinning { display:block; }
 .c-app.c-product-shell .cm-welcome { background:#fafcfb; padding:32px; }
@@ -95,7 +95,7 @@
 .c-app.c-product-shell .cm-thread-heading { padding:16px; gap:10px; }
 .c-app.c-product-shell .cm-thread-person h2 { font-size:16px; }
 .c-app.c-product-shell .cm-message-viewport { background:#fafcfb; }
-.c-app.c-product-shell .cm-date-divider span { border:0; background:#edf3ef; font-size:11px; border-radius:20px; padding:5px 10px; }
+.c-app.c-product-shell .cm-date-divider span { border:0; background:#edf3ef; font-size:12px; border-radius:20px; padding:5px 10px; }
 .c-app.c-product-shell .cm-bubble { background:#fff; border-color:#e1e9e5; border-radius:13px 13px 13px 3px; padding:10px 13px 5px; }
 .c-app.c-product-shell .cm-message-row.is-mine .cm-bubble { background:var(--c-green); border-color:var(--c-green); border-radius:13px 13px 3px 13px; }
 .c-app.c-product-shell .cm-composer { padding:12px 14px 10px; }
@@ -206,7 +206,7 @@
   .c-app.c-product-shell .cm-message-viewport { padding:12px 16px; }
   .c-app.c-product-shell .cm-thread-back { flex-basis:40px; }
   .c-app.c-product-shell .cm-composer { padding-inline:14px; }
-  .c-app.c-product-shell .cm-thread-person p { font-size:10px; }
+  .c-app.c-product-shell .cm-thread-person p { font-size:12px; }
 }
 @media(max-width:359px) {
   .c-app.c-product-shell :is(.team-page,.cm-page,.people-page,.ci-page,.c-activity) h1 { font-size:26px; }

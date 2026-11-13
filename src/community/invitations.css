@@ -34,7 +34,7 @@
 .ci-dialog::backdrop { background: #15161b85; backdrop-filter: blur(5px); }
 .ci-dialog-head { display: flex; gap: 16px; justify-content: space-between; align-items: flex-start; }
 .ci-dialog-head h2 { font-size: 22px; line-height: 1.2; margin: 6px 0 0; }
-.ci-dialog-head .c-eyebrow { font-size: 10px; letter-spacing: .12em; margin: 0; }
+.ci-dialog-head .c-eyebrow { font-size: 12px; letter-spacing: .12em; margin: 0; }
 .ci-close { flex: 0 0 36px; height: 36px; border: 0; border-radius: 10px; background: var(--c-bg); color: var(--c-ink); display: grid; place-items: center; cursor: pointer; }
 .ci-dialog > p { font-size: 13px; line-height: 1.65; }
 .ci-code-card { padding: 17px 14px 14px; background: #f9f2ee; border: 1px solid #efdfd7; border-radius: 18px; text-align: center; }

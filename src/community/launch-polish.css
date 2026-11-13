@@ -95,3 +95,11 @@
  .c-app.c-studio.lc-public-shell .c-header>.c-brand { display:flex; }
  .c-app.c-studio.lc-public-shell .c-nav { display:flex; }
 }
+
+/* F1: texto secundario legible; sin opacidades que rebajen el contraste. */
+.c-app.c-studio :is(.lc-photo-label,.lc-rail-credit,.lc-rail-label,.lc-rail-brand small,.lc-rail-account small,.c-brand-credit,.c-footer>div>span) { font-size:12px; opacity:1; }
+.c-app.c-studio .lc-photo-label { background:#163b2c; color:#fff; }
+.c-app.c-studio .lc-sidebar :is(.lc-rail-credit,.lc-rail-label,.lc-rail-brand small,.lc-rail-account small) { color:#fff; }
+.c-app.c-studio .lc-purpose p { color:#fff; opacity:1; }
+.c-app.c-studio :is(.c-footer,.c-mobile-info,.c-auth-content) { overflow-wrap:anywhere; }
+.c-app.c-studio .c-legal-index a { min-height:44px; display:inline-flex; align-items:center; }

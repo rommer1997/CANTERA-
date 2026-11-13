@@ -10,7 +10,7 @@
 .cf-avatar { flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%; background: var(--c-ink, #152921); color: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 750; border: 1px solid var(--c-ink, #152921); text-decoration: none; }
 .cf-composer-top > .cf-avatar { width: 44px; height: 44px; }
 .cf-page .cf-avatar, .cf-page a.cf-avatar:hover { color: #fff; }
-.cf-avatar--small { width: 30px; height: 30px; font-size: 10px; }
+.cf-avatar--small { width: 30px; height: 30px; font-size: 12px; }
 .cf-profile-avatar { width: 52px; height: 52px; font-size: 17px; margin-bottom: 5px; }
 .cf-rail-name { font-size: 16px; font-weight: 700; line-height: 1.35; display: flex; align-items: center; gap: 5px; overflow-wrap: anywhere; }
 .cf-profile-card h2 { font-size: 18px; }
@@ -195,8 +195,8 @@
   .cf-publish-action { min-height: 44px; padding: 9px 12px; gap: 6px; }
   .cf-page .cf-composer { padding: 10px; border-radius: 12px; }
   .cf-composer-top { gap: 8px; }
-  .cf-avatar { width: 36px; height: 36px; font-size: 11px; }
-  .cf-avatar--small { width: 29px; height: 29px; font-size: 10px; }
+  .cf-avatar { width: 36px; height: 36px; font-size: 12px; }
+  .cf-avatar--small { width: 29px; height: 29px; font-size: 12px; }
   .cf-compose-trigger { padding: 10px 12px; font-size: 13px; }
   .cf-icon-button { min-width: 44px; min-height: 44px; }
   .cf-expand-button { display: none; }
@@ -360,7 +360,7 @@
 .cf-rail-nav .is-active { color: #07543b; background: #e5f1eb; box-shadow: none; }
 .cf-page .cf-composer { padding: 14px 16px; border: 1px solid var(--c-line, #dce7e1); border-radius: 14px; background: #fff; }
 .cf-compose-trigger { border-radius: 24px; background: #f5f8f6; border-color: #e4ece7; font-size: 14px; }
-.cf-page .cf-composer-note { margin-top: 7px; padding-left: 54px; font-size: 11px; }
+.cf-page .cf-composer-note { margin-top: 7px; padding-left: 54px; font-size: 12px; }
 .cf-feed-controls { margin: 12px 0 16px; padding: 2px 0; }
 .cf-source-tabs { gap: 5px; border: 0; margin-bottom: 7px; }
 .cf-source-tabs button { flex: 0 0 auto; border: 1px solid var(--c-line, #dce7e1); margin: 0; border-radius: 8px; background: #fff; padding: 8px 13px; min-height: 44px; font-size: 13px; }
@@ -371,13 +371,13 @@
 .cf-filters { gap: 5px; }
 .cf-filters button { min-height: 40px; border-color: var(--c-line, #dce7e1); background: #fff; border-radius: 8px; padding: 7px 11px; font-size: 12px; }
 .cf-filters button.is-active { background: #e5f1eb; color: #07543b; border-color: #a8cfbc; }
-.cf-page .cf-search-scope { margin-top: 7px; font-size: 11px; color: var(--c-muted, #62746a); }
+.cf-page .cf-search-scope { margin-top: 7px; font-size: 12px; color: var(--c-muted, #62746a); }
 .cf-stream { gap: 14px; }
 .cf-page .cf-post { border-radius: 14px; border-color: #dce7e1; box-shadow: 0 2px 6px #093e2b03; }
 .cf-post-head { gap: 10px; padding: 16px 16px 12px; }
 .cf-author { gap: 2px; }
 .cf-author-name strong { font-size: 14px; }
-.cf-post-meta { font-size: 11px; }
+.cf-post-meta { font-size: 12px; }
 .cf-follow-button { border-color: transparent; color: #07543b; background: #e9f4ee; border-radius: 8px; }
 .cf-page .cf-caption { padding-top: 2px; }
 .cf-written-post { padding-top: 2px; }
@@ -385,7 +385,7 @@
 .cf-post-text { font-size: 14px; line-height: 1.7; }
 .cf-achievement { border: 1px solid #d9e9df; background: #f3f8f5; border-radius: 10px; padding: 14px; }
 .cf-page .cf-achievement h2 { font-size: 21px; }
-.cf-achievement-label { color: #07543b; font-size: 10px; }
+.cf-achievement-label { color: #07543b; font-size: 12px; }
 .cf-media { margin: 4px 16px 0; border-radius: 10px; }
 .cf-post-actions { gap: 19px; margin-top: 12px; padding: 3px 0; }
 .cf-post-actions button, .cf-post-actions a { font-size: 12px; }
@@ -417,10 +417,10 @@
   .cf-community-cover .cf-feed-search input { font-size: 16px; height: 44px; }
   .cf-page .cf-composer { border-radius: 12px; padding: 12px; }
   .cf-composer-top > .cf-avatar { width: 36px; height: 36px; }
-  .cf-page .cf-composer-note { padding-left: 44px; font-size: 11px; }
+  .cf-page .cf-composer-note { padding-left: 44px; font-size: 12px; }
   .cf-source-tabs { gap: 5px; flex-wrap: wrap; }
   .cf-source-tabs button { font-size: 12px; min-height: 44px; padding: 8px 11px; }
-  .cf-people-link { font-size: 11px; gap: 4px; padding-inline: 5px; }
+  .cf-people-link { font-size: 12px; gap: 4px; padding-inline: 5px; }
   .cf-people-link svg { display: none; }
   .cf-feed-controls { margin: 10px 0 13px; }
   .cf-filters button { min-height: 44px; font-size: 12px; }
@@ -438,5 +438,5 @@
 @media (max-width: 360px) {
   .cf-source-tabs { flex-wrap: nowrap; gap: 4px; }
   .cf-source-tabs button { padding-inline: 9px; }
-  .cf-source-tabs .cf-people-link { min-width: 0; flex: 1; padding: 5px 3px; white-space: normal; line-height: 1.25; text-align: center; justify-content: center; font-size: 10px; }
+  .cf-source-tabs .cf-people-link { min-width: 0; flex: 1; padding: 5px 3px; white-space: normal; line-height: 1.25; text-align: center; justify-content: center; font-size: 12px; }
 }

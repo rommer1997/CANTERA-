@@ -131,18 +131,18 @@
 .people-profile-card{overflow:hidden;border:1px solid var(--c-line,#dce7e1);border-radius:16px;background:#fff;padding-bottom:20px}
 .people-profile-cover{position:relative;height:215px;margin:0;background:#0c4533;overflow:hidden}
 .people-profile-cover>img{display:block;width:100%;height:100%;object-fit:cover;object-position:center 58%}
-.people-profile-cover>figcaption{position:absolute;right:14px;bottom:13px;display:inline-block;padding:4px 8px;border-radius:5px;background:#103c2cd9;color:#fff;font-size:10px;line-height:1.4}
+.people-profile-cover>figcaption{position:absolute;right:14px;bottom:13px;display:inline-block;padding:4px 8px;border-radius:5px;background:#103c2cd9;color:#fff;font-size:12px;line-height:1.4}
 .people-public-profile .people-profile-heading{position:relative;align-items:flex-start;gap:18px;padding:0 25px 0;margin-top:-35px}
 .people-public-profile .people-profile-avatar{width:88px;height:88px;flex-basis:88px;border:5px solid #fff;background:#e1f0e7;font-size:32px}
 .people-public-profile .people-profile-heading>div{padding-top:47px}
 .people-public-profile .people-profile-heading h1{font-size:28px;margin-bottom:5px}
-.people-public-profile .people-profile-heading .people-eyebrow{font-size:10px;letter-spacing:.08em;margin:0 0 6px}
+.people-public-profile .people-profile-heading .people-eyebrow{font-size:12px;letter-spacing:.08em;margin:0 0 6px}
 .people-public-profile .people-location{font-size:12px;margin:5px 0}
-.people-public-profile .people-verification{font-size:11px;margin-top:7px}
+.people-public-profile .people-verification{font-size:12px;margin-top:7px}
 .people-public-profile .people-counts{justify-content:flex-start;border:0;border-top:1px solid #e8efeb;border-bottom:1px solid #e8efeb;border-radius:0;padding:16px 0;margin:20px 25px 16px;gap:22px 32px}
 .people-public-profile .people-counts>span{display:flex;flex-direction:column;font-size:12px;color:var(--c-muted,#6c7a73)}
 .people-public-profile .people-counts strong{font-size:23px;font-weight:800;color:var(--c-ink,#102b21);line-height:1.4;margin:0}
-.people-public-profile .people-counts small{font-size:10px}
+.people-public-profile .people-counts small{font-size:12px}
 .people-public-profile .people-actions{padding:0 25px;gap:8px}
 .people-public-profile .people-actions .people-button{font-size:12px;border-radius:8px}
 .people-public-profile .people-share-status{margin:10px 25px 0;min-height:0}
@@ -152,9 +152,9 @@
 .people-information h2{font-size:20px;font-weight:800;letter-spacing:-.035em;margin:0 0 16px}
 .people-information .people-bio{margin:0 0 20px;font-size:14px;line-height:1.75}
 .people-information .people-details{gap:18px 28px}
-.people-information .people-details dt{font-size:11px}
+.people-information .people-details dt{font-size:12px}
 .people-information .people-details dd{font-size:14px}
-.people-information .people-window{margin:18px 0 0;font-size:11px}
+.people-information .people-window{margin:18px 0 0;font-size:12px}
 .people-public-profile .people-activity{margin-top:24px;border-top:0;padding-top:0}
 .people-public-profile .people-activity h2{font-size:20px;font-weight:800;letter-spacing:-.035em}
 .people-public-profile .people-activity>ul{display:grid;gap:12px}
@@ -162,9 +162,9 @@
 .people-public-profile .people-post h3,.people-public-profile .people-event h3{font-size:17px}
 .people-public-profile .people-post p{font-size:14px;line-height:1.7}
 .people-public-profile .people-event p{font-size:12px}
-.people-public-profile .people-meta{font-size:11px}
+.people-public-profile .people-meta{font-size:12px}
 .people-public-profile .people-activity-footer{font-size:13px}
-.people-public-profile .people-activity-footer .people-window{font-size:11px}
+.people-public-profile .people-activity-footer .people-window{font-size:12px}
 @media(max-width:767px){
 .people-public-profile{padding-top:16px}
 .people-profile-card{border-radius:13px;padding-bottom:17px}
@@ -173,15 +173,15 @@
 .people-public-profile .people-profile-avatar{width:72px;height:72px;flex-basis:72px;font-size:27px;border-width:4px}
 .people-public-profile .people-profile-heading>div{padding-top:45px}
 .people-public-profile .people-profile-heading h1{font-size:24px}
-.people-public-profile .people-profile-heading .people-eyebrow{margin-bottom:5px;font-size:9px}
-.people-public-profile .people-location{font-size:11px}
+.people-public-profile .people-profile-heading .people-eyebrow{margin-bottom:5px;font-size:12px}
+.people-public-profile .people-location{font-size:12px}
 .people-public-profile .people-location svg{width:13px;height:13px}
-.people-public-profile .people-verification{font-size:10px;align-items:flex-start}
+.people-public-profile .people-verification{font-size:12px;align-items:flex-start}
 .people-public-profile .people-verification svg{width:14px;height:14px;flex-shrink:0;margin-top:2px}
 .people-public-profile .people-counts{margin:17px 17px 14px;padding-block:13px;gap:16px 27px}
 .people-public-profile .people-counts strong{font-size:21px}
 .people-public-profile .people-actions{padding-inline:17px}
-.people-public-profile .people-actions .people-button{font-size:11px;padding:9px 11px;gap:5px}
+.people-public-profile .people-actions .people-button{font-size:12px;padding:9px 11px;gap:5px}
 .people-public-profile .people-actions .people-button svg{width:15px;height:15px}
 .people-public-profile .people-share-status{margin-inline:17px}
 .people-information{padding:20px 17px;border-radius:12px}
