@@ -1,3 +1,10 @@
+import { publicSite } from '../config/publicSite';
+import { analyticsReady } from './analytics';
+
+const analyticsNotice = analyticsReady(publicSite.analytics)
+  ? 'Usamos analítica sin cookies y sin datos identificativos de tu cuenta para saber cuántas personas visitan la web. Solo enviamos categorías de páginas y acciones, sin nombres, correos, códigos ni contenido. El proveedor recibe los datos de conexión necesarios para atender la petición; respetamos No rastrear y no almacenamos identificadores en tu dispositivo.'
+  : 'La analítica de visitas está desactivada. No enviamos mediciones a proveedores de analítica. Antes de activarla publicaremos el proveedor y su tratamiento de los datos de conexión.';
+
 export const operator = {
   name: import.meta.env.VITE_OPERATOR_NAME || '',
   email: import.meta.env.VITE_CONTACT_EMAIL || '',
@@ -7,7 +14,7 @@ export const operator = {
 export const legalReady = Boolean(operator.name && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(operator.email) && operator.country);
 export const hostingProvider = import.meta.env.VITE_HOSTING_PROVIDER === 'firebase' ? 'firebase' : 'vercel';
 export const COOKIES_VERSION = '2026-11-13';
-export const PRIVACY_VERSION = '2026-11-08';
+export const PRIVACY_VERSION = '2026-11-13';
 export const legalDocuments = {
   terms: {
     title: 'Términos de uso', intro: 'LaCantera es una iniciativa de acceso gratuito que conecta a personas y equipos a través del fútbol. Estos términos describen las condiciones de participación.',
@@ -39,16 +46,18 @@ export const legalDocuments = {
       ['Exportaciones, copias y reservas', 'Los archivos locales de exportación se retiran al confirmar su recepción o, como límite ordinario, siete días después de la entrega. Una exportación sin entregar se retira a los 30 días de prepararse; los planes y diarios de supresión, dentro de 30 días del cierre técnico. Las copias de recuperación son manuales: el responsable debe custodiarlas en almacenamiento cifrado bajo su control, revisar su antigüedad semanalmente y retirarlas a los 30 días por copia. Antes de recuperar una copia se excluyen los datos ya retirados. Una obligación o responsabilidad concreta puede exigir reservar solo los datos necesarios, separados del uso habitual y con acceso restringido, motivo y plazo de revisión o fin documentados. Cuando corresponda el bloqueo legal de datos, se limita a los fines y plazos aplicables; no autoriza conservar toda una cuenta indefinidamente.'],
       ['Tus derechos', 'Puedes pedir acceso, rectificación, supresión, portabilidad y, cuando proceda, oposición o limitación en el correo de contacto. La cuenta permite registrar solicitudes de exportación y baja; el responsable informa de su tramitación. La respuesta se facilita en un mes; cuando corresponda una prórroga por complejidad, se justifica y comunica dentro del primer mes. No necesitas aceptar una nueva versión de las condiciones para ejercer estos derechos. Se verificará tu identidad de forma proporcionada. También puedes reclamar ante la autoridad de protección de datos competente. Puedes retirar un consentimiento opcional sin que ello afecte a los tratamientos anteriores lícitos.'],
       ['Notificaciones opcionales del dispositivo', 'Si activas las notificaciones, guardamos el identificador de tu cuenta, la suscripción del navegador, sus claves de entrega y tus preferencias de mensajes e invitaciones en Cloudflare Workers y D1. El servidor comprueba en Firebase los metadatos del mensaje o la invitación; la consulta de mensajes excluye su texto. Los avisos se cifran para el navegador y su pantalla bloqueada muestra textos genéricos. La entrega pasa por el servicio de notificaciones de tu navegador, como Apple, Google o Mozilla. Puedes desactivar los avisos de este dispositivo; al cerrar sesión retiramos su suscripción local. Las suscripciones sin renovación se retiran a los treinta días y las entregas pendientes caducan en una hora. Las solicitudes de acceso y supresión incluyen estos registros y se tramitan con el mismo correo de contacto. Las notificaciones son opcionales y no hacen falta para usar los mensajes ni aceptar invitaciones.'],
+      ['Medición de visitas', analyticsNotice],
       ['Menores y seguridad', 'La cuenta requiere mayoría de edad autodeclarada en esta versión. La incorporación de menores se habilitará con tutela, controles de contacto y políticas locales revisadas. No compartas datos de salud, identificadores oficiales ni ubicaciones personales precisas. Aplicamos controles de acceso y permisos separados para las funciones administrativas; ningún sistema ofrece seguridad absoluta.']
     ]
   },
   cookies: {
-    title: 'Cookies y almacenamiento', intro: 'Una comunidad sin seguimiento publicitario. Esta versión no incorpora cookies de marketing, píxeles publicitarios ni analítica de terceros.',
+    title: 'Cookies y almacenamiento', intro: 'Una comunidad sin seguimiento publicitario. No utilizamos cookies de marketing ni píxeles publicitarios.',
     sections: [
       ['Almacenamiento necesario', 'Guardamos en tu navegador tu sesión y tus preferencias para que puedas seguir usando tu cuenta. LaCantera guarda la elección de publicaciones ocultas y tus preferencias de instalación. Para recomendar la instalación después de tu primera visita, conserva una marca de visita previa en este navegador, sin identificarte ni rastrearte entre sitios. La versión instalable conserva exclusivamente el código y los recursos estáticos de la aplicación para poder abrir su interfaz sin conexión. Ese caché no incluye respuestas de Firebase, perfiles, publicaciones ni archivos de usuarios; las acciones en la comunidad requieren conexión. El sitio utiliza conexiones y registros técnicos del proveedor de alojamiento para servir la página y proteger el servicio. Estos usos deben distinguirse de la publicidad o medición opcional.'],
       ['Servicios externos', 'Cuando eliges entrar con Google, se abre el servicio de Google, que puede utilizar sus propias cookies y políticas. La tipografía no carga fuentes de terceros; el feed no incrusta reproductores de plataformas sociales. Las cargas de vídeos y fotografías en la nube permanecen desactivadas hasta confirmar patrocinio y configurar el almacenamiento.'],
       ['Avisos opcionales', 'Al activar notificaciones se guarda en tu dispositivo su vinculación a tu cuenta. El intento de envío puede conservar identificadores de mensajes o invitaciones en el dispositivo hasta diez minutos para reintentar al reconectar; no guarda el texto de los mensajes ni tokens de acceso. Desactivar los avisos o salir retira la vinculación local. Estos datos no se usan para publicidad.'],
       ['Control', 'Puedes cerrar sesión, eliminar las preferencias o borrar los datos de este sitio desde tu navegador. Esto puede eliminar la sesión o las preferencias locales; no borra automáticamente el contenido publicado en tu cuenta. Para eso utiliza las funciones de publicación y el canal de privacidad.'],
+      ['Medición de visitas', analyticsNotice],
       ['Cambios futuros', 'Si se incorporan tecnologías opcionales que requieran consentimiento, se bloquearán hasta que puedas aceptar o rechazar de forma clara y modificar después tu elección. La finalidad y los proveedores se informarán antes de activarlas.']
     ]
   }
