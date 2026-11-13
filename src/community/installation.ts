@@ -47,10 +47,13 @@ export function installationVisit(local: PreferenceStorage, session: PreferenceS
   } catch { return false; }
 }
 
-export function installationDismissed(session: PreferenceStorage): boolean {
-  try { return session.getItem(dismissalKey) === 'yes'; } catch { return false; }
+export const installationDismissalMs = 30 * 24 * 60 * 60 * 1000;
+export function installationDismissed(local: PreferenceStorage, now = Date.now()): boolean {
+  try { const until = Number(local.getItem(dismissalKey)); return Number.isFinite(until) && until > now && until <= now + installationDismissalMs; } catch { return false; }
 }
-
-export function dismissInstallation(session: PreferenceStorage): void {
-  try { session.setItem(dismissalKey, 'yes'); } catch { /* Browsing works with blocked storage. */ }
+export function dismissInstallation(local: PreferenceStorage, now = Date.now()): void {
+  try { local.setItem(dismissalKey, String(now + installationDismissalMs)); } catch { /* Browsing works with blocked storage. */ }
+}
+export function shouldRecommendInstallation(registered: boolean, returning: boolean, justRegistered: boolean): boolean {
+  return registered && (returning || justRegistered);
 }

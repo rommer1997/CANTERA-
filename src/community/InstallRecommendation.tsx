@@ -1,6 +1,6 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { ArrowUpRight, Download, X } from 'lucide-react';
-import { dismissInstallation, installationDismissed, installationVisit, installedDisplayModes, installationDevice, isInstalledExperience, nativeInstallation, type InstallationDevice, type NativeInstallPrompt } from './installation';
+import { dismissInstallation, installationDismissed, installationVisit, shouldRecommendInstallation, installedDisplayModes, installationDevice, isInstalledExperience, nativeInstallation, type InstallationDevice, type NativeInstallPrompt } from './installation';
 import './installation.css';
 import { InstallationTutorial } from './InstallationTutorial';
 
@@ -19,14 +19,15 @@ const helpUrls: Record<InstallationDevice, string> = {
   desktop: 'https://support.google.com/chrome/answer/9658361?co=GENIE.Platform%3DDesktop&hl=es',
 };
 
-export function InstallRecommendation({ registered = false }: { registered?: boolean } = {}) {
+export function InstallRecommendation({ registered = false, suppressed = false }: { registered?: boolean; suppressed?: boolean } = {}) {
   const [runningAsApp, setRunningAsApp] = useState(appExperience);
   const [dismissed, setDismissed] = useState(() => {
-    try { return installationDismissed(window.sessionStorage); } catch { return false; }
+    try { return installationDismissed(window.localStorage); } catch { return false; }
   });
   const [returning] = useState(() => {
     try { return installationVisit(window.localStorage, window.sessionStorage); } catch { return false; }
   });
+  const [justRegistered, setJustRegistered] = useState(false);
   const [installer, setInstaller] = useState<ReturnType<typeof nativeInstallation> | null>(null);
   const [installing, setInstalling] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
@@ -47,6 +48,8 @@ export function InstallRecommendation({ registered = false }: { registered?: boo
     };
     const installed = () => { setRunningAsApp(true); setInstaller(null); setGuideOpen(false); };
     const openGuide = () => { setGuideOpen(true); };
+    const completed = () => setJustRegistered(true);
+    window.addEventListener('cantera-registration-completed', completed);
     window.addEventListener('cantera-open-install-guide', openGuide);
     window.addEventListener('beforeinstallprompt', prompt);
     window.addEventListener('appinstalled', installed);
@@ -58,6 +61,7 @@ export function InstallRecommendation({ registered = false }: { registered?: boo
       mounted.current = false;
       window.removeEventListener('beforeinstallprompt', prompt);
       window.removeEventListener('appinstalled', installed);
+      window.removeEventListener('cantera-registration-completed', completed);
       window.removeEventListener('cantera-open-install-guide', openGuide);
       modes.forEach(mode => {
         if (mode.removeEventListener) mode.removeEventListener('change', changedMode);
@@ -68,7 +72,7 @@ export function InstallRecommendation({ registered = false }: { registered?: boo
 
   const dismiss = () => {
     setGuideOpen(false); setDismissed(true);
-    try { dismissInstallation(window.sessionStorage); } catch { /* Storage may be blocked. */ }
+    try { dismissInstallation(window.localStorage); } catch { /* Storage may be blocked. */ }
   };
   const install = async () => {
     if (!installer) { setGuideOpen(true); return; }
@@ -86,19 +90,19 @@ export function InstallRecommendation({ registered = false }: { registered?: boo
 
   if (runningAsApp) return null;
   return <>
-    {!dismissed && (registered || returning) && <aside className="c-install-recommendation" aria-label="Instalar LaCantera">
+    {!suppressed && !dismissed && shouldRecommendInstallation(registered, returning, justRegistered) && <aside className="c-install-recommendation" aria-label="Instalar LaCantera">
       <div className="c-install-content">
         <img className="c-install-app-icon" src={`${import.meta.env.BASE_URL}cantera-mark.svg`} width="40" height="40" alt="" />
         <div className="c-install-copy"><strong>Instala LaCantera</strong><span>Gratis · en tu pantalla de inicio</span></div>
-        <button ref={trigger} type="button" className="c-button secondary c-install-action" onClick={() => void install()} disabled={installing} aria-haspopup={installer ? undefined : 'dialog'}><Download size={16} aria-hidden="true" />{installing ? 'Abriendo…' : installer ? 'Instalar' : device === 'ios' ? 'Ver tutorial' : 'Ver cómo'}</button>
+        <button ref={trigger} type="button" className="c-button secondary c-install-action" onClick={() => setGuideOpen(true)} aria-haspopup="dialog"><Download size={16} aria-hidden="true" />Cómo instalar</button>
         <button type="button" className="c-install-close" aria-label="Cerrar recomendación de instalación" onClick={dismiss}><X size={18} aria-hidden="true" /></button>
       </div>
     </aside>}
-    {guideOpen && <InstallationGuide device={device} setDevice={setDevice} close={() => setGuideOpen(false)} dismiss={dismiss} trigger={trigger} error={error} />}
+    {guideOpen && <InstallationGuide device={device} setDevice={setDevice} close={() => setGuideOpen(false)} dismiss={dismiss} trigger={trigger} error={error} nativeAction={installer || installing ? () => void install() : undefined} installing={installing} />}
   </>;
 }
 
-function InstallationGuide({ device, setDevice, close, dismiss, trigger, error }: { device: InstallationDevice; setDevice(device: InstallationDevice): void; close(): void; dismiss(): void; trigger: React.RefObject<HTMLButtonElement | null>; error: string }) {
+function InstallationGuide({ device, setDevice, close, dismiss, trigger, error, nativeAction, installing }: { nativeAction?: () => void; installing?: boolean; device: InstallationDevice; setDevice(device: InstallationDevice): void; close(): void; dismiss(): void; trigger: React.RefObject<HTMLButtonElement | null>; error: string }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const title = useId();
   useEffect(() => {
@@ -133,6 +137,6 @@ function InstallationGuide({ device, setDevice, close, dismiss, trigger, error }
       <li><strong>Confirma la instalación.</strong><span>LaCantera aparecerá entre tus aplicaciones. Si la opción no está disponible, puedes seguir usando la web.</span></li>
     </ol>}
     {device !== 'ios' && help}
-    <footer>{device === 'ios' ? help : <span>Instalación gratuita.</span>}<button type="button" className="c-button" onClick={dismiss}>Entendido</button></footer>
+    <footer>{device === 'ios' ? help : <span>Instalación gratuita.</span>}<button type="button" className="c-button" disabled={installing} onClick={nativeAction || dismiss}>{installing ? 'Abriendo…' : nativeAction ? 'Instalar ahora' : 'Entendido'}</button></footer>
   </dialog>;
 }

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { dismissInstallation, installationDismissed, installationVisit, installationDevice, isInstalledExperience, nativeInstallation } from '../src/community/installation.ts';
+import { dismissInstallation, installationDismissalMs, installationDismissed, shouldRecommendInstallation, installationVisit, installationDevice, isInstalledExperience, nativeInstallation } from '../src/community/installation.ts';
 
 const desktopMacUserAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) AppleWebKit/605.1.15 Version/18.0 Safari/605.1.15';
 
@@ -169,7 +169,7 @@ test('la primera visita no se convierte en segunda por recargar ni remontar comp
   assert.equal(installationVisit(local, preferenceStorage()), true);
 });
 
-test('cerrar la recomendación dura la sesión y el almacenamiento bloqueado no rompe la app', () => {
+test('cerrar la recomendación dura treinta días y el almacenamiento bloqueado no rompe la app', () => {
   const session = preferenceStorage();
   dismissInstallation(session);
   assert.equal(installationDismissed(session), true);
@@ -178,4 +178,16 @@ test('cerrar la recomendación dura la sesión y el almacenamiento bloqueado no 
   assert.equal(installationVisit(blocked, session), false);
   assert.equal(installationDismissed(blocked), false);
   assert.doesNotThrow(() => dismissInstallation(blocked));
+});
+
+
+test('el cierre vence al cumplir treinta días y nunca se recomienda a visitantes sin cuenta', () => {
+ const local = preferenceStorage(), now = 1_000_000;
+ dismissInstallation(local, now);
+ assert.equal(installationDismissed(local, now + installationDismissalMs - 1), true);
+ assert.equal(installationDismissed(local, now + installationDismissalMs), false);
+ assert.equal(shouldRecommendInstallation(false, true, true), false);
+ assert.equal(shouldRecommendInstallation(true, false, false), false);
+ assert.equal(shouldRecommendInstallation(true, true, false), true);
+ assert.equal(shouldRecommendInstallation(true, false, true), true);
 });
