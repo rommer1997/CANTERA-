@@ -57,7 +57,7 @@ function ProfileAccount() {
     return <section className="c-auth-layout">
       <div className={`c-auth-art ${returning ? 'c-auth-art--login' : ''}`}>
         <img src={returning ? '/images/design-2026-10/profile-football.webp' : '/images/design-2026-10/auth-goal.webp'} alt="" />
-        <div><span className="c-eyebrow">TU SITIO EN LACANTERA</span><p>{returning ? <>Aquí también<br />se crece.</> : <>El fútbol<br />nos reúne.</>}</p></div>
+        <div><span className="c-eyebrow">TU SITIO EN LACANTERA</span><p>El fútbol nos une.</p></div>
       </div>
       <div className="c-auth-content">
         <Link className="c-brand" to="/"><BrandMark className="c-brand-mark" />LaCantera</Link>
