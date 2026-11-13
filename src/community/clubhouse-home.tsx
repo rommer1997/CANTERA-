@@ -1,3 +1,4 @@
+import { LandingFaq } from './LandingFaq';
 import { publicSite } from '../config/publicSite';
 import { Link } from 'react-router-dom';
 import { ArrowUpRight, ArrowRight, ChevronRight, CalendarDays, MapPin, MessageCircle, Users } from 'lucide-react';
@@ -30,6 +31,7 @@ function Landing() {
     ].map(([title, body], index) => <li key={title}><span className="lc-how-number" aria-hidden="true">0{index + 1}</span><h3>{title}</h3><p>{body}</p><figure><img src={publicSite.screenshots[index].src} alt={publicSite.screenshots[index].alt} width={480} height={320} loading="lazy" />{publicSite.screenshots[index].pending && <figcaption>Captura pendiente</figcaption>}</figure></li>)}</ol></section>
     <section className="lc-landing-features"><header><span className="lc-kicker">TODO EMPIEZA CON UN BALÓN</span><h2>El resto,<br />lo ponemos juntos.</h2></header><div><Link to="/play" className="lc-feature-row"><span>01</span><div><h3>Sal a jugar.</h3><p>Partidos y torneos por ciudad, formato y nivel. Abiertos o con invitación privada.</p></div><ArrowUpRight size={26} /></Link><Link to="/teams" className="lc-feature-row"><span>02</span><div><h3>Encuentra tu equipo.</h3><p>Un grupo de amigos o un club. Un lugar para organizaros y compartir el campo.</p></div><ArrowUpRight size={26} /></Link><Link to="/feed" className="lc-feature-row"><span>03</span><div><h3>Hazte escuchar.</h3><p>Comparte tus publicaciones y logros. Conecta con quienes viven el fútbol como tú.</p></div><ArrowUpRight size={26} /></Link></div></section>
     <section className="lc-purpose"><span className="lc-kicker">UNA COMUNIDAD, NO UNA CUOTA</span><h2>El talento no debería<br />necesitar una suscripción.</h2><p>LaCantera es una iniciativa con vocación sin ánimo de lucro. El núcleo es gratuito; buscamos patrocinadores para seguir creciendo.</p><Link className="c-button" to="/about">Conoce el proyecto<ArrowUpRight size={18} /></Link></section>
+    <LandingFaq />
   </div>;
 }
 
