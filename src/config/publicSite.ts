@@ -11,10 +11,11 @@ export const publicSite = {
     { src: '/images/screens/equipo.svg', alt: 'Espacio reservado para una captura real de la pantalla de un equipo', title: 'A jugar', pending: true },
   ],
   analytics: {
-    enabled: false,
-    provider: 'plausible' as const,
-    domain: 'TODO_ANALYTICS_DOMAIN',
-    endpoint: 'https://plausible.io/api/event',
+    enabled: true,
+    provider: 'umami' as const,
+    domain: 'lacantera.com.es',
+    endpoint: 'https://gateway.umami.is/api/send',
+    websiteId: '8d1f0921-a53c-4346-b128-dbbc26664e40',
   },
 };
 

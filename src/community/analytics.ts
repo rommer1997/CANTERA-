@@ -2,7 +2,7 @@ import { publicSite } from '../config/publicSite.ts';
 
 export const analyticsEvents = ['pageview', 'JoinClick', 'GoogleLoginClick', 'RegistrationCompleted', 'MatchCreated', 'MatchShared'] as const;
 export type AnalyticsEvent = typeof analyticsEvents[number];
-export interface AnalyticsSettings { enabled: boolean; provider: string; domain: string; endpoint: string; }
+export interface AnalyticsSettings { enabled: boolean; provider: string; domain: string; endpoint: string; websiteId?: string; }
 interface AnalyticsEnvironment {
   production: boolean;
   hash(): string;
@@ -18,19 +18,23 @@ export function analyticsPage(hash: string): string {
   return '/other';
 }
 export function analyticsReady(settings: AnalyticsSettings): boolean {
-  if (!settings.enabled || settings.provider !== 'plausible' || !/^(?:[a-z0-9-]+\.)+[a-z]{2,}$/i.test(settings.domain) || settings.domain.includes('TODO')) return false;
+  if (!settings.enabled || !['plausible', 'umami'].includes(settings.provider) || !/^(?:[a-z0-9-]+\.)+[a-z]{2,}$/i.test(settings.domain) || settings.domain.includes('TODO')) return false;
+  if (settings.provider === 'umami' && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(settings.websiteId || '')) return false;
   try { const endpoint = new URL(settings.endpoint); return endpoint.protocol === 'https:' && !endpoint.username && !endpoint.password && !endpoint.search && !endpoint.hash; } catch { return false; }
 }
 export function createAnalytics(settings: AnalyticsSettings, environment: AnalyticsEnvironment) {
   return (name: AnalyticsEvent) => {
     if (!environment.production || environment.doNotTrack() || !analyticsReady(settings) || !analyticsEvents.includes(name)) return;
-    const body = JSON.stringify({ name, domain: settings.domain, url: `https://${settings.domain}/#${analyticsPage(environment.hash())}` });
+    const path = analyticsPage(environment.hash());
+    const body = JSON.stringify(settings.provider === 'umami'
+      ? { type: 'event', payload: { hostname: settings.domain, website: settings.websiteId, url: `/#${path}`, referrer: '', ...(name === 'pageview' ? {} : { name }) } }
+      : { name, domain: settings.domain, url: `https://${settings.domain}/#${path}` });
     // No cookies, local storage, device identifier, custom properties or retry queue.
-    try { void environment.send(settings.endpoint, { method: 'POST', body, headers: { 'Content-Type': 'text/plain' }, credentials: 'omit', referrerPolicy: 'no-referrer', keepalive: true }).catch(() => {}); } catch { /* Metrics never interrupt a user action. */ }
+    try { void environment.send(settings.endpoint, { method: 'POST', body, headers: { 'Content-Type': settings.provider === 'umami' ? 'application/json' : 'text/plain' }, credentials: 'omit', referrerPolicy: 'no-referrer', keepalive: true }).catch(() => {}); } catch { /* Metrics never interrupt a user action. */ }
   };
 }
 const track = createAnalytics(publicSite.analytics, {
-  production: import.meta.env?.PROD === true,
+  production: import.meta.env?.PROD === true && typeof window !== 'undefined' && window.location.hostname === publicSite.analytics.domain,
   hash: () => window.location.hash,
   doNotTrack: () => ['1', 'yes'].includes(navigator.doNotTrack || '') || (navigator as Navigator & { globalPrivacyControl?: boolean }).globalPrivacyControl === true,
   send: (url, request) => fetch(url, request),

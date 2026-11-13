@@ -2,7 +2,7 @@ import { publicSite } from '../config/publicSite';
 import { analyticsReady } from './analytics';
 
 const analyticsNotice = analyticsReady(publicSite.analytics)
-  ? 'Usamos analítica sin cookies y sin datos identificativos de tu cuenta para saber cuántas personas visitan la web. Solo enviamos categorías de páginas y acciones, sin nombres, correos, códigos ni contenido. El proveedor recibe los datos de conexión necesarios para atender la petición; respetamos No rastrear y no almacenamos identificadores en tu dispositivo.'
+  ? 'Usamos analítica sin cookies y sin datos identificativos de tu cuenta para saber cuántas personas visitan la web. Solo enviamos categorías de páginas y acciones, sin nombres, correos, códigos ni contenido. El servicio elegido es Umami Cloud. Recibe la dirección IP y el agente del navegador al atender la petición para elaborar estadísticas agregadas; no enviamos identificadores de cuenta ni conservamos identificadores de visita en tu navegador; respetamos No rastrear y no almacenamos identificadores en tu dispositivo.'
   : 'La analítica de visitas está desactivada. No enviamos mediciones a proveedores de analítica. Antes de activarla publicaremos el proveedor y su tratamiento de los datos de conexión.';
 
 export const operator = {
