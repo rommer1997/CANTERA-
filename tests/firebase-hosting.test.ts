@@ -75,6 +75,14 @@ test('Firebase Hosting sirve la SPA y actualiza la PWA con la polÃ­tica de cachÃ
       assert.equal(response.headers.get('cache-control'), 'no-cache, max-age=0, must-revalidate');
     });
 
+    await t.test('documentos internos retirados no se sirven ni reciben el fallback de la SPA', async () => {
+      for (const path of ['/Cantera-Whitepaper.pdf', '/whitepaper.md']) {
+        const response = await fetch(`${origin}${path}`);
+        assert.equal(response.status, 404, path);
+        assert.notEqual(await response.text(), shell, path);
+      }
+    });
+
     await t.test('un asset retirado devuelve 404 y no HTML guardable como JavaScript', async () => {
       const response = await fetch(`${origin}/assets/old-Ab12Cd_3.js`);
       assert.equal(response.status, 404);
