@@ -117,13 +117,13 @@ No se activaron pagos, servicios de pago, nuevas credenciales administrativas, S
 
 ## Validación técnica
 
-361 pruebas de dominio/operador pasan y TypeScript compila. En el ensayo final aislado pasan 85 pruebas de seguridad más la integración HTTP de push con Firebase emulado. Las herramientas de Functions pasan 16 pruebas. El Worker añade una prueba de creación de esquema en SQLite, rechazo de referencias/estados inválidos y borrado en cascada. Las auditorías `--prod` no devuelven avisos conocidos al terminar la actualización.
+366 pruebas de dominio/operador pasan y TypeScript compila. En el ensayo final aislado pasan 86 pruebas de seguridad más la integración HTTP de push con Firebase emulado. Las herramientas de Functions pasan 16 pruebas. El Worker añade una prueba de creación de esquema en SQLite, rechazo de referencias/estados inválidos y borrado en cascada. Las auditorías `--prod` no devuelven avisos conocidos al terminar la actualización.
 
-Las trazas agregadas se conservan bajo `.audit/backend-*-2026-11-13.*`: integridad de nube, correspondencia de esquema D1, recuperación, dependencias, preflight y pruebas. No se publican snapshots, tokens, suscripciones ni chats en el repositorio. El despliegue de Hosting y la CI del commit final se registrarán después de pasar; esta sección por sí sola no afirma que ya esté publicado.
+Las trazas agregadas se conservan bajo `.audit/backend-*-2026-11-13.*`: integridad de nube, correspondencia de esquema D1, recuperación, dependencias, preflight y pruebas. No se publican snapshots, tokens, suscripciones ni chats en el repositorio. La versión de código `fa6c93932b6f7ce1c42b8f9e748622fcd2b8fdff` pasa las tres tareas de CI de la PR [43342081693](https://github.com/rommer1997/CANTERA-/actions/runs/43342081693) y de push 43342073792. Se publicaron Hosting y únicamente las reglas de la base configurada. Los dos dominios responden por HTTPS con HTML, JavaScript principal y service worker idénticos al build; imagen PNG 1200 × 630, robots y sitemap responden con contenido y tipo correctos. Una lectura posterior confirma 31 documentos sin incidencias de integridad, reglas coincidentes e índices 33/33 listos. No se escribieron documentos deportivos en producción durante estas comprobaciones.
 
 ## Ajustes de lanzamiento tras la revisión editorial
 
-El responsable confirma que todavía no hay encuentros reales confirmados. No se han creado partidos, equipos, perfiles ni publicaciones de relleno. También confirma que `hola@lacantera.com.es` no existe: se conserva el correo operativo actual.
+El responsable confirma que todavía no hay encuentros reales confirmados. No se han creado partidos, equipos, perfiles ni publicaciones de relleno en producción. Las pruebas del formulario y sus filtros usan exclusivamente un entorno local aislado. También confirma que `hola@lacantera.com.es` no existe: se conserva el correo operativo actual.
 
 - Metadatos Open Graph y Twitter disponibles en el HTML inicial, sin depender de JavaScript. Imagen propia `public/og-image.png`, PNG 1200 × 630, con logo y fotografía ya existentes. Fuente editable en `media/og-card/index.html`.
 - Descripción concreta del servicio en portada; marca centrada en «El fútbol nos reúne» y «Del barrio al mundo». Edad mínima de 18 años visible, sin anuncio de una fecha para menores.
@@ -142,3 +142,8 @@ El sitemap y Open Graph de portada no resuelven la indexación individual ni gen
 La existencia y descarga HTTP de metadatos e imagen se comprueba en el despliegue. La presentación final y caché de WhatsApp/Facebook deben comprobarse en sus propios clientes; una respuesta HTTP correcta no acredita por sí sola la vista previa de esas plataformas.
 
 Fuentes técnicas: [Open Graph](https://ogp.me/) y [sitemaps de Google](https://developers.google.com/search/docs/crawling-indexing/sitemaps/build-sitemap).
+
+
+### Comprobación pendiente en clientes sociales
+
+El depurador de Meta se abrió con la URL de portada, pero exige iniciar sesión en Facebook. No se ha probado la vista previa de Facebook ni enviado un mensaje en WhatsApp en nombre del responsable. Queda por pegar el enlace en un chat propio y comprobar título, descripción e imagen; actualizar la caché en el depurador si conserva la portada anterior. Las verificaciones de HTTP y dimensiones sí están completadas.
