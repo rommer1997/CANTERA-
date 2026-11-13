@@ -15,6 +15,14 @@ const META=new URL('.cantera-shell-manifest',ROOT).href;
 const SHELL_CACHE=/^cantera-shell-[0-9a-f]{16}$/;
 const HASHED_ASSET=/^assets\/[^/]+-[A-Za-z0-9_-]{8}\.[A-Za-z0-9]+$/;
 const clientVersions=new Map();
+const RETIRED=new Set(['Cantera-Whitepaper.pdf','whitepaper.md']);
+function retired(url){
+ try{const value=new URL(url);return value.origin===ROOT.origin&&RETIRED.has(decodeURIComponent(value.pathname.slice(ROOT.pathname.length)))}catch{return false}
+}
+async function removeRetired(){
+ const names=(await caches.keys()).filter(name=>SHELL_CACHE.test(name));
+ for(const name of names){const cache=await caches.open(name);for(const key of await cache.keys())if(retired(key.url))await cache.delete(key)}
+}
 async function windowClients(){
  return (await self.clients.matchAll({type:'window',includeUncontrolled:true})).filter(client=>{
   try{const url=new URL(client.url);return url.origin===ROOT.origin&&url.pathname.startsWith(ROOT.pathname)}catch{return false}
@@ -67,6 +75,7 @@ async function historicalAsset(target){
  return null;
 }
 self.addEventListener('install',event=>event.waitUntil((async()=>{
+ await removeRetired();
  const names=(await caches.keys()).filter(name=>SHELL_CACHE.test(name)&&name!==CACHE);
  const cache=await caches.open(CACHE);
  const previous=await cacheManifest(cache);
@@ -81,11 +90,12 @@ self.addEventListener('message',event=>{
   event.waitUntil(pruneCaches());
  }
 });
-self.addEventListener('activate',event=>event.waitUntil(self.clients.claim().then(maintainCaches)));
+self.addEventListener('activate',event=>event.waitUntil(removeRetired().then(()=>self.clients.claim()).then(maintainCaches)));
 self.addEventListener('fetch',event=>{
  const req=event.request;
  const url=new URL(req.url);
  if(req.method!=='GET'||url.origin!==ROOT.origin||!url.pathname.startsWith(ROOT.pathname))return;
+ if(retired(req.url)){event.waitUntil(removeRetired());event.respondWith(Promise.resolve(new Response('Documento no disponible.',{status:404,headers:{'Cache-Control':'no-store'}})));return}
  const shell=req.mode==='navigate'&&(url.pathname===ROOT.pathname||url.pathname===ROOT.pathname+'index.html');
  const target=shell?new URL('index.html',ROOT).href:req.url;
  const relative=url.pathname.slice(ROOT.pathname.length);
@@ -104,7 +114,7 @@ export function canteraShell(): Plugin {
   const staticFiles = ['cantera-mark.svg', 'cantera-maskable.svg', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'icon-touch-180.png', 'manifest.webmanifest'];
   const paths = ['index.html', ...staticFiles, ...Object.keys(bundle).filter(path => path.startsWith('assets/'))];
   const digest = createHash('sha256');
-  digest.update(pushServiceWorkerSource());
+  digest.update(shellServiceWorkerSource([], ''));
   for (const [name, output] of Object.entries(bundle).sort(([a], [b]) => a.localeCompare(b))) digest.update(name).update(output.type === 'chunk' ? output.code : output.source);
   for (const file of staticFiles) digest.update(file).update(readFileSync(`public/${file}`));
   const version = digest.digest('hex').slice(0, 16);

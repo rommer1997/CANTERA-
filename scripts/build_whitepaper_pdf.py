@@ -379,6 +379,8 @@ def parse_content(markdown: str, renderer: MarkdownRenderer, style: dict[str, Pa
 
 
 def build(source: Path, output: Path, publish: bool, expected_sha: str | None) -> dict:
+    if publish:
+        raise ValueError('El whitepaper es interno y no se permite publicarlo.')
     source_bytes = source.read_bytes()
     source_sha = hashlib.sha256(source_bytes).hexdigest()
     if expected_sha and source_sha != expected_sha:
@@ -440,13 +442,6 @@ def build(source: Path, output: Path, publish: bool, expected_sha: str | None) -
         'external_link_annotations': len(urls), 'local_document_references': renderer.local_references,
         'published_download_copy': None,
     }
-    if publish:
-        public_copy = ROOT / 'public/Cantera-Whitepaper.pdf'
-        public_copy.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(output, public_copy)
-        if output.read_bytes() != public_copy.read_bytes():
-            raise ValueError('La copia pública difiere del PDF original.')
-        metadata['published_download_copy'] = str(public_copy)
     output.with_suffix('.metadata.json').write_text(json.dumps(metadata, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
     return metadata
 

@@ -4,7 +4,7 @@
     "public": "dist",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "predeploy": ["pnpm run build:hosting"],
-    "rewrites": [{ "source": "!/assets/**", "destination": "/index.html" }],
+    "rewrites": [{ "source": "!/@(assets/**|Cantera-Whitepaper.pdf|whitepaper.md)", "destination": "/index.html" }],
     "headers": [
       {
         "source": "**",

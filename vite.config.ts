@@ -17,7 +17,7 @@ export default defineConfig(({mode}) => {
     server: {
       hmr: process.env.DISABLE_HMR !== 'true',
       // Non-frontend work must not discard a form being tested in the browser.
-      watch: { ignored: ['**/.audit/**', '**/.github/**', '**/functions/**', '**/docs/**', '**/scripts/**', '**/tests/**', '**/tmp/**', '**/output/**', '**/PLAN_CANTERA.md', '**/WHITEPAPER.md', '**/README.md', '**/firestore.rules', '**/storage.rules', '**/firebase.json', '**/public/whitepaper.md', '**/public/Cantera-Whitepaper.pdf'] },
+      watch: { ignored: ['**/.audit/**', '**/.github/**', '**/functions/**', '**/docs/**', '**/scripts/**', '**/tests/**', '**/tmp/**', '**/output/**', '**/PLAN_CANTERA.md', '**/WHITEPAPER.md', '**/README.md', '**/firestore.rules', '**/storage.rules', '**/firebase.json'] },
     },
   };
 });

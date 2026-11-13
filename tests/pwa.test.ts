@@ -28,6 +28,7 @@ function workerHarness() {
    if (!buckets.has(name)) buckets.set(name, new Map());
    const records = buckets.get(name)!;
    return {
+    async delete(input: string | Request) { return records.delete(typeof input === 'string' ? input : input.url); },
     async match(input: string | Request) { return records.get(typeof input === 'string' ? input : input.url)?.clone(); },
     async keys() { return [...records.keys()].map(url => new Request(url)); },
     async put(input: string | Request, response: Response) { records.set(typeof input === 'string' ? input : input.url, response.clone()); },
@@ -272,4 +273,20 @@ test('la primera instalación no recarga el navegador y las solicitudes de versi
  assert.equal(state.reloads(), 0);
  assert.ok(state.button().props.children.includes('Recargar app'));
  state.cleanup();
+});
+
+
+test('documentos retirados se purgan de shells antiguos y no reaparecen ni con parámetros', async () => {
+ const state = workerHarness();
+ await state.seed(previousVersion, ['index.html', oldLazyAsset, 'Cantera-Whitepaper.pdf', 'whitepaper.md']);
+ state.client('legacy-tab');
+ await state.install(); await state.activate();
+ assert.ok(state.buckets.has(cacheName(previousVersion)));
+ assert.ok(!state.buckets.get(cacheName(previousVersion))!.has(`${origin}/Cantera-Whitepaper.pdf`));
+ assert.ok(!state.buckets.get(cacheName(previousVersion))!.has(`${origin}/whitepaper.md`));
+ for(const path of ['Cantera-Whitepaper.pdf', 'whitepaper.md?download=1']) {
+  const response = await state.request(`${origin}/${path}`);
+  assert.equal(response!.status, 404);
+ }
+ assert.equal(state.fetched.length, 0);
 });
