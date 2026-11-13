@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { RefreshCw, WifiOff } from 'lucide-react';
 import { InstallRecommendation } from './InstallRecommendation';
 
-export function AppAvailability({ registered = false }: { registered?: boolean } = {}) {
+export function AppAvailability({ registered = false, serviceNotice }: { registered?: boolean; serviceNotice?: React.ReactNode } = {}) {
  const [offline, setOffline] = useState(!navigator.onLine);
  const [registration, setRegistration] = useState<ServiceWorkerRegistration | null>(null);
  const [reloadAvailable, setReloadAvailable] = useState(false);
@@ -14,7 +14,8 @@ export function AppAvailability({ registered = false }: { registered?: boolean }
   const stops: Array<() => void> = [];
   if (import.meta.env.PROD && 'serviceWorker' in navigator) {
    const version = document.querySelector<HTMLMetaElement>('meta[name="cantera-shell-version"]')?.content || '';
-   let hadController = Boolean(navigator.serviceWorker.controller);
+   const controlledAtStart = Boolean(navigator.serviceWorker.controller);
+   let hadController = controlledAtStart;
    let currentRegistration: ServiceWorkerRegistration | null = null;
    const reportVersion = (worker = navigator.serviceWorker.controller) => {
     if (worker && /^[0-9a-f]{16}$/.test(version)) worker.postMessage({ type: 'CLIENT_SHELL_VERSION', version });
@@ -23,7 +24,7 @@ export function AppAvailability({ registered = false }: { registered?: boolean }
     if (!active || event.data?.type !== 'SHELL_VERSION_REQUEST') return;
     const worker = event.source && 'postMessage' in event.source ? event.source as ServiceWorker : navigator.serviceWorker.controller;
     reportVersion(worker);
-    if (typeof event.data.version === 'string' && /^[0-9a-f]{16}$/.test(event.data.version) && version && version !== event.data.version) {
+    if (controlledAtStart && typeof event.data.version === 'string' && /^[0-9a-f]{16}$/.test(event.data.version) && version && version !== event.data.version) {
      setRegistration(null); setReloadAvailable(true);
     }
    };
@@ -31,7 +32,7 @@ export function AppAvailability({ registered = false }: { registered?: boolean }
     if (!active) return;
     reportVersion();
     if (activationRequested.current) { location.reload(); return; }
-    if (hadController) { setRegistration(null); setReloadAvailable(true); }
+    if (controlledAtStart && hadController) { setRegistration(null); setReloadAvailable(true); }
     hadController = true;
    };
    const checkUpdate = () => { if (active) void currentRegistration?.update().catch(() => {}); };
@@ -42,7 +43,7 @@ export function AppAvailability({ registered = false }: { registered?: boolean }
    void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`, { updateViaCache: 'none' }).then(reg => {
     if (!active) return;
     currentRegistration = reg;
-    const waiting = () => { if (active && reg.waiting && navigator.serviceWorker.controller) setRegistration(reg); };
+    const waiting = () => { if (active && controlledAtStart && reg.waiting && navigator.serviceWorker.controller) setRegistration(reg); };
     const found = () => {
      const worker = reg.installing;
      if (!worker) return;
@@ -61,5 +62,6 @@ export function AppAvailability({ registered = false }: { registered?: boolean }
   activationRequested.current = true;
   registration.waiting.postMessage({ type: 'ACTIVATE_UPDATE' });
  }
- return <>{offline ? <div className="c-service-status" role="status"><WifiOff size={17} /> Sin conexión. Los cambios en la comunidad requieren volver a conectarte.</div> : null}{registration || reloadAvailable ? <div className="c-service-status" role="status">Hay una nueva versión de LaCantera. <button className="c-button secondary" onClick={updateApp}><RefreshCw size={16} />{reloadAvailable ? 'Recargar app' : 'Actualizar app'}</button></div> : null}<InstallRecommendation registered={registered} /></>;
+ const updating = Boolean(registration || reloadAvailable);
+ return <>{updating ? <div className="c-service-status" role="status">Hay una nueva versión de LaCantera. <button className="c-button secondary" onClick={updateApp}><RefreshCw size={16} />{reloadAvailable ? 'Recargar app' : 'Actualizar app'}</button></div> : offline ? <div className="c-service-status" role="status"><WifiOff size={17} /> Sin conexión. Los cambios en la comunidad requieren volver a conectarte.</div> : serviceNotice ? <div className="c-service-status" role="status">{serviceNotice}</div> : null}<InstallRecommendation registered={registered} suppressed={updating || offline || Boolean(serviceNotice)} /></>;
 }

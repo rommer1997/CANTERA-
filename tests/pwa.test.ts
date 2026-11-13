@@ -271,7 +271,7 @@ test('la primera instalación no recarga el navegador y las solicitudes de versi
  assert.equal(replies[0].type, 'CLIENT_SHELL_VERSION');
  assert.equal(replies[0].version, previousVersion);
  assert.equal(state.reloads(), 0);
- assert.ok(state.button().props.children.includes('Recargar app'));
+ assert.equal(state.button(), undefined, 'una primera instalación no muestra aviso de versión anterior');
  state.cleanup();
 });
 
@@ -289,4 +289,12 @@ test('documentos retirados se purgan de shells antiguos y no reaparecen ni con p
   assert.equal(response!.status, 404);
  }
  assert.equal(state.fetched.length, 0);
+});
+
+
+test('ni un worker en espera provoca aviso si el visitante no tenía controlador previo', async () => {
+ const state = availabilityHarness(true, false);
+ await Promise.resolve();
+ assert.equal(state.button(), undefined);
+ state.cleanup();
 });
