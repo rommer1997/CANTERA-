@@ -33,3 +33,10 @@
 .lc-faq summary:focus-visible { outline:3px solid var(--c-green); outline-offset:5px; border-radius:4px; }
 .lc-faq details p { font-size:15px; color:var(--c-muted); line-height:1.75; margin:16px 0 0; }
 .lc-faq a { color:var(--c-green); text-decoration:underline; }
+
+.lc-public-contact { margin-top:16px; }
+.lc-social-links { display:flex; align-items:center; gap:8px; }
+.lc-social-links :is(a,span) { display:inline-flex; align-items:center; justify-content:center; width:44px; height:44px; border:1px solid var(--c-line); border-radius:50%; color:var(--c-green); }
+.lc-social-links>span { border-style:dashed; color:var(--c-muted); }
+.c-app.c-studio .lc-social-note { font-size:12px; line-height:1.5; color:var(--c-muted); margin:8px 0 12px; }
+.lc-feedback-link { display:inline-flex; align-items:center; min-height:44px; font-size:14px; font-weight:650; color:var(--c-green); text-decoration:underline; text-underline-offset:3px; }
