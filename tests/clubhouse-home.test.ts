@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 import { TERMS_VERSION } from '../src/community/policy.ts';
 import * as privacy from '../src/community/eventPrivacy.ts';
+import { publicSite } from '../src/config/publicSite.ts';
 import * as covers from '../src/community/eventCovers.ts';
 
 const now = Date.parse('2026-10-29T12:00:00Z');
@@ -12,7 +13,7 @@ function home(extra: Record<string, unknown> = {}) {
   const api = { profile, loading:false, ownEventsLoading:false, eventsLoading:false, postsLoading:false, error:'', ownEvents:[], events:[], posts:[], hiddenPostIds:[], blockedIds:[], ...extra };
   const jsx = (type: unknown, props: unknown) => ({ type, props });
   const modules: Record<string, unknown> = {
-    'react/jsx-runtime':{ jsx, jsxs:jsx }, 'react-router-dom':{ Link:'Link' }, 'lucide-react':{},
+    '../config/publicSite':{publicSite}, './LandingFaq':{LandingFaq:()=>null}, 'react/jsx-runtime':{ jsx, jsxs:jsx }, 'react-router-dom':{ Link:'Link' }, 'lucide-react':{},
     './TeamsContext':{ useTeams:()=>({ownTeams:[]}) }, './CommunityContext':{ useCommunity:()=>api, TERMS_VERSION }, './eventPrivacy':privacy, './eventCovers':covers, './useClock':{ useClock:()=>now },
   };
   const source = readFileSync(new URL('../src/community/clubhouse-home.tsx', import.meta.url),'utf8');
