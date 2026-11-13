@@ -147,3 +147,136 @@ Fuentes técnicas: [Open Graph](https://ogp.me/) y [sitemaps de Google](https://
 ### Comprobación pendiente en clientes sociales
 
 El depurador de Meta se abrió con la URL de portada, pero exige iniciar sesión en Facebook. No se ha probado la vista previa de Facebook ni enviado un mensaje en WhatsApp en nombre del responsable. Queda por pegar el enlace en un chat propio y comprobar título, descripción e imagen; actualizar la caché en el depurador si conserva la portada anterior. Las verificaciones de HTTP y dimensiones sí están completadas.
+
+
+## Revisión pública A–F solicitada el 13 de noviembre
+
+Se mantienen Firebase, la autenticación y las reglas de datos. Las modificaciones del contexto de comunidad y de los validadores son únicamente textos; la instrumentación se realiza en la interfaz después de que una acción termine correctamente.
+
+| Bloque | Resultado | Archivos principales |
+|---|---|---|
+| A1 | Whitepaper retirado de la web, generador impedido de republicarlo, rutas retiradas responden 404 y la PWA purga/bloquea sus copias. Se conserva el documento de trabajo del repositorio. | `CommunityPages.tsx`, `firebase.json`, `scripts/pwa-plugin.ts`, `scripts/build_whitepaper_pdf.py`, eliminación de dos archivos de `public/` |
+| A2 | Búsquedas, directorio y avisos simplificados; sin jerga de almacenamiento en la política ni avisos de patrocinio en el menú de creación. Cookies tiene versión 2026-11-13. | `PeoplePages.tsx`, `TeamsPage.tsx`, `MessagesPage.tsx`, `FeedPage.tsx`, `CommunityPages.tsx`, `legal.ts` |
+| A3 | Español de España y vocabulario «partido», conservando la distinción de torneos. | Componentes y mensajes de `src/community/`; ensayos afectados por el cambio editorial |
+| B1 | Umami Cloud elegido y configurado por el responsable. Captura propia por API para enviar rutas categorizadas en cada cambio de hash; sin scripts automáticos, consultas, códigos ni IDs de cuenta. Sin envíos con No rastrear, control global de privacidad, desarrollo o localhost. | `src/config/publicSite.ts`, `analytics.ts`, `src/main.tsx`, `legal.ts`, `CommunityPages.tsx` |
+| B2 | Eventos JoinClick, GoogleLoginClick, RegistrationCompleted, MatchCreated y MatchShared. Creación de series cuenta cada partido después de guardar; las ediciones no cuentan como altas. Compartir mide enlace/código copiado, interfaz de compartir completada o enlace a WhatsApp/SMS abierto; no acredita entrega a un destinatario. | `analytics.ts`, `ProfilePage.tsx`, `EventsPage.tsx`, `InvitationDialog.tsx`, `CommunityPages.tsx` |
+| C1 | H1 compacto, propuesta concreta, organizar con retorno después de registro y buscar partido; gratuidad y +18 en la primera pantalla. | `clubhouse-home.tsx`, `launch-polish.css` |
+| C2 | Tres pasos y tres espacios explícitos para capturas reales, sin simular pantallas ni actividad. | `clubhouse-home.tsx`, `src/config/publicSite.ts`, `public/images/screens/*.svg`, `launch-polish.css` |
+| C3 | FAQ de cuatro preguntas con details/summary nativos. | `LandingFaq.tsx`, `clubhouse-home.tsx`, `launch-polish.css` |
+| C4 | El sello de la portada ya era un enlace a Juega; se conserva y se comprueba. | `clubhouse-home.tsx` |
+| C5 | Instagram y TikTok aportados por el responsable; X oculto mientras no exista. Contacto de feedback con el correo vigente y asunto correcto. | `PublicFooterLinks.tsx`, `src/config/publicSite.ts`, `CommunityPages.tsx` |
+| C6 | Marca «Del barrio al mundo» y acceso «El fútbol nos une.»; imagen social regenerada con la foto existente. | `CommunityPages.tsx`, `ProfilePage.tsx`, `clubhouse-home.tsx`, `index.html`, `media/og-card/index.html`, `public/og-image.png` |
+| D1 | Recomendación únicamente con perfil completo, tras registrarse o volver a visitar; cierre persistente treinta días. Botón «Cómo instalar» y tutorial manual disponible. Se mantiene la instalación nativa cuando el navegador la ofrece. | `installation.ts`, `InstallRecommendation.tsx`, `ProfilePage.tsx`, `CommunityPages.tsx`, `legal.ts` |
+| D2 | Una sola barra de disponibilidad, priorizando actualizar. Un visitante sin controlador previo no recibe aviso de versión antigua. Se conserva «Recargar app» para pestañas antiguas cuando otra pestaña ya activó la actualización, sin descartar formularios automáticamente. | `AppAvailability.tsx`, `CommunityPages.tsx` |
+| E1 | Google blanco, texto #1f1f1f, borde 1,5 px, 52 px de alto, radio 14 y foco visible. Contraste de texto aproximado 16,48:1. | `launch-polish.css` |
+| E2 | Acceso móvil con imagen decorativa de portada a 300 px, degradado, titular y tarjeta blanca superpuesta; sin segundo logo. | `ProfilePage.tsx`, `launch-polish.css` |
+| E3 | Dos columnas desde 768 px, imagen nunca menor de 280 px y menor espacio vacío; misma foto y lema. | `launch-polish.css` |
+| E4 | Marco superior consistente en todas las páginas públicas. Mensajes fuera del menú anónimo; Crear lleva al registro conservando el destino. | `CommunityPages.tsx`, `launch-polish.css` |
+| F1 | Tamaños CSS inferiores a 12 px elevados; texto secundario y opacidades corregidos. | Hojas de estilo de `src/community/`, especialmente `app-finish.css`, `clubhouse.css`, `launch-polish.css` |
+| F2 | Etiquetas a 14 px/peso 600 y ejemplos de entrada más claros sin ser mayores. | `launch-polish.css` |
+
+### Verificación de esta revisión
+
+La compilación de producción y TypeScript pasan. Hay 374 pruebas de dominio/interfaz/operador en verde, incluidas las nuevas pruebas de analítica, cierre de instalación, primera instalación y retirada HTTP/caché de documentos. El aviso de Vite por un chunk mayor de 500 kB ya existía; no se han añadido avisos nuevos de compilación.
+
+En 375×812, 768×1024 y 1366×800 se comprueban portada, acceso sin sesión, proyecto y cookies: doce casos con scrollWidth igual al ancho solicitado y sin textos visibles menores de 12 px. Las acciones de portada y Google están en la primera pantalla. El texto sobre fondos planos de esas páginas supera 4,5:1 (mínimo medido 5,67:1); las fotografías y sus degradados se inspeccionan visualmente y no se presentan como una certificación WCAG completa. Se guardan capturas y mediciones sin datos privados en `.audit/public-polish-2026-11-13/`.
+
+El endpoint de Umami Cloud acepta una vista de verificación con el Website ID proporcionado y CORS habilitado. Su respuesta de sesión no se conserva ni se reutiliza. Esto comprueba aceptación HTTP; la lectura del panel del titular y la comparación de totales quedan fuera de la comprobación de este cliente.
+
+### Datos pendientes y decisiones
+
+- **[DECIDIR]** Entregar las 2–3 capturas reales de C2. Las fuentes, textos alternativos y el indicador `pending` están centralizados en `src/config/publicSite.ts`.
+- X permanece sin enlace, conforme a la confirmación del responsable de que todavía no hay cuenta; `TODO_X_URL` queda preparado en esa misma configuración.
+- **[DECIDIR]** El texto «Al continuar aceptas…» no describe el flujo vigente: entrar con Google identifica la cuenta y las condiciones se aceptan explícitamente al completar el perfil. Se conserva «Consulta los términos y la privacidad» para mantener ese flujo sin alterar autenticación ni consentimientos. Cambiarlo requiere decidir primero otro flujo de aceptación.
+- La pastilla de acceso usa 12 px, aplicando el mínimo de F1 frente a los 11 px propuestos en E2.
+- La política dice «sin datos identificativos de tu cuenta», no promete que Umami no reciba IP o agente del navegador: su procesamiento de conexión se informa expresamente. No se envían campos de identificación de personas ni se conservan identificadores analíticos en el dispositivo.
+
+Fuentes del adaptador: [API de Umami](https://docs.umami.is/docs/api/sending-stats), [configuración del tracker](https://docs.umami.is/docs/tracker-configuration) y [privacidad de Umami Cloud](https://umami.is/privacy).
+
+### Inventario completo de archivos de esta revisión
+
+- `firebase.json`
+- `index.html`
+- `media/og-card/index.html`
+- `public/Cantera-Whitepaper.pdf`
+- `public/images/screens/crear-partido.svg`
+- `public/images/screens/equipo.svg`
+- `public/images/screens/lista-jugadores.svg`
+- `public/og-image.png`
+- `public/whitepaper.md`
+- `scripts/build_whitepaper_pdf.py`
+- `scripts/pwa-plugin.ts`
+- `src/community/ActivityPage.tsx`
+- `src/community/AppAvailability.tsx`
+- `src/community/CommunityContext.tsx`
+- `src/community/CommunityPages.tsx`
+- `src/community/ConnectionsPage.tsx`
+- `src/community/DirectInvitations.tsx`
+- `src/community/EventsPage.tsx`
+- `src/community/FeedPage.tsx`
+- `src/community/InstallRecommendation.tsx`
+- `src/community/InvitationDialog.tsx`
+- `src/community/LandingFaq.tsx`
+- `src/community/MessagesPage.tsx`
+- `src/community/MobileHome.tsx`
+- `src/community/PeoplePages.tsx`
+- `src/community/ProfilePage.tsx`
+- `src/community/PublicFooterLinks.tsx`
+- `src/community/QrScanner.tsx`
+- `src/community/TeamsPage.tsx`
+- `src/community/analytics.ts`
+- `src/community/app-finish.css`
+- `src/community/audit-fixes.css`
+- `src/community/brand.css`
+- `src/community/clubhouse-home.tsx`
+- `src/community/clubhouse.css`
+- `src/community/community.css`
+- `src/community/design-refresh.css`
+- `src/community/discovery-design.css`
+- `src/community/events.css`
+- `src/community/feed.css`
+- `src/community/fidelity.css`
+- `src/community/installation.ts`
+- `src/community/invitations.css`
+- `src/community/launch-polish.css`
+- `src/community/legal.ts`
+- `src/community/local.ts`
+- `src/community/logic.ts`
+- `src/community/messages.css`
+- `src/community/mobile.css`
+- `src/community/people.css`
+- `src/community/qr-scanner.css`
+- `src/community/teams.css`
+- `src/config/publicSite.ts`
+- `src/core/i18n/LanguageContext.tsx`
+- `src/main.tsx`
+- `tests/account-erasure-auth.security.test.mjs`
+- `tests/account-erasure.test.ts`
+- `tests/account-export.test.ts`
+- `tests/account-messages-export.test.ts`
+- `tests/analytics.test.ts`
+- `tests/clubhouse-home.test.ts`
+- `tests/community-backup.test.ts`
+- `tests/delivery-batches.test.ts`
+- `tests/event-covers.test.ts`
+- `tests/firebase-hosting.test.ts`
+- `tests/installation.test.ts`
+- `tests/invitation-demo.test.ts`
+- `tests/invitation-identity.test.ts`
+- `tests/invitation-qr.test.ts`
+- `tests/local-media-cache.test.ts`
+- `tests/logic.test.ts`
+- `tests/manage-pilot.test.ts`
+- `tests/messaging-pilot.test.ts`
+- `tests/messaging-security.test.mjs`
+- `tests/messaging.test.ts`
+- `tests/open-community.test.ts`
+- `tests/pilot-security.test.mjs`
+- `tests/private-events.test.ts`
+- `tests/profile-onboarding.test.ts`
+- `tests/profile-session.test.ts`
+- `tests/pwa.test.ts`
+- `tests/qr-scanner.test.ts`
+- `tests/security.test.mjs`
+- `tests/social.test.ts`
+- `vite.config.ts`
