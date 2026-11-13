@@ -1,0 +1,15 @@
+/* Lanzamiento: ajustes sobre los tokens y componentes compartidos. */
+.c-app.c-studio .lc-landing-hero { min-height:560px; }
+.c-app.c-studio .lc-landing-image { height:540px; }
+.c-app.c-studio .lc-landing-copy h1 { font-size:clamp(52px,5.6vw,84px); line-height:1.03; letter-spacing:-.065em; margin:24px 0; }
+.c-app.c-studio .lc-landing-copy>p { max-width:43ch; }
+.c-app.c-studio .lc-landing-copy>.lc-landing-promise { font-size:13px; font-weight:650; margin:0 0 12px; }
+@media(max-width:767px) {
+ .c-app.c-studio .lc-landing-hero { min-height:0; }
+ .c-app.c-studio .lc-landing-copy h1 { font-size:clamp(42px,10.5vw,64px); margin:20px 0; }
+ .c-app.c-studio .lc-landing-image { height:360px; }
+}
+@media(max-width:440px) {
+ .c-app.c-studio .lc-landing-actions { flex-direction:column; align-items:stretch; gap:12px; margin-block:20px 16px; }
+ .c-app.c-studio .lc-landing-actions :is(a,button) { justify-content:center; min-height:48px; }
+}

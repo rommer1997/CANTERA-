@@ -21,6 +21,7 @@ import './audit-fixes.css';
 import './discovery-design.css';
 import './app-finish.css';
 import './clubhouse.css';
+import './launch-polish.css';
 
 const routeNames: Record<string, string> = {
   '/': 'Inicio', '/play': 'Juega', '/feed': 'Comunidad', '/profile': 'Tu perfil',
