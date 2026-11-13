@@ -13,3 +13,15 @@
  .c-app.c-studio .lc-landing-actions { flex-direction:column; align-items:stretch; gap:12px; margin-block:20px 16px; }
  .c-app.c-studio .lc-landing-actions :is(a,button) { justify-content:center; min-height:48px; }
 }
+
+.lc-how { padding-block:48px; border-block:1px solid var(--c-line); }
+.c-studio .lc-how h2 { font-size:clamp(28px,4vw,42px); letter-spacing:-.045em; margin:10px 0 28px; }
+.lc-how ol { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:24px; list-style:none; padding:0; margin:0; }
+.lc-how li { min-width:0; }
+.lc-how-number { display:grid; place-items:center; width:40px; height:40px; border-radius:50%; background:var(--c-surface); color:var(--c-green); font-size:14px; font-weight:800; }
+.lc-how h3 { font-size:20px; line-height:1.4; margin:16px 0 8px; }
+.lc-how p { font-size:15px; line-height:1.6; color:var(--c-muted); margin-bottom:20px; }
+.lc-how figure { margin:0; }
+.lc-how img { display:block; width:100%; height:auto; border-radius:var(--c-radius-lg); }
+.lc-how figcaption { font-size:12px; color:var(--c-muted); margin-top:8px; }
+@media(max-width:767px) { .lc-how ol { grid-template-columns:1fr; gap:32px; } }
