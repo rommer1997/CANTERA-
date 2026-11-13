@@ -280,3 +280,12 @@ Fuentes del adaptador: [API de Umami](https://docs.umami.is/docs/api/sending-sta
 - `tests/security.test.mjs`
 - `tests/social.test.ts`
 - `vite.config.ts`
+
+
+### Publicación comprobada de la revisión A–F
+
+Se publica el código `e04642981251fa6156a15cf71577c92af9bbd1b3` tras CI completa correcta: [43348122030](https://github.com/rommer1997/CANTERA-/actions/runs/43348122030). Despliegue limitado a `hosting:cantera`; no se despliegan reglas, índices, Functions ni Worker, ni se modifican documentos de usuarios.
+
+La comprobación final de HTTPS, HTML, JavaScript principal, service worker, imagen social, robots y sitemap coincide byte a byte con el build en `lacantera.com.es` y `lacantera.web.app`. Los dos documentos retirados responden 404 en ambos orígenes. La vista de producción a 375×812 confirma Google de 52 px, fondo blanco, sin avisos superiores para la cuenta anónima, sin desbordamiento y con «Inicia sesión» antes de la barra inferior (el bloque termina en 728,18 px y la barra comienza a 732 px). Se conserva el retorno a la creación del partido después del registro.
+
+El informe visual local completo está en `.audit/public-polish-2026-11-13/revision.html`; las mediciones verifican además que la anchura real del navegador coincide con cada tamaño solicitado. Una última regla elimina un margen heredado con `!important` del antiguo acceso, no solo el borde duplicado del separador.
