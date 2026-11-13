@@ -6,9 +6,30 @@ export const publicSite = {
     x: 'TODO_X_URL',
   },
   screenshots: [
-    { src: '/images/screens/crear-partido.svg', alt: 'Espacio reservado para una captura real del formulario de creación de un partido', title: 'Crea el partido', pending: true },
-    { src: '/images/screens/lista-jugadores.svg', alt: 'Espacio reservado para una captura real de la lista de jugadores inscritos', title: 'Reúne a tu gente', pending: true },
-    { src: '/images/screens/equipo.svg', alt: 'Espacio reservado para una captura real de la pantalla de un equipo', title: 'A jugar', pending: true },
+    {
+      src: '/images/screens/crear-partido.webp',
+      alt: 'Formulario real de LaCantera para crear un partido: nombre, campo, ciudad, fecha y hora, sin publicar ningún encuentro.',
+      title: 'Organiza tu partido',
+      description: 'Elige dónde, cuándo y cuántas personas vais a jugar.',
+      caption: 'Formulario sin publicar',
+      width: 390, height: 606,
+    },
+    {
+      src: '/images/screens/invitaciones.webp',
+      alt: 'Pantalla real de invitaciones de LaCantera, sin códigos activos, con opciones para compartir un enlace e introducir o escanear un código.',
+      title: 'Invita a tu gente',
+      description: 'Conecta por enlace o QR. Los partidos privados tienen su propia invitación.',
+      caption: 'Vista sin invitaciones activas',
+      width: 390, height: 660,
+    },
+    {
+      src: '/images/screens/crear-equipo.webp',
+      alt: 'Formulario real y vacío de LaCantera para crear un equipo o grupo, con nombre, país, ciudad y presentación.',
+      title: 'Crea tu equipo',
+      description: 'Si jugáis juntos, cread vuestro equipo o grupo para organizaros.',
+      caption: 'Formulario sin guardar',
+      width: 390, height: 760,
+    },
   ],
   analytics: {
     enabled: true,

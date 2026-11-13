@@ -289,3 +289,12 @@ Se publica el código `e04642981251fa6156a15cf71577c92af9bbd1b3` tras CI complet
 La comprobación final de HTTPS, HTML, JavaScript principal, service worker, imagen social, robots y sitemap coincide byte a byte con el build en `lacantera.com.es` y `lacantera.web.app`. Los dos documentos retirados responden 404 en ambos orígenes. La vista de producción a 375×812 confirma Google de 52 px, fondo blanco, sin avisos superiores para la cuenta anónima, sin desbordamiento y con «Inicia sesión» antes de la barra inferior (el bloque termina en 728,18 px y la barra comienza a 732 px). Se conserva el retorno a la creación del partido después del registro.
 
 El informe visual local completo está en `.audit/public-polish-2026-11-13/revision.html`; las mediciones verifican además que la anchura real del navegador coincide con cada tamaño solicitado. Una última regla elimina un margen heredado con `!important` del antiguo acceso, no solo el borde duplicado del separador.
+
+
+## «Cómo funciona»: capturas reales (13 de noviembre)
+
+Se sustituyen las tres imágenes pendientes por capturas del servicio publicado, tomadas a 390 px de ancho: formulario de partido sin publicar (390 × 606), invitaciones sin códigos activos (390 × 660) y formulario de equipo vacío sin guardar (390 × 760). Solo se ha recortado la captura nativa del navegador y comprimido a WebP; no se ha reconstruido la interfaz ni añadido contenido.
+
+La captura de invitaciones excluye la cabecera de cuenta, el contador de conexiones y cualquier contacto. No se generó ningún QR, enlace ni código utilizable. No se publicaron partidos, equipos, mensajes ni perfiles para preparar estas imágenes. Los textos distinguen la conexión entre personas del acceso por invitación a partidos privados. La sección no representa actividad existente ni una convocatoria confirmada.
+
+Las imágenes conservan sus proporciones, dimensiones explícitas, texto alternativo, carga diferida y un máximo de 390 px para evitar ampliaciones. La revisión visual cubre móvil de 375/390 px, tablet de 768 px y escritorio de 1366 px. Las evidencias locales se guardan en `.audit/how-real-2026-11-13/` (no se publican). El alcance es exclusivamente frontend y Firebase Hosting.
