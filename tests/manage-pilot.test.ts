@@ -94,12 +94,15 @@ test('piloto ya correcto es idempotente y aun así vuelve a comprobar cada ident
 });
 
 test('identidad debe ser Google verificada, habilitada, correo exacto y UID exacto', async () => {
-  for (const extra of [{ emailVerified: false }, { disabled: true }, { uid: 'bad/uid' }, { uid: '' }, { providerUserInfo: [] }, { providerUserInfo: [{ providerId: 'password' }] }, { providerUserInfo: [{ providerId: 'google.com', email: 'other@example.invalid' }] }, { customAttributes: '{malformed' }, { customAttributes: '[]' }]) {
+  for (const extra of [{ emailVerified: false }, { disabled: true }, { uid: 'bad/uid' }, { uid: '' }, { providerUserInfo: [] }, { providerUserInfo: [{ providerId: 'password' }] }, { customAttributes: '{malformed' }, { customAttributes: '[]' }]) {
     const h = harness(null, [identity(owner, cli.OWNER_EMAIL, extra)]);
     await assert.rejects(() => h.run({ apply: true })); assert.equal(h.commits, 0);
   }
   assert.throws(() => cli.checkedIdentity(identity(), { email: 'other@example.invalid' }), /identity-mismatch/);
   assert.throws(() => cli.checkedIdentity(identity(), { uid: 'other' }), /identity-mismatch/);
+  const linked = identity(undefined, undefined, { providerUserInfo: [{ providerId: 'google.com', email: 'provider-alias@example.invalid' }] });
+  assert.equal(cli.checkedIdentity(linked, { email: cli.OWNER_EMAIL }).uid, owner);
+  assert.throws(() => cli.checkedIdentity(linked, { email: 'provider-alias@example.invalid' }), /identity-mismatch/);
   const h = harness(); let calls = 0;
   h.identityApi.findUser = async () => ++calls === 1 ? identity() : identity('other');
   await assert.rejects(() => h.run({ apply: true }), /identity-mismatch/); assert.equal(h.commits, 0);

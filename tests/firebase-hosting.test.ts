@@ -53,6 +53,17 @@ test('Firebase Hosting sirve la SPA y actualiza la PWA con la política de cach�
       }
     });
 
+    await t.test('el documento y los assets rechazan enmarcado, sniffing y permisos no utilizados', async () => {
+      for (const path of ['/', '/assets/index-Ab12Cd_3.js']) {
+        const response = await fetch(`${origin}${path}`);
+        assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+        assert.equal(response.headers.get('x-frame-options'), 'DENY');
+        assert.equal(response.headers.get('referrer-policy'), 'strict-origin-when-cross-origin');
+        assert.equal(response.headers.get('content-security-policy'), "frame-ancestors 'none'; base-uri 'self'; object-src 'none'");
+        assert.equal(response.headers.get('permissions-policy'), 'camera=(self), geolocation=(self), microphone=()');
+      }
+    });
+
     await t.test('sólo los archivos con hash reciben un año de caché inmutable', async () => {
       for (const path of ['/assets/index-Ab12Cd_3.js', '/assets/manrope-latin-wght-normal-HI8z8_Pq.woff2']) {
         const response = await fetch(`${origin}${path}`);

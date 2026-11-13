@@ -28,6 +28,7 @@ jobs:
           working-directory: push-worker
           install: false
       - run: pnpm --dir push-worker --ignore-workspace install --frozen-lockfile --ignore-scripts
+      - run: pnpm --dir push-worker --ignore-workspace audit --prod --audit-level high
       - run: pnpm --dir push-worker --ignore-workspace check
       - run: pnpm --dir push-worker --ignore-workspace test
       - run: pnpm --dir push-worker --ignore-workspace exec wrangler deploy --dry-run
@@ -67,6 +68,9 @@ jobs:
       - name: Comprobar TypeScript
         run: pnpm lint
 
+      - name: Revisar avisos altos y críticos de dependencias y herramientas
+        run: pnpm audit --audit-level high
+
       - name: Probar dominio y normalización
         run: pnpm test
 
@@ -102,6 +106,9 @@ jobs:
 
       - name: Comprobar el código de la función
         run: pnpm --dir functions --ignore-workspace check
+
+      - name: Revisar avisos de seguridad del backend del operador
+        run: pnpm --dir functions --ignore-workspace audit --prod --audit-level high
 
       - name: Probar limpieza con dobles locales de datos y archivos
         run: pnpm --dir functions --ignore-workspace test

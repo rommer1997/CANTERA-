@@ -8,7 +8,14 @@
     "headers": [
       {
         "source": "**",
-        "headers": [{ "key": "Cache-Control", "value": "no-cache, max-age=0, must-revalidate" }]
+        "headers": [
+          { "key": "Cache-Control", "value": "no-cache, max-age=0, must-revalidate" },
+          { "key": "X-Content-Type-Options", "value": "nosniff" },
+          { "key": "X-Frame-Options", "value": "DENY" },
+          { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+          { "key": "Content-Security-Policy", "value": "frame-ancestors 'none'; base-uri 'self'; object-src 'none'" },
+          { "key": "Permissions-Policy", "value": "camera=(self), geolocation=(self), microphone=()" }
+        ]
       },
       {
         "regex": "^/assets/[^/]+-[A-Za-z0-9_-]{8}\\.[A-Za-z0-9]+$",

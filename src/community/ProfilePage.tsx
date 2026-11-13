@@ -61,7 +61,7 @@ function ProfileAccount() {
       <div className="c-auth-content">
         <Link className="c-brand" to="/"><BrandMark className="c-brand-mark" />LaCantera</Link>
         <div className="c-auth-heading"><h1>{pilotAccess ? 'Piloto privado' : returning ? 'Bienvenido de vuelta' : 'Únete a la comunidad'}</h1><p>{returning ? 'Tu comunidad te está esperando.' : 'Crea tu cuenta y empieza a vivir el fútbol de una forma diferente.'}</p></div>
-        {returnTo ? <p className="c-profile-return">Tu invitación está guardada. Volverás a ella después de completar tu cuenta.</p> : null}
+        {returnTo ? <p className="c-profile-return">Después de completar tu cuenta volverás a la pantalla que estabas abriendo.</p> : null}
         {realAccess ? <>
           <button disabled={busy} className="c-button c-google-login" onClick={() => void action(api.login)}>
             <img src="/images/google-signin.png" alt="" width={18} height={18} />

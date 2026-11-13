@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ArrowDown, ArrowLeft, ArrowRight, Ban, ChevronRight, LoaderCircle, LockKeyhole, MessageCircle, Search, Send, ShieldCheck, Trash2, Users, WifiOff } from 'lucide-react';
 import { useCommunity, usePublicProfile } from './CommunityContext';
 import { useInvitations } from './InvitationsContext';
@@ -10,6 +10,7 @@ import './messages.css';
 import { ScreenHeading } from './screen-heading';
 import { messageIsAfterRead } from './messagingLogic';
 import { profileInitials } from './experience';
+import { safeReturnTo } from './teamLogic';
 
 const dayFormatter = new Intl.DateTimeFormat('es', { day: 'numeric', month: 'long', year: 'numeric' });
 const timeFormatter = new Intl.DateTimeFormat('es', { hour: '2-digit', minute: '2-digit' });
@@ -40,8 +41,11 @@ function useOnline() {
   return online;
 }
 
-function MessagesStatus({ title, children, login = false }: { title: string; children: React.ReactNode; login?: boolean }) {
-  return <section className="cm-page"><header className="cm-page-heading"><div><h1>Mensajes</h1></div></header><div className="cm-empty cm-status"><span className="cm-empty-icon"><LockKeyhole size={28} aria-hidden="true" /></span><h2>{title}</h2><p>{children}</p><Link className="c-button" to={login ? '/profile?returnTo=%2Fmessages' : '/profile'}>{login ? 'Entrar a mi cuenta' : 'Mi cuenta'}<ArrowRight size={17} aria-hidden="true" /></Link></div></section>;
+function MessagesStatus({ title, children, login = false, resume = false }: { title: string; children: React.ReactNode; login?: boolean; resume?: boolean }) {
+  const location = useLocation();
+  const returnTo = safeReturnTo(location.pathname + location.search) || '/messages';
+  const accountLink = login || resume ? `/profile?${new URLSearchParams({ returnTo })}` : '/profile';
+  return <section className="cm-page"><header className="cm-page-heading"><div><h1>Mensajes</h1></div></header><div className="cm-empty cm-status"><span className="cm-empty-icon"><LockKeyhole size={28} aria-hidden="true" /></span><h2>{title}</h2><p>{children}</p><Link className="c-button" to={accountLink}>{login ? 'Entrar a mi cuenta' : 'Mi cuenta'}<ArrowRight size={17} aria-hidden="true" /></Link></div></section>;
 }
 
 function conversationIdForContact(peerId: string, conversations: MessagingConversation[]) { return conversations.find(item => item.participantIds.includes(peerId))?.id || ''; }
@@ -182,7 +186,7 @@ function MessagesContent() {
   if (!community.profile) return <MessagesStatus title="Habla con tus conexiones" login>Entra con tu propia cuenta. Solo tú y la otra persona podréis consultar vuestra conversación.</MessagesStatus>;
   if (community.accountModeration?.status === 'suspended') return <MessagesStatus title="Tu cuenta tiene el acceso limitado">Consulta el estado de tu cuenta o contacta con el administrador desde tu perfil.</MessagesStatus>;
   if (!invitations.emailVerified) return <MessagesStatus title="Verifica tu correo">Verifica el correo de tu cuenta antes de enviar o consultar mensajes.</MessagesStatus>;
-  if (!messaging.eligible) return <MessagesStatus title="Completa tu cuenta para conversar">Completa tu perfil, ubicación y aceptación de los términos para escribir a tus conexiones.</MessagesStatus>;
+  if (!messaging.eligible) return <MessagesStatus title="Completa tu cuenta para conversar" resume>Completa tu perfil, ubicación y aceptación de los términos para escribir a tus conexiones.</MessagesStatus>;
   return <section className={`cm-page ${conversationId ? 'has-conversation' : ''}`}><ScreenHeading className="cm-page-heading" eyebrow="EL VESTUARIO" title="Mensajes." description="Una conversación. El próximo plan."><Link className="c-button secondary" to="/connect"><Users size={17} aria-hidden="true" />Conexiones</Link></ScreenHeading>{!online ? <p className="cm-notice cm-offline" role="status"><WifiOff size={18} aria-hidden="true" />Sin conexión. Los mensajes se actualizarán al recuperar la conexión; el envío queda pausado.</p> : null}<div className="cm-workspace"><ConversationSidebar selectedId={conversationId} online={online} />{conversationId ? <ConversationThread key={conversationId} conversationId={conversationId} online={online} /> : <div className="cm-welcome"><span className="cm-empty-icon"><MessageCircle size={32} aria-hidden="true" /></span><h2>Hablemos de fútbol</h2><p>Elige una conversación y prepara el próximo encuentro.</p><span className="cm-privacy-note"><LockKeyhole size={15} aria-hidden="true" />Los mensajes no aparecen en el feed.</span></div>}</div></section>;
 }
 
