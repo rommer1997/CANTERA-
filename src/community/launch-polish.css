@@ -109,3 +109,6 @@
 .c-app.c-studio :is(input,textarea,select) { font-size:14px; }
 .c-app.c-studio :is(input,textarea)::placeholder { color:#63746b; opacity:1; font-size:14px; font-weight:400; }
 .c-app.c-studio :is(input,textarea,select):disabled { opacity:1; }
+
+/* E2/E3: un único separador entre identificación e información de acceso. */
+.c-app.c-studio .c-auth-note { border:0; background:transparent; padding:0; }
