@@ -5,7 +5,7 @@ import ts from 'typescript';
 import * as logic from '../src/community/messagingLogic.ts';
 import { TERMS_VERSION } from '../src/community/policy.ts';
 
-test('revocar sólo al peer del piloto cierra su hilo y descarta callbacks con el actor aún habilitado', async () => {
+test('revocar solo al peer del piloto cierra su hilo y descarta callbacks con el actor aún habilitado', async () => {
   const community = {
     mode: 'cloud', serviceAvailable: true, accountModeration: null, blockedIds: [],
     profile: { id: 'alice', adultConfirmed: true, city: 'Madrid', country: 'España', acceptedTermsVersion: TERMS_VERSION, acceptedTermsAt: '2026-10-08T12:00:00.000Z' },

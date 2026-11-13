@@ -168,7 +168,7 @@ test('restauración rechaza producción, alias, puertos y argumentos ambiguos an
   assert.throws(() => backup.parseArgs(['--apply']));
 });
 
-test('simulación valida manifiesto y plan sin emitir ninguna petición y remapea referencias sólo al emulador', async () => {
+test('simulación valida manifiesto y plan sin emitir ninguna petición y remapea referencias solo al emulador', async () => {
   const data = payload(); const original = JSON.stringify(data);
   const report = await restore.restoreBackup({ payload: data, target, fetchImpl: () => { throw new Error('network-must-not-run'); } });
   assert.equal(report.written, 0); assert.equal(report.fieldsVerified, false);

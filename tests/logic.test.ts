@@ -107,14 +107,14 @@ test('serie mensual usa último día sin desplazar fechas de meses posteriores',
 test('serie rechaza límites, inicio pasado y una ocurrencia en hora inexistente', () => {
   const now = Date.parse('2026-03-01T00:00:00Z');
   const input: EventInput = { ...event(0), type: 'match', startAt: zonedDateTimeToIso('2026-03-22T02:30', 'Europe/Madrid') };
-  assert.throws(() => expandEventSeries(input, 'weekly', 2, now), /encuentro 2.*no existe/);
+  assert.throws(() => expandEventSeries(input, 'weekly', 2, now), /partido 2.*no existe/);
   for (const count of [1, 13, 2.5]) assert.throws(() => expandEventSeries(input, 'monthly', count, now), /2 y 12/);
   assert.throws(() => expandEventSeries({ ...input, startAt: '2020-01-01T00:00:00Z' }, 'weekly', 2, now), /futura/);
   assert.equal(expandEventSeries({ ...input, startAt: zonedDateTimeToIso('2026-03-22T18:00', 'Europe/Madrid') }, 'weekly', 12, now).length, 12);
   assert.throws(() => makeFixtures({ ...event(), status: 'completed' }), /celebrado/);
 });
 
-test('agenda exporta sólo cruces con horario real, zona en descripción y revisión', () => {
+test('agenda exporta solo cruces con horario real, zona en descripción y revisión', () => {
   const e = event(3); e.startAt = '2020-01-01T12:00:00.000Z'; e.fixtures = makeFixtures(e); e.revision = 4;
   e.fixtures[0] = { ...e.fixtures[0], startAt: '2026-10-25T17:00:00.000Z', timeZone: 'Europe/Madrid', venue: 'Campo 2' };
   const calendar = buildEventCalendar(e, 'https://cantera.example/#/play/event', undefined, Date.parse('2026-10-01T00:00:00Z'));

@@ -120,7 +120,7 @@ test('edad, términos actuales, fecha y ubicación siguen siendo necesarios para
   }
 });
 
-test('cuenta Google nueva empieza vacía sin consentimientos y sólo envía aceptación después de sus cambios explícitos', async () => {
+test('cuenta Google nueva empieza vacía sin consentimientos y solo envía aceptación después de sus cambios explícitos', async () => {
   const h = profileHarness(fixture(), '/feed');
   try {
     assert.equal(h.label('Ciudad').props.value, ''); assert.equal(h.label('País').props.value, '');

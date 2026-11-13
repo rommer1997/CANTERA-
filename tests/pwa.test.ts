@@ -239,7 +239,7 @@ test('activar desde otra pestaña ofrece recargar sin descartar automáticamente
  assert.ok(button);
  assert.ok(button.props.children.includes('Recargar app'));
  button.props.onClick();
- assert.equal(state.reloads(), 1, 'la recarga sólo ocurre con una elección explícita en esta pestaña');
+ assert.equal(state.reloads(), 1, 'la recarga solo ocurre con una elección explícita en esta pestaña');
  state.cleanup();
  assert.equal(state.listeners.size, 0);
  assert.equal(state.registrationListeners.size, 0);

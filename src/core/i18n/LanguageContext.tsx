@@ -153,7 +153,7 @@ const translations: Record<Language, Record<string, string>> = {
     's3.create_event': 'Crear Evento',
     's3.my_events': 'Mis Eventos Creados',
     's3.auth_events': 'Eventos Autorizados',
-    's3.auth_desc': 'Como scout de alto nivel, tienes permisos para crear eventos oficiales. Tu reputación y validaciones respaldan la calidad de estos encuentros.',
+    's3.auth_desc': 'Como scout de alto nivel, tienes permisos para crear eventos oficiales. Tu reputación y validaciones respaldan la calidad de estos partidos.',
     's3.shortlist': 'Añadir a Lista',
     's3.profile': 'Ver Perfil',
     's3.reach': 'Años',

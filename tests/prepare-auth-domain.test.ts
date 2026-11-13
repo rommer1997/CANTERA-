@@ -19,7 +19,7 @@ test('hostname no admite URLs, credenciales, rutas, puertos, comodines ni direcc
   assert.equal(cli.validateDomain('xn--espaa-rta.example'), 'xn--espaa-rta.example');
   for (const value of ['', 'https://cantera-tau.vercel.app', 'http://example.com', 'example.com/path', 'example.com?key=SECRET', 'name:password@example.com', 'example.com:443', '*.example.com', 'localhost', 'foo.localhost', '127.0.0.1', '[::1]', 'example.com.', '-example.com', 'example-.com', 'x..com', 'a'.repeat(64) + '.com', ' x.example', 'x.example ', 'x\n.example', 'x%2Eexample.com', 'España.example', 'a'.repeat(250) + '.com']) assert.throws(() => cli.validateDomain(value), /Dominio inválido/);
   assert.equal(cli.parseArgs(['--domain', 'localhost', '--allow-localhost']).domain, 'localhost');
-  assert.throws(() => cli.parseArgs(['--domain', domain, '--allow-localhost']), /sólo se admite/);
+  assert.throws(() => cli.parseArgs(['--domain', domain, '--allow-localhost']), /solo se admite/);
 });
 
 test('simulación conserva los dominios existentes y nunca escribe Auth', async () => {
@@ -88,7 +88,7 @@ test('módulos Firebase CLI simulados reciben la cuenta autorizada sin imprimir 
   };
   const result = await cli.main({ args: ['--domain', domain], readConfig: () => ({ ...config, apiKey: 'SECRET_KEY' }), loadModule: (name: string) => { loaded.push(name); return modules[name]; }, log: (value: string) => output.push(value) });
   assert.equal(result.action, 'planned'); assert.equal(loaded.length, 3);
-  assert.ok(!output.join('\n').includes('SECRET')); assert.ok(output[0].includes(domain)); assert.match(output[1], /Sólo lectura/);
+  assert.ok(!output.join('\n').includes('SECRET')); assert.ok(output[0].includes(domain)); assert.match(output[1], /Solo lectura/);
 });
 
 test('ayuda e inputs inválidos no cargan Firebase, y no disponer de sesión impide consultar nube', async () => {

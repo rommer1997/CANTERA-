@@ -315,7 +315,7 @@ test('volver a una cuenta administradora renueva su paginación y descarta una p
 
 const verifiedGoogle = { emailVerified: true, provider: 'google.com' };
 
-test('el piloto crea sólo un borrador privado para la identidad Google autorizada sin aceptar términos', async () => {
+test('el piloto crea solo un borrador privado para la identidad Google autorizada sin aceptar términos', async () => {
   const h = providerHarness({ buildOpen: false, pilotBuild: true });
   try {
     await h.identify('alpha', verifiedGoogle);
@@ -460,7 +460,7 @@ test('createPost guarda texto sin título ni medios y conserva validaciones de l
   } finally { h.cleanup(); }
 });
 
-test('createPost de texto impide enlazar un encuentro privado igual que un logro', async () => {
+test('createPost de texto impide enlazar un partido privado igual que un logro', async () => {
   const h = providerHarness();
   try {
     await h.identify(); await h.runtime('open');
@@ -468,12 +468,12 @@ test('createPost de texto impide enlazar un encuentro privado igual que un logro
     const startAt = new Date(Date.now() + 86_400_000).toISOString();
     const event = { id: 'private', ownerId: 'alpha', ownerName: 'Mi perfil', title: 'Prueba privada', visibility: 'private', type: 'match', format: '7', level: 'amateur', city: 'Madrid', country: 'España', timeZone: 'Europe/Madrid', venue: 'Campo', startAt, capacity: 4, entry: 'players', description: '', status: 'open', tournamentFormat: 'league', participants: {}, fixtures: [], createdAt: time };
     h.existing.set('communityEvents/private', event);
-    await assert.rejects(api.createPost({ kind: 'post', text: 'Texto público', title: '', eventId: 'private' }), /solo puedes asociar un encuentro público/);
+    await assert.rejects(api.createPost({ kind: 'post', text: 'Texto público', title: '', eventId: 'private' }), /solo puedes asociar un partido público/);
     assert.equal(h.writes.some(write => write.path.startsWith('communityPosts/')), false);
   } finally { h.cleanup(); }
 });
 
-test('borrar un post de texto de una página antigua retira su tarjeta y enlace sólo después de confirmar Firebase', async () => {
+test('borrar un post de texto de una página antigua retira su tarjeta y enlace solo después de confirmar Firebase', async () => {
   const h = providerHarness(); let stop: (() => void) | undefined;
   try {
     await h.identify(); await h.runtime('open');

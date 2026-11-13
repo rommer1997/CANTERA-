@@ -64,7 +64,7 @@ test('Firebase Hosting sirve la SPA y actualiza la PWA con la política de cach�
       }
     });
 
-    await t.test('sólo los archivos con hash reciben un año de caché inmutable', async () => {
+    await t.test('solo los archivos con hash reciben un año de caché inmutable', async () => {
       for (const path of ['/assets/index-Ab12Cd_3.js', '/assets/manrope-latin-wght-normal-HI8z8_Pq.woff2']) {
         const response = await fetch(`${origin}${path}`);
         assert.equal(response.status, 200, path);

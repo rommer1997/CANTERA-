@@ -15,7 +15,7 @@ const projectId = `${process.env.GCLOUD_PROJECT || 'demo-cantera'}-rights-auth`,
 function assertIsolatedTarget() {
   if (!/^demo-[a-z0-9-]+$/.test(projectId) || projectId.length > 63
     || !/^127\.0\.0\.1:\d+$/.test(process.env.FIRESTORE_EMULATOR_HOST || '')
-    || !/^127\.0\.0\.1:\d+$/.test(process.env.FIREBASE_AUTH_EMULATOR_HOST || '')) throw new Error('Sólo se permiten proyecto demo-* y Auth/Firestore Emulator en loopback.');
+    || !/^127\.0\.0\.1:\d+$/.test(process.env.FIREBASE_AUTH_EMULATOR_HOST || '')) throw new Error('Solo se permiten proyecto demo-* y Auth/Firestore Emulator en loopback.');
 }
 assertIsolatedTarget();
 let app, db, auth;

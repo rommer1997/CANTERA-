@@ -699,7 +699,7 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
     const key = `${user.id}:${id}`;
     let state = deliveryCursors.current.get(key);
     if (!state) { state = { stage: 'changes', cursor: null, candidates: [], busy: false }; deliveryCursors.current.set(key, state); }
-    if (state.busy) throw new Error('Ya se están recuperando los avisos de este encuentro.');
+    if (state.busy) throw new Error('Ya se están recuperando los avisos de este partido.');
     state.busy = true;
     try {
       while (state.candidates.length < 200 && state.stage !== 'done') {
@@ -733,7 +733,7 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
         await commitDeliveryBatches(missing, async candidates => {
           const current = await getDoc(doc(db, 'communityEvents', id));
           const latest = current.exists() ? normalizeEvent(current.data(), id) : null;
-          if (!latest || latest.ownerId !== user.id) throw new Error('El encuentro ya no está disponible para entregar avisos.');
+          if (!latest || latest.ownerId !== user.id) throw new Error('El partido ya no está disponible para entregar avisos.');
           const eligible = candidates.filter(candidate => noticeRecipientAllowed(latest, candidate.value.recipientId));
           if (!eligible.length) return;
           const batch = writeBatch(db);
@@ -782,10 +782,10 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
     return profile;
   }
   function mutateDemo(change: (data: DemoData) => DemoData) { writeDemo(normalizeDemoData(change(normalizeDemoData(readDemo())))); }
-  async function mutateEvent(id: string, change: (event: PlayEvent, user: CommunityProfile) => PlayEvent, ownerOnly = false, reason = 'Se ha actualizado el encuentro.', withdrawal = false, notifyOnly?: string[]) {
+  async function mutateEvent(id: string, change: (event: PlayEvent, user: CommunityProfile) => PlayEvent, ownerOnly = false, reason = 'Se ha actualizado el partido.', withdrawal = false, notifyOnly?: string[]) {
     const user = withdrawal ? sessionActor() : actor();
     const apply = (event: PlayEvent) => {
-      if (!canReadEvent(event, user.id)) throw new Error('Necesitas una invitación para acceder a este encuentro privado.');
+      if (!canReadEvent(event, user.id)) throw new Error('Necesitas una invitación para acceder a este partido privado.');
       if (ownerOnly && event.ownerId !== user.id) throw new Error('Solo el organizador puede realizar esta acción.');
       const changed = change(event, user);
       const promoted = Object.keys(changed.participants).find(uid => !event.participants[uid] && event.waitlist?.[uid]);
@@ -831,7 +831,7 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
         // still verify the recipient's current membership at delivery time.
         const current = user.id === notificationOwnerId ? await getDoc(doc(db, 'communityEvents', id)) : null;
         const latest = current ? current.exists() ? normalizeEvent(current.data(), id) : null : notificationEvent;
-        if (!latest || latest.ownerId !== notificationOwnerId) throw new Error('El encuentro ya no está disponible para entregar avisos.');
+        if (!latest || latest.ownerId !== notificationOwnerId) throw new Error('El partido ya no está disponible para entregar avisos.');
         const eligible = notices.filter(notice => noticeRecipientAllowed(latest, notice.value.recipientId));
         if (!eligible.length) return;
         const batch = writeBatch(db);
@@ -926,7 +926,7 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
     return id;
   }
   async function createEventSeries(inputs: EventInput[]) {
-    const user = actor(); if (inputs.length < 2 || inputs.length > 12) throw new Error('La serie admite entre 2 y 12 encuentros.');
+    const user = actor(); if (inputs.length < 2 || inputs.length > 12) throw new Error('La serie admite entre 2 y 12 partidos.');
     const records = inputs.map(input => { const cleaned = validateEvent(input); const id = newId(); return { ...cleaned, id, ownerId: user.id, ownerName: user.name, startAtMs: Date.parse(cleaned.startAt), status: 'open' as const, participants: {}, participantIds: [], fixtures: [], waitlist: {}, waitlistOrder: [], rsvps: {}, revision: 0, history: [], createdAt: stamp(), updatedAt: stamp() }; });
     if (mode === 'demo') mutateDemo(data => ({ ...data, events: [...records, ...data.events] }));
     else { const batch = writeBatch(db); for (const record of records) batch.set(doc(db, 'communityEvents', record.id), { ...record, createdAt: serverTimestamp(), updatedAt: serverTimestamp() }); await batch.commit(); }
@@ -950,16 +950,16 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
       const source = mode === 'demo' ? normalizeDemoData(readDemo()).events.find(event => event.id === id) : await getDoc(doc(db, 'communityEvents', id)).then(snapshot => snapshot.exists() ? normalizeEvent(snapshot.data(), id) : null);
       if (!source || source.status !== 'open' || source.fixtures.length || Date.parse(source.startAt) <= Date.now() || Object.keys(source.participants).length >= source.capacity || !(source.waitlistOrder || []).length) return;
       const uid = source.waitlistOrder![0];
-      await mutateEvent(id, event => { const first = event.waitlistOrder?.[0]; if (!first || Object.keys(event.participants).length >= event.capacity || event.status !== 'open') throw new Error('La lista de espera ha cambiado. Actualiza el encuentro.'); const waitlist = { ...(event.waitlist || {}) }; const name = waitlist[first].name; delete waitlist[first]; return { ...event, participants: { ...event.participants, [first]: name }, waitlist, waitlistOrder: event.waitlistOrder!.slice(1) }; }, true, 'Has conseguido una plaza al ampliar la convocatoria.', false, [uid]);
+      await mutateEvent(id, event => { const first = event.waitlistOrder?.[0]; if (!first || Object.keys(event.participants).length >= event.capacity || event.status !== 'open') throw new Error('La lista de espera ha cambiado. Actualiza el partido.'); const waitlist = { ...(event.waitlist || {}) }; const name = waitlist[first].name; delete waitlist[first]; return { ...event, participants: { ...event.participants, [first]: name }, waitlist, waitlistOrder: event.waitlistOrder!.slice(1) }; }, true, 'Has conseguido una plaza al ampliar la convocatoria.', false, [uid]);
     }
   }
   async function updateEvent(id: string, input: EventInput, changeReason: string) { await mutateEvent(id, event => ({ ...event, ...validateEventEdit(event, input, changeReason), startAtMs: Date.parse(input.startAt) }), true, changeReason); try { await promoteWaitingPlayers(id); } catch { throw new Error('El cambio se ha guardado, pero queda una promoción pendiente. Vuelve a guardar el aforo para reintentarlo.'); } }
   async function setEventStatus(id: string, status: PlayEvent['status'], reason?: string) {
     if (!['open', 'closed', 'cancelled', 'completed'].includes(status)) throw new Error('Estado inválido.');
-    await mutateEvent(id, event => { if (status === 'open' && (event.fixtures.length || Date.parse(event.startAt) <= Date.now())) throw new Error('No puedes reabrir un calendario ya generado o celebrado.'); if (status === 'completed') { if (Date.parse(event.startAt) > Date.now()) throw new Error('El encuentro todavía no ha comenzado.'); if (event.status === 'cancelled') throw new Error('Un encuentro cancelado no puede marcarse celebrado.'); if (event.type === 'match' && !event.result) throw new Error('Registra primero el resultado del partido.'); if (event.type === 'tournament' && (!event.fixtures.length || event.fixtures.some(f => f.awayId && f.homeScore === null) || event.tournamentFormat === 'knockout' && event.fixtures.filter(f => f.round === Math.max(...event.fixtures.map(f => f.round))).length !== 1)) throw new Error('Completa los resultados del torneo.'); } return { ...event, status }; }, true, reason || (status === 'cancelled' ? 'El organizador ha cancelado el encuentro.' : `El organizador ha cambiado el estado a ${status}.`)); if (status === 'open') { try { await promoteWaitingPlayers(id); } catch { throw new Error('Se han abierto las inscripciones, pero queda una promoción pendiente. Vuelve a abrirlas para reintentarlo.'); } }
+    await mutateEvent(id, event => { if (status === 'open' && (event.fixtures.length || Date.parse(event.startAt) <= Date.now())) throw new Error('No puedes reabrir un calendario ya generado o celebrado.'); if (status === 'completed') { if (Date.parse(event.startAt) > Date.now()) throw new Error('El partido todavía no ha comenzado.'); if (event.status === 'cancelled') throw new Error('Un partido cancelado no puede marcarse celebrado.'); if (event.type === 'match' && !event.result) throw new Error('Registra primero el resultado del partido.'); if (event.type === 'tournament' && (!event.fixtures.length || event.fixtures.some(f => f.awayId && f.homeScore === null) || event.tournamentFormat === 'knockout' && event.fixtures.filter(f => f.round === Math.max(...event.fixtures.map(f => f.round))).length !== 1)) throw new Error('Completa los resultados del torneo.'); } return { ...event, status }; }, true, reason || (status === 'cancelled' ? 'El organizador ha cancelado el partido.' : `El organizador ha cambiado el estado a ${status}.`)); if (status === 'open') { try { await promoteWaitingPlayers(id); } catch { throw new Error('Se han abierto las inscripciones, pero queda una promoción pendiente. Vuelve a abrirlas para reintentarlo.'); } }
   }
   async function setRsvp(id: string, response: Rsvp) { if (!['yes', 'no', 'maybe'].includes(response)) throw new Error('Respuesta inválida.'); await mutateEvent(id, (event, user) => {
-    if (!event.participants[user.id]) throw new Error('Primero inscríbete en el encuentro.');
+    if (!event.participants[user.id]) throw new Error('Primero inscríbete en el partido.');
     if (Date.parse(event.startAt) <= Date.now() || event.status === 'cancelled' || event.status === 'completed') throw new Error('La convocatoria ha terminado.');
     if (response === 'no' && event.fixtures.length) throw new Error('El calendario ya está cerrado. Contacta con el organizador.');
     return { ...(response === 'no' ? releasePlace(event, user.id) : event), rsvps: { ...(event.rsvps || {}), [user.id]: response } };
@@ -994,7 +994,7 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
         const parent = await getDoc(doc(db, 'communityEvents', input.eventId));
         associated = parent.exists() ? normalizeEvent(parent.data(), parent.id) : null;
       }
-      if (!associated || !isPublicEvent(associated)) throw new Error('Las publicaciones son públicas: solo puedes asociar un encuentro público disponible.');
+      if (!associated || !isPublicEvent(associated)) throw new Error('Las publicaciones son públicas: solo puedes asociar un partido público disponible.');
     }
     let mediaUrl = '', mediaPath = '';
     try {

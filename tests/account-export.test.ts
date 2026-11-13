@@ -44,7 +44,7 @@ test('exportación no exige aceptar términos nuevos y filtra autoría de cada c
   assert.equal(result.scope.mediaBinariesIncluded, false);
 });
 
-test('encuentros exportan sólo inscripción, RSVP y espera propias incluso para el organizador', () => {
+test('partidos exportan solo inscripción, RSVP y espera propias incluso para el organizador', () => {
   const event = row('event', { ownerId: uid, title: 'Partido', teamId: 'team', participants: { [uid]: 'Yo', other: 'SECRET_PARTICIPANT' }, participantIds: [uid, 'SECRET_OTHER_UID'], rsvps: { [uid]: 'maybe', other: 'SECRET_RSVP' }, waitlist: { [uid]: { name: 'Yo en espera', joinedAt: timestamp, email: 'SECRET_EMAIL' }, other: { name: 'SECRET_WAIT', joinedAt: timestamp } }, waitlistOrder: ['other', uid], fixtures: [{ id: 'fixture', round: 1, homeId: uid, awayId: 'SECRET_OTHER_UID', homeScore: 2, awayScore: 1, startAt: '2026-10-10T12:00:00.000Z', privateRoster: 'SECRET_ROSTER' }], privateParticipants: 'SECRET_PRIVATE', result: { homeName: 'Local', awayName: 'Visitante', homeScore: 2, awayScore: 1, emails: 'SECRET_RESULT' } });
   const result = buildAccountExport(source({ events: [event, event, row('unrelated', { ownerId: 'other', participants: { other: 'SECRET_UNRELATED' } })] }));
   assert.equal(result.events.length, 1);
@@ -65,7 +65,7 @@ test('respuestas tras retirada y registros antiguos conservan datos personales s
   assert.ok(!JSON.stringify(result).includes('SECRET_NAME'));
 });
 
-test('exportación conserva la portada genérica del encuentro sin proyectar URLs ni datos de participantes ajenos', () => {
+test('exportación conserva la portada genérica del partido sin proyectar URLs ni datos de participantes ajenos', () => {
   for (const coverId of ['day', 'night', 'tournament']) {
     const result = buildAccountExport(source({ events: [row('with-cover', { ownerId: uid, coverId, participants: { [uid]: 'Yo', other: 'SECRET_PARTICIPANT' }, coverUrl: 'SECRET_URL' })] }));
     assert.equal(result.events[0].coverId, coverId);
@@ -115,7 +115,7 @@ test('historial vinculado, promociones propias y recibos del organizador excluye
   assert.ok(!JSON.stringify(result).includes('SECRET'));
 });
 
-test('equipos incluyen metadatos vinculados, sólo membresía/solicitud propia e invitaciones creadas', () => {
+test('equipos incluyen metadatos vinculados, solo membresía/solicitud propia e invitaciones creadas', () => {
   const result = buildAccountExport(source({ collections: {
     communityTeamMembers: [row('mine-member', { teamId: 'team', userId: uid, name: 'Yo', role: 'member' }), row('other-member', { teamId: 'team', userId: 'other', name: 'SECRET_ROSTER' })],
     communityTeamJoinRequests: [row('mine-request', { teamId: 'requested', userId: uid, name: 'Yo', inviteId: 'SECRET_OTHER_INVITE', status: 'pending' }), row('other-request', { teamId: 'team', userId: 'other', name: 'SECRET_REQUEST' })],
@@ -288,7 +288,7 @@ test('índice de recibos ausente aborta sin consultar miembros o cuentas sin fil
   assert.ok(!reads.some(read => ['members', 'communityEventAdmissions', 'communityConnections', 'users'].includes(read.scope)));
 });
 
-test('CLI de exportación sólo admite el proyecto y la base nombrada autorizados antes de cargar Admin', () => {
+test('CLI de exportación solo admite el proyecto y la base nombrada autorizados antes de cargar Admin', () => {
   const expected = { projectId: 'gen-lang-client-0853130215', firestoreDatabaseId: 'ai-studio-647af55f-499b-43f3-9268-9bf5f62701bb' };
   assert.doesNotThrow(() => cli.validateExportConfig(expected));
   for (const config of [null, {}, { ...expected, projectId: 'other-project' }, { ...expected, firestoreDatabaseId: '(default)' }, { ...expected, firestoreDatabaseId: 'ai-studio-9d2b1bbc-aff5-458a-bdf8-f2475620add0' }]) assert.throws(() => cli.validateExportConfig(config), /base nombrada autorizados/);

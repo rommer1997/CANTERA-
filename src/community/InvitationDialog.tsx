@@ -18,7 +18,7 @@ export function InvitationDialog({ initial, onClose }: { initial: CommunityInvit
   const remaining = invitationSecondsRemaining(invitationExpiresAt(current.createdAt), now);
   const active = current.status === 'active' && remaining > 0;
   const url = invitationLink(current.id, window.location.origin);
-  const text = `Te invito ${current.kind === 'event' ? 'a un encuentro privado' : 'a conectar'} en LaCantera. Código: ${formatInvitationCode(current.id)}. Es para una persona y caduca en 10 minutos. ${url}`;
+  const text = `Te invito ${current.kind === 'event' ? 'a un partido privado' : 'a conectar'} en LaCantera. Código: ${formatInvitationCode(current.id)}. Es para una persona y caduca en 10 minutos. ${url}`;
   useEffect(() => {
     mounted.current = true; const element = dialog.current; element?.showModal();
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
@@ -34,7 +34,7 @@ export function InvitationDialog({ initial, onClose }: { initial: CommunityInvit
     catch { if (mounted.current) setError('No se pudo copiar. Puedes seleccionar el código o compartir el enlace.'); }
   }
   return <dialog ref={dialog} className="ci-dialog" aria-labelledby={titleId} onCancel={onClose} onClick={event => { if (event.target === event.currentTarget) { const box = event.currentTarget.getBoundingClientRect(); if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) onClose(); } }}>
-    <div className="ci-dialog-head"><div><p className="c-eyebrow">INVITA A TU GENTE</p><h2 id={titleId}>{current.kind === 'event' ? 'Acceso al encuentro privado' : 'Código de conexión'}</h2></div><button className="ci-close" aria-label="Cerrar invitación" onClick={onClose}><X size={22} /></button></div>
+    <div className="ci-dialog-head"><div><p className="c-eyebrow">INVITA A TU GENTE</p><h2 id={titleId}>{current.kind === 'event' ? 'Acceso al partido privado' : 'Código de conexión'}</h2></div><button className="ci-close" aria-label="Cerrar invitación" onClick={onClose}><X size={22} /></button></div>
     <p>Compártelo solo con quien quieras invitar. Caduca en diez minutos y sirve para una persona.</p>
     {mode === 'demo' ? <p className="ci-demo-note">Código de prueba: solo funciona con las cuentas de este navegador.</p> : null}
     <div className={`ci-code-card ${active ? '' : 'inactive'}`}>

@@ -40,7 +40,7 @@ const verifiedDb = uid => env.authenticatedContext(uid, { email_verified: true }
 const media = uid => context(uid).storage();
 async function seed(path, value) { await env.withSecurityRulesDisabled(ctx => setDoc(doc(ctx.firestore(), path), value)); }
 
-async function ownerUpdate(target, changes, summary = 'El organizador modifica el encuentro.') {
+async function ownerUpdate(target, changes, summary = 'El organizador modifica el partido.') {
   return runTransaction(target.firestore, async tx => {
     const current = (await tx.get(target)).data(); const revision = (current.revision || 0) + 1;
     tx.update(target, { ...changes, revision, updatedAt: stamp() });
@@ -322,7 +322,7 @@ describe('Publicaciones e interacciones', { concurrency: false }, () => {
     await env.withSecurityRulesDisabled(async ctx => assert.equal((await getDoc(doc(ctx.firestore(), 'communityConfiguration/runtime'))).data().serviceStatus, 'pilot'));
   });
 
-  test('asociar un post escrito conserva la restricción a encuentros públicos existentes', async () => {
+  test('asociar un post escrito conserva la restricción a partidos públicos existentes', async () => {
     await seed('communityEvents/public', event('public', { visibility: 'public' }));
     await seed('communityEvents/private', event('private', { visibility: 'private' }));
     const alice = db('alice');
@@ -534,7 +534,7 @@ describe('Gestión segura de convocatorias y derechos', { concurrency: false }, 
     assert.equal((await getDoc(target)).data().skillLevel, 'beginner');
   });
 
-  test('portada genérica permite crear y editar sólo al organizador, con historial, manteniendo RSVP', async () => {
+  test('portada genérica permite crear y editar solo al organizador, con historial, manteniendo RSVP', async () => {
     const alice = db('alice'); const target = doc(alice, 'communityEvents/cover');
     await assertSucceeds(setDoc(target, event('cover', { coverId: 'day' })));
     await assertFails(updateDoc(target, { coverId: 'night' }));
@@ -570,7 +570,7 @@ describe('Gestión segura de convocatorias y derechos', { concurrency: false }, 
     await assertFails(updateDoc(doc(db('alice'), 'communityEventChanges/edit_1'), { summary: 'Reescrito' }));
     await assertFails(deleteDoc(doc(db('alice'), 'communityEventChanges/edit_1')));
   });
-  test('lista de espera preserva orden y retirada promociona sólo primero, con aviso privado', async () => {
+  test('lista de espera preserva orden y retirada promociona solo primero, con aviso privado', async () => {
     await seed('communityEvents/queue', event('queue', { capacity: 2, participants: { alice: 'alice', bob: 'bob' }, participantIds: ['alice', 'bob'], waitlist: {}, waitlistOrder: [], rsvps: { bob: 'yes' } }));
     const carol = db('carol'); const target = doc(carol, 'communityEvents/queue');
     await assertSucceeds(updateDoc(target, { waitlist: { carol: { name: 'carol', joinedAt: stamp() } }, waitlistOrder: ['carol'] }));
@@ -673,7 +673,7 @@ describe('Gestión segura de convocatorias y derechos', { concurrency: false }, 
     await assertFails(setDoc(doc(client, 'communityEventNotices/notices_1_carol'), { id: 'notices_1_carol', eventId: 'notices', recipientId: 'carol', revision, summary, title: 'Partido de la comunidad', createdAt: stamp(), readAt: '' }));
     await assertFails(ownerUpdate(target, { history: [{ revision: 0, summary: 'Historial inventado', changedAt: '2000-01-01T00:00:00.000Z' }] }));
   });
-  test('recuperación crea sólo avisos pendientes con recibos inmutables, sin acceso a lectura privada', async () => {
+  test('recuperación crea solo avisos pendientes con recibos inmutables, sin acceso a lectura privada', async () => {
     await seed('communityEvents/replay', event('replay', { participants: { bob: 'bob' }, participantIds: ['bob'] }));
     const alice = db('alice'); const bob = db('bob');
     await assertSucceeds(ownerUpdate(doc(alice, 'communityEvents/replay'), { venue: 'Nuevo campo' }));
@@ -909,7 +909,7 @@ async function admitWithCode(client, uid, code = '23456789ABCDEFGH', overrides =
   });
 }
 describe('Códigos de un uso, conexiones y eventos privados', { concurrency: false }, () => {
-  test('alta de código sólo usa entropía/formato admitidos y hora de servidor; propietario puede revocar tras caducar', async () => {
+  test('alta de código solo usa entropía/formato admitidos y hora de servidor; propietario puede revocar tras caducar', async () => {
     const alice = verifiedDb('alice');
     await assertSucceeds(setDoc(doc(alice, 'communityInvitations/23456789ABCDEFGH'), invitation()));
     await assertFails(setDoc(doc(alice, 'communityInvitations/short'), invitation('short')));
@@ -962,7 +962,7 @@ describe('Códigos de un uso, conexiones y eventos privados', { concurrency: fal
     assert.equal((await getDoc(doc(bob, 'communityConnections/alice/members/bob'))).data().inviteId, code);
     assert.equal((await getDoc(doc(bob, 'communityConnections/bob/members/alice'))).data().inviteId, code);
   });
-  test('dos receptores simultáneos sólo consumen un código una vez y retirada requiere borrar ambas aristas incluso en pausa', async () => {
+  test('dos receptores simultáneos solo consumen un código una vez y retirada requiere borrar ambas aristas incluso en pausa', async () => {
     const alice = verifiedDb('alice'); await setDoc(doc(alice, 'communityInvitations/23456789ABCDEFGH'), invitation());
     const results = await Promise.allSettled([connectWithCode(verifiedDb('bob'), 'bob'), connectWithCode(verifiedDb('carol'), 'carol')]);
     assert.equal(results.filter(result => result.status === 'fulfilled').length, 1);
@@ -1080,7 +1080,7 @@ describe('Códigos de un uso, conexiones y eventos privados', { concurrency: fal
     await assertFails(admitWithCode(bob, 'bob', '23456789ABCDEFGJ'));
     await assertSucceeds(updateDoc(doc(alice, 'communityEvents/private-invite'), { 'participants.alice': 'alice', participantIds: arrayUnion('alice'), 'rsvps.alice': 'yes' }));
   });
-  test('avisos privados sólo se entregan a participantes actuales; una entrega previa sigue accesible a su destinatario', async () => {
+  test('avisos privados solo se entregan a participantes actuales; una entrega previa sigue accesible a su destinatario', async () => {
     const alice = verifiedDb('alice'); const bob = verifiedDb('bob');
     await seed('communityEvents/secret-notice', event('secret-notice', { visibility: 'private', participantIds: [], revision: 1 }));
     await seed('communityEventChanges/secret-notice_1', { id: 'secret-notice_1', eventId: 'secret-notice', ownerId: 'alice', title: 'Reunión privada', summary: 'Cambio de campo', revision: 1, audienceIds: ['alice', 'bob'], createdAt: Timestamp.fromMillis(Date.now() - 1000) });

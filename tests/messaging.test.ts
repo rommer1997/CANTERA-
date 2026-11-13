@@ -26,7 +26,7 @@ test('mensajes conservan saltos, normalizan CRLF y rechazan vacíos, controles y
   assert.equal(messageText('<script>alert(1)</script>'), '<script>alert(1)</script>');
 });
 
-test('normalización sólo publica campos de conversación y acepta Timestamp de servidor', () => {
+test('normalización solo publica campos de conversación y acepta Timestamp de servidor', () => {
   assert.deepEqual(normalizeConversation({ ...conversation, createdAt: Timestamp.fromDate(new Date(at)), secret: 'email@private.test', lastText: 'privado' }, 'alice:bob'), conversation);
   for (const overrides of [{ id: 'bob:alice' }, { participantIds: ['alice', 'carol'] }, { participantIds: ['bob', 'alice'] }, { participantIds: ['alice', 'bob', 'carol'] }, { createdAt: '2026-02-30T12:00:00.000Z' }]) assert.equal(normalizeConversation({ ...conversation, ...overrides }, 'alice:bob'), null);
 });
@@ -54,7 +54,7 @@ test('errores de permisos nunca revelan mensajes, emails o información de terce
   assert.match(safeMessagingError(new MessagingError('offline')), /Internet/);
 });
 
-test('marcadores privados normalizan sólo la cuenta propia y desempatan mensajes del mismo instante', async () => {
+test('marcadores privados normalizan solo la cuenta propia y desempatan mensajes del mismo instante', async () => {
   const { normalizeMessageRead, messageIsAfterRead } = await import('../src/community/messagingLogic.ts');
   const data = { userId: 'alice', conversationId: 'alice:bob', lastReadAt: Timestamp.fromDate(new Date(at)), lastReadMessageId: id, updatedAt: at, secret: 'omitido' };
   const read = normalizeMessageRead(data, 'alice')!;

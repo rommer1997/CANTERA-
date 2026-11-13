@@ -32,7 +32,7 @@ function qrPixels(value: string, scale = 8) {
   return { data, width, height: width };
 }
 
-test('lector acepta códigos legibles y sólo enlaces exactos de Cantera o su origen actual', () => {
+test('lector acepta códigos legibles y solo enlaces exactos de Cantera o su origen actual', () => {
   assert.equal(parseInvitationQr(code), code);
   assert.equal(parseInvitationQr('dme2 m8z4 pfa6 gf89'), code);
   assert.equal(parseInvitationQr('DME2-M8Z4-PFA6-GF89'), code);
@@ -85,7 +85,7 @@ test('rechaza rutas, consultas, controles, escapes y código incrustado en conte
   assert.equal(parseInvitationQr(null as unknown as string), null);
 });
 
-test('decodifica un QR real de qrcode.react y entrega sólo código tras validar el payload', () => {
+test('decodifica un QR real de qrcode.react y entrega solo código tras validar el payload', () => {
   for (const payload of [code, link]) {
     const image = qrPixels(payload);
     const decoded = decodeInvitationQrImage(image.data, image.width, image.height);

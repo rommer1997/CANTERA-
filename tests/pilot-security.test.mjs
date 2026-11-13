@@ -5,7 +5,7 @@ import { assertFails, assertSucceeds, initializeTestEnvironment } from '@firebas
 import { arrayUnion, collection, deleteDoc, doc, FieldPath, getDoc, getDocs, limit, orderBy, query, runTransaction, serverTimestamp, setDoc, where, writeBatch } from 'firebase/firestore';
 
 const projectId = `${process.env.GCLOUD_PROJECT || 'demo-cantera'}-pilot`;
-if (!projectId.startsWith('demo-') || !process.env.FIRESTORE_EMULATOR_HOST) throw new Error('Ejecuta sólo dentro de Firebase Emulator Suite con un proyecto demo-.');
+if (!projectId.startsWith('demo-') || !process.env.FIRESTORE_EMULATOR_HOST) throw new Error('Ejecuta solo dentro de Firebase Emulator Suite con un proyecto demo-.');
 const at = () => serverTimestamp();
 const terms = '2026-10-08';
 const runtime = (overrides = {}) => ({ serviceStatus: 'pilot', mediaUploadsEnabled: false, contactEmail: '', updatedAt: at(), pilotUserIds: ['alice', 'bob'], ...overrides });
@@ -55,7 +55,7 @@ test('piloto administrativo valida de uno a cinco UIDs únicos sin correos y con
   }
 });
 
-test('runtime público sólo expone la lista mínima; leer y participar requiere UID inscrito, Google y correo verificado', async () => {
+test('runtime público solo expone la lista mínima; leer y participar requiere UID inscrito, Google y correo verificado', async () => {
   const actual = (await assertSucceeds(getDoc(doc(client(), 'communityConfiguration/runtime')))).data();
   assert.deepEqual(actual.pilotUserIds, ['alice', 'bob']); assert.ok(!Object.hasOwn(actual, 'pilotEmails'));
   for (const uid of ['alice', 'bob']) {

@@ -42,14 +42,14 @@ test('inicio en carga no presenta registro ni agenda vacía antes de resolver la
   assert.match(home({ profile:null }).text,/La vida/);
 });
 
-test('inicio no muestra encuentros privados ajenos ni publicaciones ocultas o bloqueadas',()=>{
+test('inicio no muestra partidos privados ajenos ni publicaciones ocultas o bloqueadas',()=>{
   const event = { id:'private', ownerId:'bob', visibility:'private', title:'SECRETO AJENO', startAt:'2026-10-30T18:00:00Z', status:'open', timeZone:'Europe/Madrid' };
   const view = home({ ownEvents:[event], events:[event], hiddenPostIds:['hidden'], blockedIds:['bob'], posts:[{ id:'blocked',authorId:'bob',text:'SECRETO BLOQUEADO' },{ id:'hidden',authorId:'alice',text:'SECRETO OCULTO' }] });
   assert.doesNotMatch(view.text,/SECRETO/);
   assert.match(view.text,/El próximo plan lo haces tú/);
 });
 
-test('inicio conserva la cita privada propia y usa el enlace real del encuentro',()=>{
+test('inicio conserva la cita privada propia y usa el enlace real del partido',()=>{
   const event = { id:'own-event',ownerId:'alice',visibility:'private',title:'Cita propia',startAt:'2026-10-30T18:00:00Z',status:'open',timeZone:'Europe/Madrid',city:'Madrid',country:'España',format:'7' };
   const view = home({ ownEvents:[event] });
   assert.match(view.text,/Cita propia/);
@@ -61,6 +61,6 @@ test('cuenta incompleta y error tienen recuperación sin fingir agenda vacía o 
   assert.match(incomplete.text,/Completar mi cuenta/);
   assert.ok(incomplete.nodes.some(node=>node.type==='Link' && node.props.to==='/profile'));
   const failed = home({ error:'offline' });
-  assert.match(failed.text,/No hemos podido actualizar los encuentros/);
+  assert.match(failed.text,/No hemos podido actualizar los partidos/);
   assert.doesNotMatch(failed.text,/Tu agenda está libre/);
 });

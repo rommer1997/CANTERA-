@@ -36,7 +36,7 @@ test('rechaza mensajes de otra ruta, participantes ajenos, IDs malformados y reg
   assert.equal(result.counts.communityMessages, 1);
 });
 
-test('el titular superviviente exporta sólo su texto archivado sin ruta ni identidad de la cuenta retirada', () => {
+test('el titular superviviente exporta solo su texto archivado sin ruta ni identidad de la cuenta retirada', () => {
   const archive = `archive_${'1'.repeat(32)}`;
   const result = exportMessages([message('own', archive), message('other', archive, 'another'), message('bad', 'archive_invalid')]);
   assert.equal(result.counts.communityMessages, 1);

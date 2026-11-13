@@ -62,7 +62,7 @@ test('una respuesta multimedia de la cuenta anterior no se publica tras cambiar 
   cache.dispose();
 });
 
-test('recargar datos mientras un archivo está pendiente publica sólo la versión actual', async () => {
+test('recargar datos mientras un archivo está pendiente publica solo la versión actual', async () => {
   const delayed = deferred<Blob | null>(); let reads = 0; let revision = 1;
   const cache = createLocalMediaCache(() => { reads++; return delayed.promise; }, () => 'blob:shared', () => {});
   const updates: string[] = [];

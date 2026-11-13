@@ -15,7 +15,7 @@ test('eventos históricos reciben una portada genérica sin migración ni URL de
   assert.equal(eventCover({ ...event, coverId: 'night' }).image, '/images/design-2026-10/event-night.webp');
 });
 
-test('portadas sólo admiten los tres identificadores estáticos y conservan privacidad al editar o repetir', () => {
+test('portadas solo admiten los tres identificadores estáticos y conservan privacidad al editar o repetir', () => {
   for (const coverId of ['day', 'night', 'tournament'] as const) {
     const input: EventInput = { ...event, coverId };
     assert.ok(isEventCoverId(coverId));

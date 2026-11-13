@@ -85,7 +85,7 @@ function harness(initial: Record<string, Record<string, any>> = {}, identity: an
     race: (hook: () => void) => { beforeCommit = hook; } };
 }
 
-test('plan determinista privado: sólo UID/rutas/huellas; identifica bloqueos sin modificar la cuenta', () => {
+test('plan determinista privado: solo UID/rutas/huellas; identifica bloqueos sin modificar la cuenta', () => {
   const h = harness({ [`communityProfiles/${uid}`]: { id: uid, name: 'SECRET_NAME' }, 'communityPosts/own': { authorId: uid, text: 'SECRET_POST', mediaUrl: '' } });
   const plan = buildErasurePlan(h.source());
   assert.deepEqual(buildErasurePlan(h.source()), plan);
@@ -128,7 +128,7 @@ test('congela y revoca primero, espera tokens, retira pares atómicamente y elim
     [`communityConnections/${uid}/members/${peer}`]: { ownerId: uid, peerId: peer, inviteId: incoming },
     [`communityConnections/${peer}/members/${uid}`]: { ownerId: peer, peerId: uid, inviteId: incoming },
     [`communityEventAdmissions/old/members/${uid}`]: { eventId: 'old', userId: uid, inviteId: incoming },
-    'communityConversations/orphan/messages/own': { senderId: uid, text: 'Sólo propio' }, 'communityConversations/orphan/messages/other': { senderId: peer, text: 'Ajeno' },
+    'communityConversations/orphan/messages/own': { senderId: uid, text: 'Solo propio' }, 'communityConversations/orphan/messages/other': { senderId: peer, text: 'Ajeno' },
     [`users/${uid}`]: { uid }, [`users/${uid}/likes/legacy`]: { timestamp: '2025-01-01' },
   });
   const plan = buildErasurePlan(h.source()); assert.deepEqual(plan.blockers, []);
@@ -334,7 +334,7 @@ test('CLI exige plan/huella/diario y conserva archivos privados sin enlaces ni s
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
-const actualEvent = (id: string, overrides: Record<string, unknown> = {}) => ({ id, ownerId: peer, ownerName: 'Organización superviviente', title: 'Encuentro privado de prueba', type: 'tournament', format: '7', level: 'amateur', city: 'Madrid', country: 'España', timeZone: 'Europe/Madrid', venue: 'Campo de prueba', startAt: '2026-10-07T10:00:00Z', startAtMs: Date.parse('2026-10-07T10:00:00Z'), capacity: 4, entry: 'players', description: 'Descripción del organizador', status: 'completed', tournamentFormat: 'league', participants: { [uid]: 'NOMBRE_SOLICITANTE', [peer]: 'Participante superviviente' }, participantIds: [uid, peer], fixtures: [], fixtureIds: ['game'], rsvps: { [uid]: 'yes', [peer]: 'yes' }, waitlist: {}, waitlistOrder: [], createdAt: '2026-10-06T10:00:00Z', ...overrides });
+const actualEvent = (id: string, overrides: Record<string, unknown> = {}) => ({ id, ownerId: peer, ownerName: 'Organización superviviente', title: 'Partido privado de prueba', type: 'tournament', format: '7', level: 'amateur', city: 'Madrid', country: 'España', timeZone: 'Europe/Madrid', venue: 'Campo de prueba', startAt: '2026-10-07T10:00:00Z', startAtMs: Date.parse('2026-10-07T10:00:00Z'), capacity: 4, entry: 'players', description: 'Descripción del organizador', status: 'completed', tournamentFormat: 'league', participants: { [uid]: 'NOMBRE_SOLICITANTE', [peer]: 'Participante superviviente' }, participantIds: [uid, peer], fixtures: [], fixtureIds: ['game'], rsvps: { [uid]: 'yes', [peer]: 'yes' }, waitlist: {}, waitlistOrder: [], createdAt: '2026-10-06T10:00:00Z', ...overrides });
 
 test('portadas genéricas válidas no bloquean la baja y se conservan al anonimizar la organización y sus cruces', async () => {
   assert.equal(knownSharedSchema('communityEvents', actualEvent('legacy')), true);

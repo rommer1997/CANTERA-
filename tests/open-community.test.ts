@@ -102,7 +102,7 @@ test('dry-run verifica destinos, reglas e índices READY, Google y admin sin esc
   assert.deepEqual(h.identities, [{ email: cli.OWNER_EMAIL, uid: undefined }, { email: undefined, uid: 'owner-uid' }]);
   const serialized = JSON.stringify(result); for (const secret of ['SECRET', cli.OWNER_EMAIL, 'owner-uid', 'second-uid', 'test-client']) assert.ok(!serialized.includes(secret));
 });
-test('apply sólo sustituye runtimeopen conCAS, conserva contacto exacto y retira pilotUserIds', async () => {
+test('apply solo sustituye runtimeopen conCAS, conserva contacto exacto y retira pilotUserIds', async () => {
   const h = harness(); const result = await h.run({ apply: true });
   assert.equal(h.commits, 1); assert.equal(result.verified, true); assert.equal(result.action, 'applied');
   assert.deepEqual(Object.keys(h.document.fields).sort(), ['contactEmail', 'mediaUploadsEnabled', 'serviceStatus', 'updatedAt']);
@@ -116,7 +116,7 @@ test('pausa se puede abrir; estadoausente/setup/campos desconocidos/medios activ
   }
   const forbidden = harness({ runtimeStatus: 403 }); await assert.rejects(() => forbidden.run({ apply: true }), /runtime-read-required/); assert.equal(forbidden.commits, 0);
 });
-test('open existente devuelve unchanged sólo después de revisar backend/admin/acta', async () => {
+test('open existente devuelve unchanged solo después de revisar backend/admin/acta', async () => {
   const h = harness({ document: runtime('open') }); const result = await h.run({ apply: true });
   assert.equal(h.commits, 0); assert.equal(result.action, 'unchanged'); assert.equal(result.verified, true); assert.equal(h.identities.length, 2);
   const invalid = harness({ document: runtime('open', { pilotUserIds: { arrayValue: { values: [] } } }) }); await assert.rejects(() => invalid.run());
@@ -170,7 +170,7 @@ test('CLI inválido no imprime secretos ni inicia cloud', () => {
   assert.equal(result.status, 1); assert.equal(result.stdout, ''); assert.ok(!result.stderr.includes('SECRET'));
 });
 
-test('nombre Google numérico sólo se admite tras GET directo que prueba el proyecto exacto', async () => {
+test('nombre Google numérico solo se admite tras GET directo que prueba el proyecto exacto', async () => {
   const h = harness({ google: { name: 'projects/123456789012/defaultSupportedIdpConfigs/google.com' } });
   assert.equal((await h.run()).checks.googleEnabled, true); assert.equal(h.commits, 0);
   for (const projectMetadata of [{ projectId: 'other' }, { projectNumber: '111' }, { projectNumber: 123456789012 }, { projectNumber: 'bad' }]) {
@@ -194,7 +194,7 @@ test('paginación Enterprise conserva pageSize cero, filtro y token sin segundo 
   assert.equal(requests.length, 2); assert.equal(requests[1].queryParams.pageToken, 'second-page');
 });
 
-test('identidad del responsable usa sólo GET con proyección mínima y coincidencia exacta en todas las páginas', async () => {
+test('identidad del responsable usa solo GET con proyección mínima y coincidencia exacta en todas las páginas', async () => {
   const requests: any[] = [];
   const account = { ...owner(), localId: 'owner-uid', passwordHash: 'SECRET_HASH', displayName: 'UNRELATED_NAME' };
   const api = { async request(request: any) {

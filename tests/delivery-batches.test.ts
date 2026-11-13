@@ -13,7 +13,7 @@ test('lotes de avisos conservan orden y no superan el presupuesto de 20 accesos 
   assert.deepEqual(deliveryBatches([1, 2, 3, 4, 5]), [[1, 2, 3, 4], [5]]);
 });
 
-test('fallo parcial conserva recibos previos y el reintento entrega sólo los pendientes', async () => {
+test('fallo parcial conserva recibos previos y el reintento entrega solo los pendientes', async () => {
   const candidates = Array.from({ length: 11 }, (_, index) => `notice-${index}`);
   const receipts = new Set<string>();
   let commits = 0;

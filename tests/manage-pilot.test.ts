@@ -67,7 +67,7 @@ test('dry-run revisa Google, correo y UID del dueño sin modificar nube ni revel
   const serialized = JSON.stringify(result); assert.ok(!serialized.includes('SECRET')); assert.ok(!serialized.includes(owner)); assert.ok(!serialized.includes(cli.OWNER_EMAIL));
 });
 
-test('alta ausente usa exists:false, timestamp servidor y sólo el documento runtime autorizado', async () => {
+test('alta ausente usa exists:false, timestamp servidor y solo el documento runtime autorizado', async () => {
   const h = harness(); const result = await h.run({ apply: true });
   assert.equal(h.commits, 1); assert.equal(result.action, 'applied'); assert.equal(result.verified, true);
   const write = h.requests[1].body.writes[0]; assert.deepEqual(write.currentDocument, { exists: false });
