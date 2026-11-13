@@ -103,3 +103,9 @@
 .c-app.c-studio .lc-purpose p { color:#fff; opacity:1; }
 .c-app.c-studio :is(.c-footer,.c-mobile-info,.c-auth-content) { overflow-wrap:anywhere; }
 .c-app.c-studio .c-legal-index a { min-height:44px; display:inline-flex; align-items:center; }
+
+/* F2: etiquetas por encima de los ejemplos de entrada. */
+.c-app.c-studio :is(form label,.ce-field,.c-profile-fields>label,.team-form label,.people-search label,.people-type-label) { font-size:14px; font-weight:600; color:var(--c-ink); }
+.c-app.c-studio :is(input,textarea,select) { font-size:14px; }
+.c-app.c-studio :is(input,textarea)::placeholder { color:#63746b; opacity:1; font-size:14px; font-weight:400; }
+.c-app.c-studio :is(input,textarea,select):disabled { opacity:1; }
