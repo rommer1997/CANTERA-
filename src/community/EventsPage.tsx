@@ -144,8 +144,9 @@ function CreateEvent({ onClose, initialType, initialTeam = '', current }: { onCl
         await updateEvent(current.id, validateEventEdit(current, input, changeReason), changeReason.trim());
         onClose(); return;
       }
-      const id = repeating ? (await createEventSeries(expandEventSeries(input, frequency, Number(repeatCount))))[0] : await createEvent(input);
-      if (mode === 'cloud') trackAnalytics('MatchCreated');
+      const ids = repeating ? await createEventSeries(expandEventSeries(input, frequency, Number(repeatCount))) : [await createEvent(input)];
+      const id = ids[0];
+      if (mode === 'cloud') for (const _id of ids) trackAnalytics('MatchCreated');
       onClose();
       navigate(`/play/${id}`);
     } catch (error) { setError(errorMessage(error)); } finally { setSaving(false); }
