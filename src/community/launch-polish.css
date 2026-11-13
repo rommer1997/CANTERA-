@@ -86,3 +86,12 @@
  .c-app.c-studio .c-auth-switch { text-align:center; font-size:14px; }
  .c-app.c-studio .c-auth-switch a { font-weight:750; }
 }
+
+/* E4: mismo marco público; el vestuario lateral se reserva a cuentas con sesión. */
+.c-app.c-studio.lc-public-shell { padding-left:0; }
+.lc-public-shell .lc-sidebar,.lc-public-shell .lc-top-context { display:none; }
+@media(min-width:1100px) {
+ .c-app.c-studio.lc-public-shell .c-header { max-width:1380px; margin-inline:auto; position:relative; }
+ .c-app.c-studio.lc-public-shell .c-header>.c-brand { display:flex; }
+ .c-app.c-studio.lc-public-shell .c-nav { display:flex; }
+}
