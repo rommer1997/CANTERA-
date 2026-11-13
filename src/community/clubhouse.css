@@ -3,6 +3,8 @@
 .c-studio .lc-kicker { display:block; font-size:var(--c-type-caption); font-weight:800; letter-spacing:.12em; line-height:1.5; color:var(--c-green); }
 .c-app.c-studio :is(.c-button,.people-button) { min-height:48px; border-radius:var(--c-radius-md); padding:12px 20px; font-size:var(--c-type-small); font-weight:750; background:var(--c-green); color:var(--c-on-brand); border:1px solid transparent; box-shadow:none; gap:var(--c-space-sm); transition:transform var(--c-motion-fast) var(--c-ease-out),background var(--c-motion-fast) var(--c-ease-out); }
 .c-app.c-studio :is(.c-button.secondary,.people-button-secondary) { background:var(--c-paper); color:var(--c-green); border-color:var(--c-line); }
+.c-app.c-studio .c-auth-content .c-google-login { background:#fff; color:#1f1f1f; border:1px solid #747775; }
+.c-app.c-studio .c-auth-content .c-google-login:hover { background:#f8faf9; border-color:#4f6259; }
 .c-app.c-studio :is(.c-button,.people-button):active:not(:disabled) { transform:scale(.98); }
 .c-app.c-studio :is(button,a):focus-visible { outline:3px solid var(--c-green); outline-offset:4px; }
 .c-app.c-studio :is(input,textarea,select) { accent-color:var(--c-green); }
