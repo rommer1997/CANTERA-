@@ -18,14 +18,14 @@
 .c-nav a.active { background: var(--c-soft); color: var(--c-green); }
 .c-header-tools { gap: 6px; }
 .c-header-login { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 9px 16px; border: 1px solid var(--c-line); border-radius: 8px; font-size: 12px; font-weight: 750; }
-.c-header-join { font-size: 12px !important; min-height: 44px; border-radius: 8px; padding: 9px 16px; }
+.c-header-join { font-size: 12px; min-height: 44px; border-radius: 8px; padding: 9px 16px; }
 .c-header .c-account { padding: 0 4px; }
 .c-header .c-mobile-account-icon { display: none; }
 .c-avatar { background: var(--c-green); border: 3px solid #e2f1e8; width: 36px; height: 36px; }
 .c-main { max-width: 1240px; padding: 0 30px; }
 .c-button { border-radius: 8px; box-shadow: 0 2px 5px #005e3e0b; }
 .c-button.secondary { border-color: var(--c-line); box-shadow: none; }
-.c-app .c-button { min-height: 44px; padding: 10px 16px; gap: 8px; font-size: 13px !important; font-weight: 650; line-height: 1.4; white-space: normal; }
+.c-app .c-button { min-height: 44px; padding: 10px 16px; gap: 8px; font-size: 13px; font-weight: 650; line-height: 1.4; white-space: normal; }
 .c-app .c-button > svg { flex-shrink: 0; width: 17px; height: 17px; }
 .c-input { border-color: var(--c-line); border-radius: 8px; }
 .c-panel, .c-empty, .c-upcoming-card, .c-pillar { border-radius: 12px; }

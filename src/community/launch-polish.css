@@ -117,3 +117,22 @@
 
 /* E2/E3: anula el margen heredado de la hoja de autenticación anterior. */
 .c-app.c-studio .c-auth-content .c-auth-switch { margin:0!important; }
+
+
+/* El visitante navega por la web; la barra inferior pertenece al espacio con sesión. */
+@media(max-width:767px) {
+ .c-app.c-studio.lc-public-shell { padding-bottom:calc(20px + env(safe-area-inset-bottom,0px)); }
+ .c-app.c-studio.lc-public-shell>.c-main { margin-bottom:0; }
+ .c-app.c-studio.lc-public-shell .c-header { display:grid; grid-template-columns:minmax(0,1fr) auto; grid-template-areas:"brand tools" "nav nav"; height:auto; gap:0 12px; padding-top:env(safe-area-inset-top,0px); }
+ .c-app.c-studio.lc-public-shell .c-header>.c-brand { display:flex; grid-area:brand; min-height:68px; }
+ .c-app.c-studio.lc-public-shell #lc-mobile-place { display:none; }
+ .c-app.c-studio.lc-public-shell .c-header-tools { grid-area:tools; margin:0; gap:0; }
+ .c-app.c-studio.lc-public-shell .c-header-tools>:is(.c-discover-link,.c-header-join,.c-mobile-account-icon) { display:none; }
+ .c-app.c-studio.lc-public-shell .c-header-login { display:inline-flex; min-height:44px; padding:10px 14px; border:1px solid var(--c-control-border); border-radius:var(--c-control-radius); background:var(--c-paper); color:var(--c-ink); font-size:13px; font-weight:650; }
+ .c-app.c-studio.lc-public-shell .c-header-login>.c-desktop-only { display:none; }
+ .c-app.c-studio.lc-public-shell .c-header-login>.c-mobile-only { display:inline; }
+ .c-app.c-studio.lc-public-shell .c-nav { grid-area:nav; display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); position:static; width:100%; height:44px; gap:4px; padding:0; margin:0; }
+ .c-app.c-studio.lc-public-shell .c-nav>a { display:flex; justify-content:center; align-items:center; position:relative; min-width:0; min-height:44px; padding:0 2px; border:0; border-radius:0; background:none; color:var(--c-muted); font-size:13px; font-weight:550; letter-spacing:-.01em; }
+ .c-app.c-studio.lc-public-shell .c-nav>a.active { color:var(--c-control-brand); font-weight:750; }
+ .c-app.c-studio.lc-public-shell .c-nav>a.active::after { content:''; position:absolute; inset:auto 12px 0; height:2px; border-radius:2px; background:var(--c-control-brand); }
+}

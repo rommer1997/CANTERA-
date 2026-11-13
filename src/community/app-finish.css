@@ -11,6 +11,11 @@
   --c-accent:#d6f65c;
   --c-on-accent:#0c2d20;
   --c-on-brand:#ffffff;
+  --c-control-brand:#07543e;
+  --c-control-hover:#043f2e;
+  --c-control-border:#cad7cf;
+  --c-control-radius:10px;
+  --c-control-shadow:inset 0 1px 0 #ffffff14,0 1px 2px #092b1f12;
   --c-space-xs:4px; --c-space-sm:8px; --c-space-md:12px; --c-space-lg:16px;
   --c-space-xl:24px; --c-space-2xl:32px; --c-space-3xl:48px; --c-space-4xl:64px;
   --c-radius-sm:8px; --c-radius-md:12px; --c-radius-lg:20px; --c-radius-xl:28px;

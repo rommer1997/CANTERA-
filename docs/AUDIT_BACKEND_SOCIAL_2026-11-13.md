@@ -298,3 +298,11 @@ Se sustituyen las tres imágenes pendientes por capturas del servicio publicado,
 La captura de invitaciones excluye la cabecera de cuenta, el contador de conexiones y cualquier contacto. No se generó ningún QR, enlace ni código utilizable. No se publicaron partidos, equipos, mensajes ni perfiles para preparar estas imágenes. Los textos distinguen la conexión entre personas del acceso por invitación a partidos privados. La sección no representa actividad existente ni una convocatoria confirmada.
 
 Las imágenes conservan sus proporciones, dimensiones explícitas, texto alternativo, carga diferida y un máximo de 390 px para evitar ampliaciones. La revisión visual cubre móvil de 375/390 px, tablet de 768 px y escritorio de 1366 px. Las evidencias locales se guardan en `.audit/how-real-2026-11-13/` (no se publican). El alcance es exclusivamente frontend y Firebase Hosting.
+
+## Navegación pública y botones compartidos
+
+La navegación inferior se renderiza únicamente cuando existe el perfil de una cuenta conectada. Durante la comprobación inicial y en las rutas públicas, no está en el árbol de la interfaz. En móvil, la cabecera pública conserva Inicio, Juega, Comunidad, Equipos y Entrar; se elimina el espacio inferior que se reservaba a la barra. La selección de ciudad y país sigue accesible desde los filtros de Juega. La navegación y el botón Crear de las cuentas conectadas mantienen sus rutas y acciones.
+
+Los controles comparten ahora tokens de color, borde, radio y relieve: acción principal en verde profundo, secundaria clara, tipografía de 14 px sin los antiguos bloqueos globales a 13 px, estados de foco/pulsación/desactivado y áreas táctiles conservadas. Los botones sobre tarjetas verdes usan fondo claro para mantener el contraste. Se conserva la identidad blanca del acceso con Google y la preferencia de movimiento reducido. El botón de organización muestra un calendario; los enlaces interiores no incorporan una flecha de salida innecesaria en el registro.
+
+La regresión del componente completo comprueba visitantes en seis rutas, sesión en comprobación y cuenta conectada: ocho casos sin acceder a Firebase ni crear cuentas. Las capturas y mediciones de revisión se conservan en `.audit/controls-2026-11-13/`. El alcance es frontend; no cambia permisos, reglas, datos, autenticación ni servicios de notificaciones.

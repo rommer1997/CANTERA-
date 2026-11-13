@@ -31,7 +31,7 @@
 .c-avatar { background: var(--c-ink); color: #fff; font-weight: 750; }
 .c-account { min-height: 44px; }
 .c-account-label { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.c-button { min-height: 44px; border-radius: 10px; font-size: 13px !important; font-weight: 700; background: var(--c-green); border-color: var(--c-green); padding: 11px 18px; transition: background .16s, border-color .16s, box-shadow .16s; }
+.c-button { min-height: 44px; border-radius: 10px; font-size: 13px; font-weight: 700; background: var(--c-green); border-color: var(--c-green); padding: 11px 18px; transition: background .16s, border-color .16s, box-shadow .16s; }
 .c-button:hover { background: var(--c-accent-hover); border-color: var(--c-accent-hover); }
 .c-button.secondary { border-color: #d4d4d9; background: #fff; }
 .c-button.secondary:hover { background: var(--c-surface); border-color: #b8b8c0; }

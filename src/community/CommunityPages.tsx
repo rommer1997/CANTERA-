@@ -76,8 +76,8 @@ export function CommunityLayout() {
         {isAdmin ? <Link to="/admin" className="c-discover-link c-admin-link" aria-label="Administración"><ShieldCheck size={20} aria-hidden="true" /></Link> : null}
         <Link to="/messages" className={`c-discover-link c-mobile-messages${pathname.startsWith('/messages') ? ' is-current' : ''}`} aria-label={`Mensajes${messaging.unreadCount ? `, ${messaging.unreadCount} ${messaging.unreadCount === 1 ? 'conversación pendiente' : 'conversaciones pendientes'}` : ''}`}><MessageCircle size={20} aria-hidden="true" />{messaging.unreadCount > 0 && <span className="c-message-badge" aria-hidden="true">{messaging.unreadCount > 9 ? '9+' : messaging.unreadCount}</span>}</Link><Link to="/profile" className="c-account" aria-label={`Tu perfil: ${profile.name}`}><span className="c-avatar">{profileInitials(profile.name)}</span></Link>
       </> : <>
-        <Link to="/profile?intent=login" className="c-header-login">Iniciar sesión</Link>
-        <Link to="/profile" className="c-button c-header-join" data-analytics-event="JoinClick">Únete gratis <ArrowUpRight size={16} aria-hidden="true" /></Link>
+        <Link to="/profile?intent=login" className="c-header-login" aria-label="Iniciar sesión"><span className="c-desktop-only">Iniciar sesión</span><span className="c-mobile-only">Entrar</span></Link>
+        <Link to="/profile" className="c-button c-header-join" data-analytics-event="JoinClick">Únete gratis</Link>
         <Link to="/profile" className="c-mobile-account-icon c-discover-link" aria-label="Entrar a LaCantera"><UserRound size={21} aria-hidden="true" /></Link>
       </>}
     </div>
@@ -87,13 +87,13 @@ export function CommunityLayout() {
     <main id="lc-main" ref={mainRef} className="c-main" tabIndex={-1}><Suspense fallback={<div className="c-app-loading" role="status">Cargando…</div>}><Outlet /></Suspense></main><footer className="c-footer"><div><Link className="c-brand" to="/" aria-label="LaCantera, inicio"><BrandMark className="c-brand-mark" />LaCantera</Link><p>Del barrio al mundo</p><p className="c-brand-credit">© {new Date().getFullYear()} LaCantera · Un proyecto de Rommer Volcanes</p></div>
       <nav aria-label="Información"><Link to="/about">Misión y patrocinio</Link><Link to="/legal/terms">Términos</Link><Link to="/legal/privacy">Privacidad</Link><Link to="/legal/cookies">Cookies y almacenamiento</Link><button type="button" className="ce-text-button" onClick={() => window.dispatchEvent(new Event('cantera-open-install-guide'))}>Instalar LaCantera</button></nav><div><span>Acceso gratuito · sin seguimiento publicitario</span><PublicFooterLinks /></div></footer>
     <details className="c-mobile-info"><summary>Sobre LaCantera y privacidad</summary><nav aria-label="Información de LaCantera"><Link to="/connect">Conexiones e invitaciones</Link><Link to="/messages">Mensajes privados</Link><Link to="/people">Personas y clubes</Link><Link to="/teams">Equipos y grupos</Link><Link to="/activity">Avisos</Link><Link to="/about">Misión y patrocinio</Link><Link to="/legal/terms">Términos de uso</Link><Link to="/legal/privacy">Privacidad</Link><Link to="/legal/cookies">Cookies y almacenamiento</Link><button type="button" className="ce-text-button" onClick={() => window.dispatchEvent(new Event('cantera-open-install-guide'))}>Instalar LaCantera</button>{isAdmin ? <Link to="/admin">Administración</Link> : null}</nav><PublicFooterLinks /><p className="c-brand-credit">© {new Date().getFullYear()} LaCantera · Un proyecto de Rommer Volcanes</p></details>
-    <nav className="c-bottom-nav" aria-label="Navegación móvil">
+    {profile && <nav className="c-bottom-nav" aria-label="Navegación móvil">
       <NavLink to="/" end><House size={22} aria-hidden="true" /><span>Inicio</span></NavLink>
       <NavLink to="/play"><CalendarDays size={22} aria-hidden="true" /><span>Juega</span></NavLink>
-      {profile ? <button className="c-bottom-create" aria-label="Crear" aria-haspopup="dialog" aria-expanded={createOpen} onClick={() => setCreateOpen(true)}><span className="c-create-icon"><Plus size={25} aria-hidden="true" /></span><span>Crear</span></button> : <Link className="c-bottom-create" to="/profile?returnTo=%2Fplay%3Fcreate%3D1%26type%3Dmatch" aria-label="Registrarte para crear un partido"><span className="c-create-icon"><Plus size={25} aria-hidden="true" /></span><span>Crear</span></Link>}
+      <button className="c-bottom-create" aria-label="Crear" aria-haspopup="dialog" aria-expanded={createOpen} onClick={() => setCreateOpen(true)}><span className="c-create-icon"><Plus size={25} aria-hidden="true" /></span><span>Crear</span></button>
       <NavLink to="/feed" className={({ isActive }) => isActive || ['/people', '/teams', '/connect', '/invite'].some(route => pathname.startsWith(route)) ? 'active' : ''}><Users size={22} aria-hidden="true" /><span>Comunidad</span></NavLink>
       <NavLink to="/profile"><UserRound size={22} aria-hidden="true" /><span>Perfil</span></NavLink>
-    </nav>
+    </nav>}
     <dialog ref={createDialog} className="c-create-sheet" aria-labelledby="c-create-title" onCancel={() => setCreateOpen(false)} onClose={() => setCreateOpen(false)}>
       <div className="c-sheet-handle" aria-hidden="true" /><header><div><h2 id="c-create-title">Crear</h2><p>¿Qué organizamos?</p></div><button className="c-sheet-close" aria-label="Cerrar opciones de creación" onClick={() => setCreateOpen(false)}><X size={24} /></button></header>
       {!profile ? <p className="c-sheet-note">Entra con tu cuenta para organizar o publicar.</p> : null}
