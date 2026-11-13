@@ -1,8 +1,8 @@
 // Completar únicamente con datos reales del proyecto. Ningún TODO se publica como enlace.
 export const publicSite = {
   socials: {
-    instagram: 'TODO_INSTAGRAM_URL',
-    tiktok: 'TODO_TIKTOK_URL',
+    instagram: 'https://www.instagram.com/lacantera_es/',
+    tiktok: 'https://www.tiktok.com/@lacantera.es',
     x: 'TODO_X_URL',
   },
   screenshots: [
