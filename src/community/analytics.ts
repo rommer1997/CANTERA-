@@ -40,6 +40,11 @@ export function trackAnalytics(name: AnalyticsEvent) { track(name); }
 export function startAnalytics(): () => void {
   if (!analyticsReady(publicSite.analytics)) return () => {};
   const pageview = () => trackAnalytics('pageview');
-  pageview(); window.addEventListener('hashchange', pageview);
-  return () => window.removeEventListener('hashchange', pageview);
+  const click = (event: MouseEvent) => {
+    if (!(event.target instanceof Element)) return;
+    const name = event.target.closest('[data-analytics-event]')?.getAttribute('data-analytics-event');
+    if (name && analyticsEvents.includes(name as AnalyticsEvent)) trackAnalytics(name as AnalyticsEvent);
+  };
+  pageview(); window.addEventListener('hashchange', pageview); document.addEventListener('click', click);
+  return () => { window.removeEventListener('hashchange', pageview); document.removeEventListener('click', click); };
 }

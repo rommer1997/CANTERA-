@@ -1,3 +1,4 @@
+import { trackAnalytics } from './analytics';
 import { useEffect, useId, useRef, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Check, Copy, Link2, MessageCircle, QrCode, Share2, X } from 'lucide-react';
@@ -30,7 +31,7 @@ export function InvitationDialog({ initial, onClose }: { initial: CommunityInvit
     finally { if (mounted.current) setBusy(false); }
   }
   async function copy(value: string, label: string) {
-    try { await navigator.clipboard.writeText(value); if (mounted.current) setMessage(label); }
+    try { await navigator.clipboard.writeText(value); if (mode === 'cloud' && current.kind === 'event') trackAnalytics('MatchShared'); if (mounted.current) setMessage(label); }
     catch { if (mounted.current) setError('No se pudo copiar. Puedes seleccionar el código o compartir el enlace.'); }
   }
   return <dialog ref={dialog} className="ci-dialog" aria-labelledby={titleId} onCancel={onClose} onClick={event => { if (event.target === event.currentTarget) { const box = event.currentTarget.getBoundingClientRect(); if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) onClose(); } }}>
@@ -45,9 +46,9 @@ export function InvitationDialog({ initial, onClose }: { initial: CommunityInvit
     <p className="c-small">La otra persona necesita entrar, verificar su correo y completar su perfil. {current.kind === 'event' ? 'Al aceptar se inscribirá, si queda una plaza.' : 'Al aceptar apareceréis en vuestras conexiones.'}</p>
     {active ? <div className="ci-actions">
       <button className="c-button" disabled={busy} onClick={() => void copy(formatInvitationCode(current.id), 'Código copiado.')}><Copy size={17} />Copiar código</button>
-      <button className="c-button secondary" disabled={busy} onClick={() => void work(async () => { if (navigator.share) { try { await navigator.share({ title: 'Invitación a LaCantera', text, url }); } catch (err) { if ((err as { name?: string }).name !== 'AbortError') throw err; } } else await copy(url, 'Enlace copiado.'); })}><Share2 size={17} />Compartir</button>
-      <a className="c-button secondary" href={`https://wa.me/?text=${encodeURIComponent(text)}`} target="_blank" rel="noopener noreferrer"><MessageCircle size={17} />WhatsApp</a>
-      <a className="c-button secondary" href={`sms:?body=${encodeURIComponent(text)}`}><MessageCircle size={17} />SMS</a>
+      <button className="c-button secondary" disabled={busy} onClick={() => void work(async () => { if (navigator.share) { try { await navigator.share({ title: 'Invitación a LaCantera', text, url }); if (mode === 'cloud' && current.kind === 'event') trackAnalytics('MatchShared'); } catch (err) { if ((err as { name?: string }).name !== 'AbortError') throw err; } } else await copy(url, 'Enlace copiado.'); })}><Share2 size={17} />Compartir</button>
+      <a className="c-button secondary" data-analytics-event={mode === 'cloud' && current.kind === 'event' ? 'MatchShared' : undefined} href={`https://wa.me/?text=${encodeURIComponent(text)}`} target="_blank" rel="noopener noreferrer"><MessageCircle size={17} />WhatsApp</a>
+      <a className="c-button secondary" data-analytics-event={mode === 'cloud' && current.kind === 'event' ? 'MatchShared' : undefined} href={`sms:?body=${encodeURIComponent(text)}`}><MessageCircle size={17} />SMS</a>
       <button className="ci-copy-link" disabled={busy} onClick={() => void copy(url, 'Enlace copiado.')}><Link2 size={16} />Copiar enlace</button>
       <button className="ci-revoke" disabled={busy} onClick={() => void work(async () => { await api.revokeInvitation(current.id); if (mounted.current) setInvitation({ ...current, status: 'revoked' }); })}>{busy ? 'Espera…' : 'Cancelar código'}</button>
     </div> : <button className="c-button ci-new-code" disabled={busy} onClick={() => void work(async () => { const next = await api.createInvitation(current.kind, current.eventId); if (mounted.current) { setInvitation(next); setNow(Date.now()); } })}><QrCode size={18} />{busy ? 'Creando…' : 'Generar otro código'}</button>}

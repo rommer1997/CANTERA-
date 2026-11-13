@@ -73,7 +73,7 @@ export function CommunityLayout() {
         <Link to="/messages" className={`c-discover-link c-mobile-messages${pathname.startsWith('/messages') ? ' is-current' : ''}`} aria-label={`Mensajes${messaging.unreadCount ? `, ${messaging.unreadCount} ${messaging.unreadCount === 1 ? 'conversación pendiente' : 'conversaciones pendientes'}` : ''}`}><MessageCircle size={20} aria-hidden="true" />{messaging.unreadCount > 0 && <span className="c-message-badge" aria-hidden="true">{messaging.unreadCount > 9 ? '9+' : messaging.unreadCount}</span>}</Link><Link to="/profile" className="c-account" aria-label={`Tu perfil: ${profile.name}`}><span className="c-avatar">{profileInitials(profile.name)}</span></Link>
       </> : <>
         <Link to="/profile?intent=login" className="c-header-login">Iniciar sesión</Link>
-        <Link to="/profile" className="c-button c-header-join">Únete gratis <ArrowUpRight size={16} aria-hidden="true" /></Link>
+        <Link to="/profile" className="c-button c-header-join" data-analytics-event="JoinClick">Únete gratis <ArrowUpRight size={16} aria-hidden="true" /></Link>
         <Link to="/profile" className="c-mobile-account-icon c-discover-link" aria-label="Entrar a LaCantera"><UserRound size={21} aria-hidden="true" /></Link>
       </>}
     </div>

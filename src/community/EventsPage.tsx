@@ -1,3 +1,4 @@
+import { trackAnalytics } from './analytics';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
@@ -45,7 +46,7 @@ function initialDate() {
 }
 
 function CreateEvent({ onClose, initialType, initialTeam = '', current }: { onClose: () => void; initialType: EventInput['type']; initialTeam?: string; current?: PlayEvent }) {
-  const { profile, createEvent, createEventSeries, updateEvent } = useCommunity();
+  const { profile, mode, createEvent, createEventSeries, updateEvent } = useCommunity();
   const { managedTeams } = useTeams();
   const navigate = useNavigate();
   const [title, setTitle] = useState(current?.title || '');
@@ -144,6 +145,7 @@ function CreateEvent({ onClose, initialType, initialTeam = '', current }: { onCl
         onClose(); return;
       }
       const id = repeating ? (await createEventSeries(expandEventSeries(input, frequency, Number(repeatCount))))[0] : await createEvent(input);
+      if (mode === 'cloud') trackAnalytics('MatchCreated');
       onClose();
       navigate(`/play/${id}`);
     } catch (error) { setError(errorMessage(error)); } finally { setSaving(false); }
@@ -376,7 +378,7 @@ function EventDetailReady({ event }: { event: PlayEvent }) {
   }
   async function copyInvite() {
     setError(''); setMessage('');
-    try { await navigator.clipboard.writeText(invitationUrl(event.id)); setMessage('Enlace de invitación copiado. Compártelo con tu grupo.'); } catch { setError('No se pudo copiar el enlace. Puedes copiar la dirección de esta página desde el navegador.'); }
+    try { await navigator.clipboard.writeText(invitationUrl(event.id)); if (mode === 'cloud') trackAnalytics('MatchShared'); setMessage('Enlace de invitación copiado. Compártelo con tu grupo.'); } catch { setError('No se pudo copiar el enlace. Puedes copiar la dirección de esta página desde el navegador.'); }
   }
 
   const registrationForm = <form onSubmit={full || waitlistOrder.length ? wait : join} className="ce-join-form"><label htmlFor="ce-join-name">{event.entry === 'teams' ? 'Nombre de tu equipo o grupo' : 'Nombre en la convocatoria'}</label><input aria-label={event.entry === 'teams' ? 'Nombre de tu equipo o grupo' : 'Nombre en la convocatoria'} className="c-input" id="ce-join-name" value={joinName} maxLength={100} minLength={2} required onChange={change => setJoinName(change.target.value)} /><label className="ce-checkbox ce-confirm-join"><input type="checkbox" required checked={joinConfirmed} onChange={change => setJoinConfirmed(change.target.checked)} /><span>He revisado el horario, el lugar y las condiciones, incluidos posibles costes del campo. Mi nombre será visible {privateEvent ? 'para las cuentas de este partido privado' : 'en la convocatoria pública'}.</span></label><button className="c-button" disabled={!!busy} type="submit">{busy === 'join' || busy === 'wait' ? 'Confirmando…' : full || waitlistOrder.length ? 'Añadirme a la espera' : 'Confirmar inscripción'}<ArrowRight size={18} /></button></form>;
