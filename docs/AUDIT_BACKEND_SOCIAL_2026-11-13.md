@@ -120,3 +120,25 @@ No se activaron pagos, servicios de pago, nuevas credenciales administrativas, S
 361 pruebas de dominio/operador pasan y TypeScript compila. En el ensayo final aislado pasan 85 pruebas de seguridad más la integración HTTP de push con Firebase emulado. Las herramientas de Functions pasan 16 pruebas. El Worker añade una prueba de creación de esquema en SQLite, rechazo de referencias/estados inválidos y borrado en cascada. Las auditorías `--prod` no devuelven avisos conocidos al terminar la actualización.
 
 Las trazas agregadas se conservan bajo `.audit/backend-*-2026-11-13.*`: integridad de nube, correspondencia de esquema D1, recuperación, dependencias, preflight y pruebas. No se publican snapshots, tokens, suscripciones ni chats en el repositorio. El despliegue de Hosting y la CI del commit final se registrarán después de pasar; esta sección por sí sola no afirma que ya esté publicado.
+
+## Ajustes de lanzamiento tras la revisión editorial
+
+El responsable confirma que todavía no hay encuentros reales confirmados. No se han creado partidos, equipos, perfiles ni publicaciones de relleno. También confirma que `hola@lacantera.com.es` no existe: se conserva el correo operativo actual.
+
+- Metadatos Open Graph y Twitter disponibles en el HTML inicial, sin depender de JavaScript. Imagen propia `public/og-image.png`, PNG 1200 × 630, con logo y fotografía ya existentes. Fuente editable en `media/og-card/index.html`.
+- Descripción concreta del servicio en portada; marca centrada en «El fútbol nos reúne» y «Del barrio al mundo». Edad mínima de 18 años visible, sin anuncio de una fecha para menores.
+- Sello de la portada enlazado a Juega. Crédito en español y copyright con año actual. Retirado el enlace de descarga del Markdown editable del whitepaper.
+- Cookies explica las finalidades reales sin referencias a pruebas locales ni nombres de APIs del navegador. Se informa de la preferencia de visita e instalación, sin identificador de seguimiento.
+- La recomendación de instalación se muestra con perfil registrado o en una sesión posterior de navegador. Recargar o cambiar de ruta no convierte la primera sesión en segunda. Cerrar el aviso se respeta durante esa sesión; el tutorial sigue accesible manualmente desde la información de la app. No se requiere instalar para utilizar el servicio.
+- Retirado el segundo acceso a publicar del feed anónimo. Etiquetas de búsqueda simplificadas, manteniendo paginación y la indicación «esta vista» donde el resultado no representa todo el directorio.
+- Nivel de juego independiente de la categoría amateur/profesional. Nuevo campo opcional `communityEvents.skillLevel`: `any`, `beginner`, `intermediate`, `advanced`. Los documentos antiguos sin ese campo se presentan como «Todos los niveles»; no se infiere habilidad a partir de su categoría. Sin migración masiva ni índices nuevos. Exportación y reconocimiento del esquema de supresión conservan el campo válido.
+- Reglas validan los cuatro valores y mantienen edición exclusiva del organizador con historial. Un participante no puede añadir ni cambiar ese nivel al inscribirse.
+- `robots.txt` y `sitemap.xml` son archivos reales. El sitemap contiene únicamente la URL canónica de portada: no introduce rutas limpias inexistentes ni URLs privadas. Se mantiene HashRouter y los enlaces actuales.
+
+### Límites que permanecen
+
+El sitemap y Open Graph de portada no resuelven la indexación individual ni generan imágenes propias para cada partido/publicación. Eso requiere una fase de rutas normales y respuestas HTML públicas específicas, con pruebas de privacidad y compatibilidad de enlaces. El acceso por email, el correo con dominio propio, los contenidos reales de lanzamiento y la financiación multimedia siguen pendientes; no se anuncian como implementados.
+
+La existencia y descarga HTTP de metadatos e imagen se comprueba en el despliegue. La presentación final y caché de WhatsApp/Facebook deben comprobarse en sus propios clientes; una respuesta HTTP correcta no acredita por sí sola la vista previa de esas plataformas.
+
+Fuentes técnicas: [Open Graph](https://ogp.me/) y [sitemaps de Google](https://developers.google.com/search/docs/crawling-indexing/sitemaps/build-sitemap).

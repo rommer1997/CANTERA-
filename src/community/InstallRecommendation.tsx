@@ -1,6 +1,6 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { ArrowUpRight, Download, X } from 'lucide-react';
-import { installedDisplayModes, installationDevice, isInstalledExperience, nativeInstallation, type InstallationDevice, type NativeInstallPrompt } from './installation';
+import { dismissInstallation, installationDismissed, installationVisit, installedDisplayModes, installationDevice, isInstalledExperience, nativeInstallation, type InstallationDevice, type NativeInstallPrompt } from './installation';
 import './installation.css';
 import { InstallationTutorial } from './InstallationTutorial';
 
@@ -19,10 +19,14 @@ const helpUrls: Record<InstallationDevice, string> = {
   desktop: 'https://support.google.com/chrome/answer/9658361?co=GENIE.Platform%3DDesktop&hl=es',
 };
 
-export function InstallRecommendation() {
+export function InstallRecommendation({ registered = false }: { registered?: boolean } = {}) {
   const [runningAsApp, setRunningAsApp] = useState(appExperience);
-  // Closing applies to this page load only: the next browser visit recommends it again.
-  const [dismissed, setDismissed] = useState(false);
+  const [dismissed, setDismissed] = useState(() => {
+    try { return installationDismissed(window.sessionStorage); } catch { return false; }
+  });
+  const [returning] = useState(() => {
+    try { return installationVisit(window.localStorage, window.sessionStorage); } catch { return false; }
+  });
   const [installer, setInstaller] = useState<ReturnType<typeof nativeInstallation> | null>(null);
   const [installing, setInstalling] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
@@ -42,7 +46,7 @@ export function InstallRecommendation() {
       setInstaller(nativeInstallation(candidate));
     };
     const installed = () => { setRunningAsApp(true); setInstaller(null); setGuideOpen(false); };
-    const openGuide = () => { setDismissed(false); setGuideOpen(true); };
+    const openGuide = () => { setGuideOpen(true); };
     window.addEventListener('cantera-open-install-guide', openGuide);
     window.addEventListener('beforeinstallprompt', prompt);
     window.addEventListener('appinstalled', installed);
@@ -62,7 +66,10 @@ export function InstallRecommendation() {
     };
   }, []);
 
-  const dismiss = () => { setGuideOpen(false); setDismissed(true); };
+  const dismiss = () => {
+    setGuideOpen(false); setDismissed(true);
+    try { dismissInstallation(window.sessionStorage); } catch { /* Storage may be blocked. */ }
+  };
   const install = async () => {
     if (!installer) { setGuideOpen(true); return; }
     const request = installer;
@@ -77,16 +84,16 @@ export function InstallRecommendation() {
     } finally { if (mounted.current) setInstalling(false); }
   };
 
-  if (runningAsApp || dismissed) return null;
+  if (runningAsApp) return null;
   return <>
-    <aside className="c-install-recommendation" aria-label="Instalar LaCantera">
+    {!dismissed && (registered || returning) && <aside className="c-install-recommendation" aria-label="Instalar LaCantera">
       <div className="c-install-content">
         <img className="c-install-app-icon" src={`${import.meta.env.BASE_URL}cantera-mark.svg`} width="40" height="40" alt="" />
         <div className="c-install-copy"><strong>Instala LaCantera</strong><span>Gratis · en tu pantalla de inicio</span></div>
         <button ref={trigger} type="button" className="c-button secondary c-install-action" onClick={() => void install()} disabled={installing} aria-haspopup={installer ? undefined : 'dialog'}><Download size={16} aria-hidden="true" />{installing ? 'Abriendo…' : installer ? 'Instalar' : device === 'ios' ? 'Ver tutorial' : 'Ver cómo'}</button>
         <button type="button" className="c-install-close" aria-label="Cerrar recomendación de instalación" onClick={dismiss}><X size={18} aria-hidden="true" /></button>
       </div>
-    </aside>
+    </aside>}
     {guideOpen && <InstallationGuide device={device} setDevice={setDevice} close={() => setGuideOpen(false)} dismiss={dismiss} trigger={trigger} error={error} />}
   </>;
 }
@@ -119,7 +126,7 @@ function InstallationGuide({ device, setDevice, close, dismiss, trigger, error }
         <li><strong>Abre el menú de los tres puntos.</strong><span>Busca “Instalar y crear acceso directo” → “Instalar”, o “Añadir a pantalla de inicio”, según tu versión.</span></li>
         <li><strong>Confirma y abre el icono de LaCantera.</strong><span>El navegador te indicará los últimos pasos.</span></li>
       </ol>
-      <p className="c-install-tip">Si sólo ofrece “Crear acceso directo”, también puedes añadirlo. Ese atajo abrirá LaCantera en el navegador.</p>
+      <p className="c-install-tip">Si solo ofrece “Crear acceso directo”, también puedes añadirlo. Ese atajo abrirá LaCantera en el navegador.</p>
     </> : <ol className="c-install-steps">
       <li><strong>Abre LaCantera en Chrome o Edge.</strong><span>Usa un navegador que admita instalar aplicaciones web.</span></li>
       <li><strong>Busca el icono de instalación.</strong><span>Puede estar en la barra de direcciones o en el menú del navegador, como “Instalar LaCantera” o “Instalar esta página como aplicación”.</span></li>

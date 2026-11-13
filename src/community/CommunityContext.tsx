@@ -682,7 +682,7 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
   }
   async function updateRuntimeStatus(status: RuntimeConfig['serviceStatus']) {
     sessionActor(); if (!isAdmin || mode !== 'cloud' || !['setup', 'open', 'paused'].includes(status)) throw new Error('Esta acción requiere la cuenta administradora.');
-    if (status === 'open' && import.meta.env.VITE_SERVICE_OPEN !== 'true') throw new Error('Esta versión sólo permite un piloto privado. La apertura pública requiere su propia revisión.');
+    if (status === 'open' && import.meta.env.VITE_SERVICE_OPEN !== 'true') throw new Error('Esta versión solo permite un piloto privado. La apertura pública requiere su propia revisión.');
     if (status === 'open' && !legalReady) throw new Error('Completa el nombre, país y contacto del responsable antes de abrir el servicio.');
     await setDoc(doc(db, 'communityConfiguration', 'runtime'), { serviceStatus: status, mediaUploadsEnabled: false, contactEmail: operator.email || runtimeConfig.contactEmail, updatedAt: serverTimestamp() });
   }
@@ -972,7 +972,7 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
     return { ...event, waitlist: { ...(event.waitlist || {}), [user.id]: { name: requireText(name, 'Nombre', 100), joinedAt: stamp() } }, waitlistOrder: [...(event.waitlistOrder || []), user.id] };
   }); }
   async function leaveWaitlist(id: string) { await mutateEvent(id, (event, user) => { const waitlist = { ...(event.waitlist || {}) }; delete waitlist[user.id]; return { ...event, waitlist, waitlistOrder: (event.waitlistOrder || []).filter(uid => uid !== user.id) }; }, false, '', true); }
-  async function saveMatchResult(id: string, result: MatchResult) { await mutateEvent(id, event => { if (event.type !== 'match' || event.status === 'cancelled' || Date.parse(event.startAt) > Date.now()) throw new Error('Sólo se pueden registrar resultados de partidos celebrados.'); return { ...event, result: validateMatchResult(result), status: 'completed' }; }, true, 'El organizador ha registrado el resultado del partido.'); }
+  async function saveMatchResult(id: string, result: MatchResult) { await mutateEvent(id, event => { if (event.type !== 'match' || event.status === 'cancelled' || Date.parse(event.startAt) > Date.now()) throw new Error('Solo se pueden registrar resultados de partidos celebrados.'); return { ...event, result: validateMatchResult(result), status: 'completed' }; }, true, 'El organizador ha registrado el resultado del partido.'); }
   async function scheduleFixture(id: string, fixtureId: string, schedule: FixtureSchedule) { await mutateEvent(id, event => { const cleaned = validateFixtureSchedule(schedule); const fixture = event.fixtures.find(f => f.id === fixtureId); if (!fixture || !fixture.awayId || fixture.homeScore !== null || event.status === 'cancelled' || event.status === 'completed') throw new Error('No se puede programar este cruce.'); return { ...event, fixtures: event.fixtures.map(f => f.id === fixtureId ? { ...f, ...cleaned } : f) }; }, true, 'El organizador ha actualizado la fecha, hora o campo de un cruce.'); }
   async function generateFixtures(id: string) { await mutateEvent(id, event => { if (event.type !== 'tournament') throw new Error('Los cruces son para torneos.'); return { ...event, fixtures: makeFixtures(event), status: 'closed' }; }, true, 'El organizador ha publicado los cruces del torneo.'); }
   async function saveScore(id: string, fixture: string, home: number, away: number) { await mutateEvent(id, event => ({ ...event, fixtures: recordScore(event, fixture, home, away) }), true, 'El organizador ha registrado un resultado del torneo.'); }
@@ -994,7 +994,7 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
         const parent = await getDoc(doc(db, 'communityEvents', input.eventId));
         associated = parent.exists() ? normalizeEvent(parent.data(), parent.id) : null;
       }
-      if (!associated || !isPublicEvent(associated)) throw new Error('Las publicaciones son públicas: sólo puedes asociar un encuentro público disponible.');
+      if (!associated || !isPublicEvent(associated)) throw new Error('Las publicaciones son públicas: solo puedes asociar un encuentro público disponible.');
     }
     let mediaUrl = '', mediaPath = '';
     try {

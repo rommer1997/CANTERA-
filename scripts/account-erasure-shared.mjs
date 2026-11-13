@@ -6,7 +6,7 @@ const dataObject = value => !!value && typeof value === 'object' && !Array.isArr
 const keysOnly = (value, keys) => dataObject(value) && Object.keys(value).every(key => keys.includes(key));
 const sameDistinctKeys = (ids, map) => Array.isArray(ids) && ids.every(id => typeof id === 'string')
   && new Set(ids).size === ids.length && ids.length === Object.keys(map).length && ids.every(id => Object.hasOwn(map, id));
-const eventKeys = ['id', 'ownerId', 'ownerName', 'title', 'type', 'format', 'level', 'city', 'country', 'timeZone', 'venue', 'startAt', 'startAtMs', 'capacity', 'entry', 'description', 'status', 'tournamentFormat', 'participants', 'participantIds', 'fixtures', 'fixtureIds', 'createdAt', 'updatedAt', 'revision', 'history', 'rsvps', 'waitlist', 'waitlistOrder', 'result', 'teamId', 'visibility', 'coverId'];
+const eventKeys = ['id', 'ownerId', 'ownerName', 'title', 'type', 'format', 'level', 'city', 'country', 'timeZone', 'venue', 'startAt', 'startAtMs', 'capacity', 'entry', 'description', 'status', 'tournamentFormat', 'participants', 'participantIds', 'fixtures', 'fixtureIds', 'createdAt', 'updatedAt', 'revision', 'history', 'rsvps', 'waitlist', 'waitlistOrder', 'result', 'teamId', 'visibility', 'coverId', 'skillLevel'];
 const fixtureKeys = ['id', 'eventId', 'ownerId', 'round', 'homeId', 'awayId', 'homeScore', 'awayScore', 'kickoffAt', 'timeZone', 'venue', 'createdAt', 'updatedAt'];
 const embeddedFixtureKeys = ['id', 'round', 'homeId', 'awayId', 'homeScore', 'awayScore', 'startAt', 'timeZone', 'venue'];
 const ownKeys = {
@@ -30,6 +30,7 @@ const ownKeys = {
 export const knownOwnedSchema = (collection, data) => Object.hasOwn(ownKeys, collection) ? keysOnly(data, ownKeys[collection]) : knownSharedSchema(collection, data);
 export function knownSharedSchema(collection, data) {
   if (collection === 'communityEvents') return keysOnly(data, eventKeys)
+    && (!Object.hasOwn(data, 'skillLevel') || ['any', 'beginner', 'intermediate', 'advanced'].includes(data.skillLevel))
     && (!Object.hasOwn(data, 'coverId') || ['day', 'night', 'tournament'].includes(data.coverId))
     && dataObject(data.participants) && (!data.rsvps || dataObject(data.rsvps))
     && (!data.waitlist || dataObject(data.waitlist) && Object.values(data.waitlist).every(value => keysOnly(value, ['name', 'joinedAt'])))

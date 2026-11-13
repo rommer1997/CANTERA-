@@ -468,7 +468,7 @@ test('createPost de texto impide enlazar un encuentro privado igual que un logro
     const startAt = new Date(Date.now() + 86_400_000).toISOString();
     const event = { id: 'private', ownerId: 'alpha', ownerName: 'Mi perfil', title: 'Prueba privada', visibility: 'private', type: 'match', format: '7', level: 'amateur', city: 'Madrid', country: 'España', timeZone: 'Europe/Madrid', venue: 'Campo', startAt, capacity: 4, entry: 'players', description: '', status: 'open', tournamentFormat: 'league', participants: {}, fixtures: [], createdAt: time };
     h.existing.set('communityEvents/private', event);
-    await assert.rejects(api.createPost({ kind: 'post', text: 'Texto público', title: '', eventId: 'private' }), /sólo puedes asociar un encuentro público/);
+    await assert.rejects(api.createPost({ kind: 'post', text: 'Texto público', title: '', eventId: 'private' }), /solo puedes asociar un encuentro público/);
     assert.equal(h.writes.some(write => write.path.startsWith('communityPosts/')), false);
   } finally { h.cleanup(); }
 });

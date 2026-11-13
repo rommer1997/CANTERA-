@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { installationDevice, isInstalledExperience, nativeInstallation } from '../src/community/installation.ts';
+import { dismissInstallation, installationDismissed, installationVisit, installationDevice, isInstalledExperience, nativeInstallation } from '../src/community/installation.ts';
 
 const desktopMacUserAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) AppleWebKit/605.1.15 Version/18.0 Safari/605.1.15';
 
@@ -155,4 +155,27 @@ test('un evento posterior del navegador permite instalar sin reutilizar el event
   assert.deepEqual(await next.request(), { outcome: 'accepted' });
   assert.equal(prompts, 2);
   assert.notStrictEqual(first.request(), next.request());
+});
+
+function preferenceStorage() {
+  const values = new Map<string, string>();
+  return { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => { values.set(key, value); } };
+}
+
+test('la primera visita no se convierte en segunda por recargar ni remontar componentes', () => {
+  const local = preferenceStorage(), firstSession = preferenceStorage();
+  assert.equal(installationVisit(local, firstSession), false);
+  assert.equal(installationVisit(local, firstSession), false);
+  assert.equal(installationVisit(local, preferenceStorage()), true);
+});
+
+test('cerrar la recomendación dura la sesión y el almacenamiento bloqueado no rompe la app', () => {
+  const session = preferenceStorage();
+  dismissInstallation(session);
+  assert.equal(installationDismissed(session), true);
+  assert.equal(installationDismissed(preferenceStorage()), false);
+  const blocked = { getItem() { throw new Error('blocked'); }, setItem() { throw new Error('blocked'); } };
+  assert.equal(installationVisit(blocked, session), false);
+  assert.equal(installationDismissed(blocked), false);
+  assert.doesNotThrow(() => dismissInstallation(blocked));
 });

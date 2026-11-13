@@ -2,7 +2,7 @@ import type { MessagingConversation, MessagingErrorCode, MessagingMessage, Messa
 
 export const MESSAGE_MAX_LENGTH = 2000;
 export const MESSAGE_PAGE_SIZE = 40;
-export const MESSAGING_POLICY = 'Sólo entre conexiones actuales, con correo verificado. Al bloquear o retirar la conexión se interrumpe el acceso al historial. Puedes retirar tus propios mensajes; la solicitud de derechos permite exportar o suprimir tus datos. Sin archivos ni notificaciones fuera de la aplicación.';
+export const MESSAGING_POLICY = 'Solo entre conexiones actuales, con correo verificado. Al bloquear o retirar la conexión se interrumpe el acceso al historial. Puedes retirar tus propios mensajes; la solicitud de derechos permite exportar o suprimir tus datos. Sin archivos ni notificaciones fuera de la aplicación.';
 
 export class MessagingError extends Error {
   code: MessagingErrorCode;

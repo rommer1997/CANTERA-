@@ -1,4 +1,5 @@
 export type Level = 'amateur' | 'professional';
+export type SkillLevel = 'any' | 'beginner' | 'intermediate' | 'advanced';
 export type PostKind = 'post' | 'reel' | 'photo' | 'achievement';
 export interface CommunityProfile {
   id: string;
@@ -54,6 +55,7 @@ export interface PlayEvent {
   type: 'match' | 'tournament';
   format: '5' | '7' | '11';
   level: Level;
+  skillLevel?: SkillLevel;
   city: string;
   country: string;
   timeZone: string;

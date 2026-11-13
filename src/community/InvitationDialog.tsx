@@ -35,8 +35,8 @@ export function InvitationDialog({ initial, onClose }: { initial: CommunityInvit
   }
   return <dialog ref={dialog} className="ci-dialog" aria-labelledby={titleId} onCancel={onClose} onClick={event => { if (event.target === event.currentTarget) { const box = event.currentTarget.getBoundingClientRect(); if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) onClose(); } }}>
     <div className="ci-dialog-head"><div><p className="c-eyebrow">INVITA A TU GENTE</p><h2 id={titleId}>{current.kind === 'event' ? 'Acceso al encuentro privado' : 'Código de conexión'}</h2></div><button className="ci-close" aria-label="Cerrar invitación" onClick={onClose}><X size={22} /></button></div>
-    <p>Compártelo sólo con quien quieras invitar. Caduca en diez minutos y sirve para una persona.</p>
-    {mode === 'demo' ? <p className="ci-demo-note">Código de prueba: sólo funciona con las cuentas de este navegador.</p> : null}
+    <p>Compártelo solo con quien quieras invitar. Caduca en diez minutos y sirve para una persona.</p>
+    {mode === 'demo' ? <p className="ci-demo-note">Código de prueba: solo funciona con las cuentas de este navegador.</p> : null}
     <div className={`ci-code-card ${active ? '' : 'inactive'}`}>
       <code className="ci-code">{formatInvitationCode(current.id)}</code>
       {active ? <div className="ci-qr"><QRCodeSVG value={url} size={168} level="M" marginSize={2} title="Escanea para abrir esta invitación en LaCantera" /></div> : <div className="ci-code-ended"><Check size={32} /><span>{current.status === 'used' ? 'Invitación utilizada' : current.status === 'revoked' ? 'Código cancelado' : 'Este código ha caducado'}</span></div>}

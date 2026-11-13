@@ -29,3 +29,28 @@ export function nativeInstallation(event: Pick<NativeInstallPrompt, 'prompt' | '
     },
   };
 }
+
+const visitKey = 'cantera-install-visited';
+const sessionKey = 'cantera-install-session';
+const dismissalKey = 'cantera-install-dismissed';
+type PreferenceStorage = Pick<Storage, 'getItem' | 'setItem'>;
+
+// A page reload, route change or StrictMode remount is still the same visit.
+export function installationVisit(local: PreferenceStorage, session: PreferenceStorage): boolean {
+  try {
+    const current = session.getItem(sessionKey);
+    if (current !== null) return current === 'returning';
+    const returning = local.getItem(visitKey) === 'yes';
+    session.setItem(sessionKey, returning ? 'returning' : 'first');
+    local.setItem(visitKey, 'yes');
+    return returning;
+  } catch { return false; }
+}
+
+export function installationDismissed(session: PreferenceStorage): boolean {
+  try { return session.getItem(dismissalKey) === 'yes'; } catch { return false; }
+}
+
+export function dismissInstallation(session: PreferenceStorage): void {
+  try { session.setItem(dismissalKey, 'yes'); } catch { /* Browsing works with blocked storage. */ }
+}

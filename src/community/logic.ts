@@ -1,5 +1,6 @@
 import type { EventInput, Fixture, FixtureSchedule, MatchResult, PlayEvent, Standing } from './types';
 import { eventVisibility } from './eventPrivacy.ts';
+import { isSkillLevel } from './skillLevels.ts';
 import { isEventCoverId } from './eventCovers.ts';
 
 export function requireText(value: string, label: string, max = 200): string {
@@ -13,6 +14,7 @@ export function validateEvent(input: EventInput, now = Date.now()): EventInput {
     !['amateur', 'professional'].includes(input.level) || !['players', 'teams'].includes(input.entry) ||
     !['league', 'knockout'].includes(input.tournamentFormat) ||
     input.visibility !== undefined && !['public', 'private'].includes(input.visibility) ||
+    input.skillLevel !== undefined && !isSkillLevel(input.skillLevel) ||
     input.coverId !== undefined && !isEventCoverId(input.coverId)) throw new Error('Formato de evento inválido.');
   if (!Number.isInteger(input.capacity) || input.capacity < 2 || input.capacity > 64) throw new Error('El aforo debe estar entre 2 y 64.');
   if (input.type === 'tournament' && input.capacity > 32) throw new Error('Los torneos admiten hasta 32 participantes para generar el calendario.');

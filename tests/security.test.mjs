@@ -515,6 +515,25 @@ describe('Storage: pausa de cargas exigida por el servidor', { concurrency: fals
 });
 
 describe('Gestión segura de convocatorias y derechos', { concurrency: false }, () => {
+  test('nivel deportivo es opcional y solo el organizador puede cambiarlo con historial', async () => {
+    const alice = db('alice');
+    for (const [index, skillLevel] of ['any', 'beginner', 'intermediate', 'advanced'].entries()) {
+      await assertSucceeds(setDoc(doc(alice, `communityEvents/skill-${index}`), event(`skill-${index}`, { skillLevel })));
+    }
+    for (const [index, skillLevel] of ['', null, 'professional', 'expert', 3].entries()) {
+      await assertFails(setDoc(doc(alice, `communityEvents/bad-skill-${index}`), event(`bad-skill-${index}`, { skillLevel })));
+    }
+    await seed('communityEvents/legacy-skill', event('legacy-skill'));
+    const target = doc(alice, 'communityEvents/legacy-skill');
+    await assertFails(updateDoc(target, { skillLevel: 'beginner' }));
+    await assertSucceeds(ownerUpdate(target, { skillLevel: 'beginner' }));
+    await assertFails(ownerUpdate(target, { skillLevel: 'expert' }));
+    await assertFails(ownerUpdate(doc(db('bob'), 'communityEvents/legacy-skill'), { skillLevel: 'advanced' }));
+    await assertFails(updateDoc(doc(db('bob'), 'communityEvents/legacy-skill'), { participants: { bob: 'bob' }, participantIds: ['bob'], skillLevel: 'advanced' }));
+    await assertSucceeds(updateDoc(doc(db('bob'), 'communityEvents/legacy-skill'), { participants: { bob: 'bob' }, participantIds: ['bob'], rsvps: { bob: 'yes' } }));
+    assert.equal((await getDoc(target)).data().skillLevel, 'beginner');
+  });
+
   test('portada genérica permite crear y editar sólo al organizador, con historial, manteniendo RSVP', async () => {
     const alice = db('alice'); const target = doc(alice, 'communityEvents/cover');
     await assertSucceeds(setDoc(target, event('cover', { coverId: 'day' })));
