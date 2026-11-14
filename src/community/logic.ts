@@ -1,3 +1,4 @@
+import { fixtureWinner, validPenalties } from './tournament.ts';
 import type { EventInput, Fixture, FixtureSchedule, MatchResult, PlayEvent, Standing } from './types';
 import { eventVisibility } from './eventPrivacy.ts';
 import { isSkillLevel } from './skillLevels.ts';
@@ -90,20 +91,21 @@ export function makeFixtures(event: PlayEvent): Fixture[] {
   return fixtures;
 }
 
-export function recordScore(event: PlayEvent, fixtureId: string, home: number, away: number, now = Date.now()): Fixture[] {
-  if (event.status === 'cancelled') throw new Error('El evento está cancelado.');
+export function recordScore(event: PlayEvent, fixtureId: string, home: number, away: number, now = Date.now(), penalties?: { home: number; away: number }): Fixture[] {
+  if (event.status === 'cancelled' || event.status === 'completed') throw new Error('El evento está cancelado o finalizado.');
   if (![home, away].every(n => Number.isInteger(n) && n >= 0 && n <= 99)) throw new Error('Introduce goles enteros entre 0 y 99.');
   const fixture = event.fixtures.find(f => f.id === fixtureId);
   if (!fixture || !fixture.awayId) throw new Error('Partido no encontrado o pase libre.');
   const kickoff = Date.parse(fixture.startAt || event.startAt);
   if (!Number.isFinite(kickoff) || kickoff > now) throw new Error('El cruce todavía no ha comenzado. Registra el resultado después de su hora de inicio.');
-  if (event.tournamentFormat === 'knockout' && home === away) throw new Error('En eliminatorias introduce el marcador decisivo, incluidos los penaltis si los hubo.');
+  if (fixture.playerTotals && (fixture.playerTotals.home.goals > home || fixture.playerTotals.away.goals > away)) throw new Error('El marcador no puede quedar por debajo de los goles registrados por jugador.');
+  if (!validPenalties({ homeScore:home, awayScore:away, homePenalties:penalties?.home, awayPenalties:penalties?.away }, event.tournamentFormat === 'knockout')) throw new Error('Introduce un marcador decisivo o, en eliminatorias empatadas, un desempate por penaltis válido.');
   if (event.tournamentFormat === 'knockout' && event.fixtures.some(f => f.round > fixture.round)) throw new Error('No puedes cambiar un resultado que ya generó la siguiente ronda.');
-  const updated = event.fixtures.map(f => f.id === fixtureId ? { ...f, homeScore: home, awayScore: away } : f);
+  const updated = event.fixtures.map(f => { if (f.id !== fixtureId) return f; const { homePenalties:_h, awayPenalties:_a, ...current } = f; return { ...current, homeScore:home, awayScore:away, ...(penalties ? {homePenalties:penalties.home,awayPenalties:penalties.away} : {}) }; });
   if (event.tournamentFormat !== 'knockout') return updated;
   const lastRound = updated.filter(f => f.round === fixture.round);
   if (lastRound.length < 2 || lastRound.some(f => f.awayId && (f.homeScore === null || f.awayScore === null))) return updated;
-  const winners = lastRound.map(f => !f.awayId || f.homeScore! > f.awayScore! ? f.homeId : f.awayId);
+  const winners = lastRound.map(f => fixtureWinner(f)!);
   for (let i = 0; i < winners.length; i += 2) updated.push({ id: `r${fixture.round + 1}-${i / 2 + 1}`, round: fixture.round + 1,
     homeId: winners[i], awayId: winners[i + 1], homeScore: null, awayScore: null });
   return updated;

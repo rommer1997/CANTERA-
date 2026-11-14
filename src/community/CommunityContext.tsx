@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { onAuthStateChanged, type User } from 'firebase/auth';
-import { collection, deleteDoc, getCountFromServer, serverTimestamp, doc, getDoc, getDocs, limit, onSnapshot, orderBy, query, runTransaction, setDoc, startAfter, updateDoc, where, writeBatch, type DocumentData, type DocumentSnapshot, type QueryDocumentSnapshot } from 'firebase/firestore';
+import { collection, deleteDoc, getCountFromServer, serverTimestamp, doc, getDoc, getDocs, getDocsFromServer, limit, onSnapshot, orderBy, query, runTransaction, setDoc, startAfter, updateDoc, where, writeBatch, type DocumentData, type DocumentSnapshot, type QueryDocumentSnapshot } from 'firebase/firestore';
 import { deleteObject, getDownloadURL, ref, uploadBytesResumable } from 'firebase/storage';
 import { auth, db, logout, signInWithGoogle, storage } from '../firebase';
 import { disablePushDevice, discardPendingPush } from './pushApi';
@@ -11,6 +11,7 @@ import { createCoalescedRefresh } from './coalescedRefresh';
 import { removeDemoConnection } from './invitationDemo';
 import { legalReady, operator } from './legal';
 import { normalizeFixtureRecord, fixtureFields, sameFixture } from './fixtureRecords';
+import { recordDiscipline, updatePlayerTotals, validPlayerStats } from './tournament';
 import { commitDeliveryBatches } from './deliveryBatches';
 import { TERMS_VERSION } from './policy';
 import { pilotAccountAllowed, type PilotIdentity } from './pilotAccess.ts';
@@ -18,7 +19,7 @@ import { canReadEvent, isPublicEvent } from './eventPrivacy';
 export { TERMS_VERSION } from './policy';
 import { joinParticipants, makeFixtures, recordScore, requireText, validateEvent, validateEventEdit, validateFixtureSchedule, validateMatchResult } from './logic';
 import { normalizeCommentRecord, normalizeDemoData, normalizeEvent, normalizeFollow, normalizeHiddenPostIds, normalizeLike, normalizePost, normalizeProfile, normalizePublicProfile, normalizeReport, normalizeVerification, normalizeNotice, normalizeRightsRequest, normalizeRuntime, profileSearchTokens, searchText } from './normalization';
-import type { CommunityPost, CommunityProfile, ContentReport, EventInput, PlayEvent, PostComment, PostInput, PublicProfile, VerificationRequest, RuntimeConfig, AccountModeration, EventNotice, RightsRequest, FixtureSchedule, MatchResult, Rsvp, EventChange, Fixture, PeopleSearchField, PostInteractionState } from './types';
+import type { CommunityPost, CommunityProfile, ContentReport, EventInput, PlayEvent, PostComment, PostInput, PublicProfile, VerificationRequest, RuntimeConfig, AccountModeration, EventNotice, RightsRequest, FixtureSchedule, FixtureDiscipline, FixturePlayerStats, MatchResult, Rsvp, EventChange, Fixture, PeopleSearchField, PostInteractionState } from './types';
 
 type Mode = 'demo' | 'cloud';
 function noticeRecipientAllowed(event: Pick<PlayEvent, 'visibility' | 'ownerId' | 'participants'>, recipientId: string): boolean {
@@ -54,7 +55,10 @@ interface CommunityAPI {
   setRsvp(id: string, response: Rsvp): Promise<void>; joinWaitlist(id: string, name: string): Promise<void>; leaveWaitlist(id: string): Promise<void>;
   saveMatchResult(id: string, result: MatchResult): Promise<void>; scheduleFixture(id: string, fixtureId: string, schedule: FixtureSchedule): Promise<void>;
   addGuest(id: string, name: string): Promise<void>; setEventStatus(id: string, status: PlayEvent['status'], reason?: string): Promise<void>;
-  generateFixtures(id: string): Promise<void>; saveScore(id: string, fixture: string, home: number, away: number): Promise<void>;
+  generateFixtures(id: string): Promise<void>; saveScore(id: string, fixture: string, home: number, away: number, penalties?: {home:number;away:number}): Promise<void>;
+  loadFixturePlayers(id: string, fixture: string): Promise<FixturePlayerStats[]>;
+  savePlayerStats(id: string, fixture: string, input: Omit<FixturePlayerStats, 'id'>): Promise<void>;
+  saveDiscipline(id: string, fixture: string, discipline: FixtureDiscipline): Promise<void>;
   createPost(input: PostInput, progress?: (n: number) => void): Promise<string>; deletePost(id: string): Promise<void>;
   toggleLike(id: string): Promise<void>; addComment(id: string, text: string): Promise<void>;
   reportPost(id: string, reason: string): Promise<void>; hidePost(id: string): void;
@@ -975,7 +979,37 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
   async function saveMatchResult(id: string, result: MatchResult) { await mutateEvent(id, event => { if (event.type !== 'match' || event.status === 'cancelled' || Date.parse(event.startAt) > Date.now()) throw new Error('Solo se pueden registrar resultados de partidos celebrados.'); return { ...event, result: validateMatchResult(result), status: 'completed' }; }, true, 'El organizador ha registrado el resultado del partido.'); }
   async function scheduleFixture(id: string, fixtureId: string, schedule: FixtureSchedule) { await mutateEvent(id, event => { const cleaned = validateFixtureSchedule(schedule); const fixture = event.fixtures.find(f => f.id === fixtureId); if (!fixture || !fixture.awayId || fixture.homeScore !== null || event.status === 'cancelled' || event.status === 'completed') throw new Error('No se puede programar este cruce.'); return { ...event, fixtures: event.fixtures.map(f => f.id === fixtureId ? { ...f, ...cleaned } : f) }; }, true, 'El organizador ha actualizado la fecha, hora o campo de un cruce.'); }
   async function generateFixtures(id: string) { await mutateEvent(id, event => { if (event.type !== 'tournament') throw new Error('Los cruces son para torneos.'); return { ...event, fixtures: makeFixtures(event), status: 'closed' }; }, true, 'El organizador ha publicado los cruces del torneo.'); }
-  async function saveScore(id: string, fixture: string, home: number, away: number) { await mutateEvent(id, event => ({ ...event, fixtures: recordScore(event, fixture, home, away) }), true, 'El organizador ha registrado un resultado del torneo.'); }
+  async function saveScore(id: string, fixture: string, home: number, away: number, penalties?: {home:number;away:number}) { await mutateEvent(id, event => ({ ...event, fixtures: recordScore(event, fixture, home, away, Date.now(), penalties) }), true, 'El organizador ha registrado un resultado del torneo.'); }
+  const loadFixturePlayers=useCallback(async (id: string, fixture: string): Promise<FixturePlayerStats[]> => {
+    if (mode === 'demo') return normalizeDemoData(readDemo()).events.find(event=>event.id===id)?.fixtures.find(item=>item.id===fixture)?.players || [];
+    const response = await getDocsFromServer(query(collection(db,'communityFixtures',`${id}_${fixture}`,'playerStats'),limit(201)));
+    if (response.size > 200) throw new Error('El acta de jugadores necesita revisión.');
+    return response.docs.map(record=>{ const data=record.data(); const value={id:record.id,side:data.side,jersey:data.jersey,goals:data.goals,yellowCards:data.yellowCards,redCards:data.redCards,fouls:data.fouls}; if (!validPlayerStats(value) || data.eventId !== id || data.fixtureId !== fixture || record.id !== `${data.side}_${data.jersey}`) throw new Error('El acta de jugadores contiene un registro inválido.'); return value; });
+  },[mode]);
+  async function savePlayerStats(id: string, fixtureId: string, input: Omit<FixturePlayerStats,'id'>) {
+    const user=actor(); const playerId=`${input.side}_${input.jersey}`; const next={...input,id:playerId};
+    if (!validPlayerStats(next)) throw new Error('Revisa el dorsal, los goles, las tarjetas y las faltas.');
+    const updatedFixture=(event:PlayEvent, fixture:Fixture, previous:FixturePlayerStats|null) => {
+      if (event.ownerId !== user.id || event.type !== 'tournament' || event.entry !== 'teams' || event.status !== 'closed' || !fixture.awayId || Date.parse(fixture.startAt || event.startAt)>Date.now()) throw new Error('Solo la organización puede editar el acta de un partido iniciado de un torneo en curso.');
+      return {...fixture,playerTotals:updatePlayerTotals(fixture,previous,next),playerChangeId:playerId,playerRevision:(fixture.playerRevision||0)+1};
+    };
+    if (mode==='demo') { await mutateEvent(id,event=>{const fixture=event.fixtures.find(item=>item.id===fixtureId); if (!fixture) throw new Error('Cruce no encontrado.'); const players=fixture.players||[]; const updated=updatedFixture(event,fixture,players.find(item=>item.id===playerId)||null); return {...event,fixtures:event.fixtures.map(item=>item.id===fixtureId?{...updated,players:[...players.filter(item=>item.id!==playerId),next]}:item)};},true,'El organizador ha actualizado las estadísticas por dorsal.'); return; }
+    await runTransaction(db,async tx=>{
+      const eventRef=doc(db,'communityEvents',id), fixtureRef=doc(db,'communityFixtures',`${id}_${fixtureId}`), playerRef=doc(db,'communityFixtures',`${id}_${fixtureId}`,'playerStats',playerId);
+      const [eventSnap,fixtureSnap,playerSnap]=await Promise.all([tx.get(eventRef),tx.get(fixtureRef),tx.get(playerRef)]);
+      const event=eventSnap.exists()?normalizeEvent(eventSnap.data(),id):null;
+      const fixture=fixtureSnap.exists()?normalizeFixtureRecord(fixtureSnap.data(),id):null;
+      if (!event || !fixture) throw new Error('El torneo o el cruce no está disponible.');
+      const previous=playerSnap.exists()?{...playerSnap.data(),id:playerId}:null;
+      if (previous && !validPlayerStats(previous)) throw new Error('El registro anterior necesita revisión.');
+      if (previous && (['goals','yellowCards','redCards','fouls'] as const).every(key=>previous[key]===next[key])) return;
+      const updated=updatedFixture(event,fixture,previous as FixturePlayerStats|null);
+      tx.update(fixtureRef,{playerTotals:updated.playerTotals,playerChangeId:playerId,playerRevision:updated.playerRevision,updatedAt:serverTimestamp()});
+      tx.set(playerRef,{...next,eventId:id,fixtureId,revision:playerSnap.exists()?(playerSnap.data().revision||0)+1:1,createdAt:playerSnap.exists()?playerSnap.data().createdAt:serverTimestamp(),updatedAt:serverTimestamp()});
+    });
+  }
+
+  async function saveDiscipline(id: string, fixture: string, discipline: FixtureDiscipline) { await mutateEvent(id, event => ({ ...event, fixtures: recordDiscipline(event, fixture, discipline) }), true, 'El organizador ha actualizado el acta disciplinaria de un partido.'); }
 
   async function createPost(input: PostInput, progress?: (n: number) => void) {
     const user = actor(); const id = newId();
@@ -1093,7 +1127,7 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
     profiles: peopleAvailable && peoplePage.mode === mode ? peoplePage.profiles : [], publicProfiles: serviceOpen ? publicCaches[mode] : {}, publicProfileStates: profileStates[mode], followingIds: privateReadReady ? followingIds : [],
     peopleAvailable, peopleLoading: peopleAvailable && peoplePage.mode === mode && peoplePage.loading, peopleError: peopleAvailable && peoplePage.mode === mode ? peoplePage.error : '', peopleHasMore: peopleAvailable && (peoplePage.mode !== mode || peoplePage.hasMore),
     loadMorePeople, watchPublicProfile, retryPublicProfile, toggleFollow, watchPost, linkedPostStates: linkedStates[mode],
-    login, loginAdmin, signOut, beginDemo, saveProfile, createEvent, createEventSeries, updateEvent, removeGuest, setRsvp, joinWaitlist, leaveWaitlist, saveMatchResult, scheduleFixture, joinEvent, leaveEvent, addGuest, setEventStatus, generateFixtures, saveScore,
+    login, loginAdmin, signOut, beginDemo, saveProfile, createEvent, createEventSeries, updateEvent, removeGuest, setRsvp, joinWaitlist, leaveWaitlist, saveMatchResult, scheduleFixture, joinEvent, leaveEvent, addGuest, setEventStatus, generateFixtures, saveScore, saveDiscipline, loadFixturePlayers, savePlayerStats,
     createPost, deletePost, toggleLike, addComment, reportPost, hidePost, requestVerification, reviewVerification, resolveReport };
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }

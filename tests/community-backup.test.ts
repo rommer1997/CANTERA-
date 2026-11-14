@@ -230,3 +230,18 @@ test('respaldo anterior a cursores sigue siendo válido sin aceptar colecciones 
   incomplete.collections = incomplete.collections.filter((row: any) => row.path !== 'communityProfiles');
   assert.throws(() => backup.validateBackup(resign(incomplete)), /incomplete-root-schema/);
 });
+
+
+test('las actas por dorsal entran en el respaldo y se conservan los manifiestos anteriores', async () => {
+  const fixture = 'communityFixtures/local_r1-1', player = `${fixture}/playerStats/home_7`;
+  const data = payload([{ path: fixture, fields: {} }, { path: player, fields: { jersey: { integerValue: '7' } } }]);
+  assert.equal(backup.validateBackup(data).documents.length, 2);
+  const legacy = payload(); delete legacy.schema.nestedCollections.communityFixtures;
+  assert.equal(backup.validateBackup(resign(legacy)).documents.length, 1);
+  const foreign = structuredClone(data); delete foreign.schema.nestedCollections.communityFixtures;
+  assert.throws(() => backup.validateBackup(resign(foreign)), /unreviewed/);
+  const src = fakeSource(['communityFixtures'], {
+    communityFixtures: [restDocument(fixture)], [`${fixture}/playerStats`]: [restDocument(player, {jersey:{integerValue:'7'}})],
+  }, {[fixture]: ['playerStats']});
+  assert.ok((await backup.collectBackup({config, api:src.api, createdAt:created})).documents.some((row:any)=>row.path===player));
+});

@@ -49,8 +49,11 @@ export const auth = getAuth(app);
 export const db = initializeFirestore(app, firestoreTransport(navigator), config.databaseId || '(default)');
 export const storage = getStorage(app);
 if (useLocalEmulators) {
-  connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
-  connectFirestoreEmulator(db, '127.0.0.1', 8080);
+  const authPort=Number(import.meta.env.VITE_AUTH_EMULATOR_PORT || 9099);
+  const firestorePort=Number(import.meta.env.VITE_FIRESTORE_EMULATOR_PORT || 8080);
+  if (![authPort,firestorePort].every(port=>Number.isInteger(port)&&port>0&&port<=65535)) throw new Error('Puerto de emulador local inválido.');
+  connectAuthEmulator(auth, `http://127.0.0.1:${authPort}`, { disableWarnings: true });
+  connectFirestoreEmulator(db, '127.0.0.1', firestorePort);
 }
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });

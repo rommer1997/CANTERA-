@@ -407,37 +407,157 @@ service cloud.firestore {
           && data.result.homeScore is int && data.result.homeScore >= 0 && data.result.homeScore <= 99
           && data.result.awayScore is int && data.result.awayScore >= 0 && data.result.awayScore <= 99);
     }
+    function validDisciplineSide(side) {
+      return side is map && side.keys().hasAll(['yellowCards', 'redCards', 'fouls']) && side.keys().hasOnly(['yellowCards', 'redCards', 'fouls'])
+        && side.yellowCards is int && side.yellowCards >= 0 && side.yellowCards <= 64
+        && side.redCards is int && side.redCards >= 0 && side.redCards <= 32
+        && side.fouls is int && side.fouls >= 0 && side.fouls <= 199;
+    }
+    function validFixtureDiscipline(data) {
+      return data is map && data.keys().hasAll(['home', 'away']) && data.keys().hasOnly(['home', 'away'])
+        && validDisciplineSide(data.home) && validDisciplineSide(data.away);
+    }
+    function validFixturePenalties(data, format) {
+      let hasPenalties = data.keys().hasAny(['homePenalties', 'awayPenalties']);
+      return !hasPenalties && (format != 'knockout' || data.homeScore == null || data.homeScore != data.awayScore)
+        || format == 'knockout' && data.homeScore != null && data.homeScore == data.awayScore
+          && data.keys().hasAll(['homePenalties', 'awayPenalties'])
+          && data.homePenalties is int && data.homePenalties >= 0 && data.homePenalties <= 99
+          && data.awayPenalties is int && data.awayPenalties >= 0 && data.awayPenalties <= 99
+          && data.homePenalties != data.awayPenalties;
+    }
+    function zeroPlayerStats() { return { 'goals':0, 'yellowCards':0, 'redCards':0, 'fouls':0 }; }
+    function playerTotalsSide(data) {
+      return data is map && data.keys().hasOnly(['goals','yellowCards','redCards','fouls'])
+        && data.keys().hasAll(['goals','yellowCards','redCards','fouls'])
+        && data.goals is int && data.goals >= 0 && data.goals <= 99
+        && validDisciplineSide({'yellowCards':data.yellowCards,'redCards':data.redCards,'fouls':data.fouls});
+    }
+    function validFixturePlayerTotals(data) {
+      let totals = data.get('playerTotals', {'home':zeroPlayerStats(),'away':zeroPlayerStats()});
+      return !('playerTotals' in data) && !('playerChangeId' in data) && !('playerRevision' in data)
+        || totals is map && totals.keys().hasOnly(['home','away']) && totals.keys().hasAll(['home','away'])
+          && playerTotalsSide(totals.home) && playerTotalsSide(totals.away)
+          && data.playerRevision is int && data.playerRevision >= 1 && text(data.playerChangeId, 6, 8) && data.playerChangeId.matches('(home|away)_[0-9]{1,2}')
+          && data.homeScore != null && data.awayScore != null && 'discipline' in data
+          && totals.home.goals <= data.homeScore && totals.away.goals <= data.awayScore
+          && totals.home.yellowCards <= data.discipline.home.yellowCards && totals.away.yellowCards <= data.discipline.away.yellowCards
+          && totals.home.redCards <= data.discipline.home.redCards && totals.away.redCards <= data.discipline.away.redCards
+          && totals.home.fouls <= data.discipline.home.fouls && totals.away.fouls <= data.discipline.away.fouls;
+    }
+    function validPlayerRecord(data, playerId, fixture) {
+      return data.keys().hasAll(['id','eventId','fixtureId','side','jersey','goals','yellowCards','redCards','fouls','revision','createdAt','updatedAt'])
+        && data.keys().hasOnly(['id','eventId','fixtureId','side','jersey','goals','yellowCards','redCards','fouls','revision','createdAt','updatedAt'])
+        && data.id == playerId && data.eventId == fixture.eventId && data.fixtureId == fixture.id
+        && data.side in ['home','away'] && data.jersey is int && data.jersey >= 0 && data.jersey <= 99
+        && playerId == data.side + '_' + string(data.jersey)
+        && data.goals is int && data.goals >= 0 && data.goals <= 99
+        && data.yellowCards is int && data.yellowCards >= 0 && data.yellowCards <= 2
+        && data.redCards is int && data.redCards >= 0 && data.redCards <= 1
+        && data.fouls is int && data.fouls >= 0 && data.fouls <= 99
+        && data.revision is int && data.revision >= 1 && date(data.createdAt) && data.updatedAt == request.time;
+    }
+    function statsDelta(before, after, previous, next) {
+      return after.goals == before.goals - previous.goals + next.goals
+        && after.yellowCards == before.yellowCards - previous.yellowCards + next.yellowCards
+        && after.redCards == before.redCards - previous.redCards + next.redCards
+        && after.fouls == before.fouls - previous.fouls + next.fouls;
+    }
+    function validPlayerDelta(data, original) {
+      let playerPath = /databases/$(database)/documents/communityFixtures/$(data.eventId + '_' + data.id)/playerStats/$(data.playerChangeId);
+      let next = getAfter(playerPath).data;
+      let previous = exists(playerPath) ? get(playerPath).data : zeroPlayerStats();
+      let before = original.get('playerTotals', {'home':zeroPlayerStats(),'away':zeroPlayerStats()});
+      let other = next.side == 'home' ? 'away' : 'home';
+      // The paired player write validates its complete schema. The timestamp proves it is part of this commit.
+      return next.updatedAt == request.time
+        && statsDelta(before[next.side], data.playerTotals[next.side], previous, next)
+        && data.playerTotals[other] == before[other];
+    }
     function fixtureDocument(data, docId) {
       let event = getAfter(/databases/$(database)/documents/communityEvents/$(data.eventId)).data;
       return data.keys().hasAll(['id', 'eventId', 'ownerId', 'round', 'homeId', 'awayId', 'homeScore', 'awayScore', 'kickoffAt', 'timeZone', 'venue', 'createdAt', 'updatedAt'])
-        && data.keys().hasOnly(['id', 'eventId', 'ownerId', 'round', 'homeId', 'awayId', 'homeScore', 'awayScore', 'kickoffAt', 'timeZone', 'venue', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'eventId', 'ownerId', 'round', 'homeId', 'awayId', 'homeScore', 'awayScore', 'kickoffAt', 'timeZone', 'venue', 'createdAt', 'updatedAt', 'homePenalties', 'awayPenalties', 'discipline', 'playerTotals', 'playerChangeId', 'playerRevision'])
         && docId == data.eventId + '_' + data.id && data.ownerId == event.ownerId
         && data.round is int && data.round >= 1 && data.round <= 64 && data.id.matches('r' + string(data.round) + '-[1-9][0-9]*')
         && data.homeId in event.participants && data.homeId != data.awayId
         && (data.awayId in event.participants || data.awayId == '' && event.tournamentFormat == 'knockout')
         && (data.homeScore == null && data.awayScore == null
           || data.awayId != '' && data.homeScore is int && data.awayScore is int && data.homeScore >= 0 && data.homeScore <= 99 && data.awayScore >= 0 && data.awayScore <= 99
-            && (event.tournamentFormat != 'knockout' || data.homeScore != data.awayScore)
             && (data.kickoffAt is timestamp ? data.kickoffAt <= request.time : event.startAtMs <= request.time.toMillis()))
+        && validFixturePlayerTotals(data)
+        && validFixturePenalties(data, event.tournamentFormat)
+        && (!('discipline' in data) || data.homeScore != null && data.awayId != '' && validFixtureDiscipline(data.discipline))
         && (data.kickoffAt == null || data.kickoffAt is timestamp)
         && text(data.timeZone, 1, 100) && text(data.venue, 1, 200) && date(data.createdAt) && date(data.updatedAt)
         && event.updatedAt == request.time && event.get('revision', 0) == get(/databases/$(database)/documents/communityEvents/$(data.eventId)).data.get('revision', 0) + 1
         && data.id in event.get('fixtureIds', []) && event.type == 'tournament' && event.status in ['closed', 'completed'];
     }
+    function compatiblePlayerTotals(data) {
+      let totals = data.get('playerTotals', {'home':zeroPlayerStats(),'away':zeroPlayerStats()});
+      return !('playerTotals' in data) || data.homeScore != null && data.awayScore != null && 'discipline' in data
+        && totals.home.goals <= data.homeScore && totals.away.goals <= data.awayScore
+        && totals.home.yellowCards <= data.discipline.home.yellowCards && totals.away.yellowCards <= data.discipline.away.yellowCards
+        && totals.home.redCards <= data.discipline.home.redCards && totals.away.redCards <= data.discipline.away.redCards
+        && totals.home.fouls <= data.discipline.home.fouls && totals.away.fouls <= data.discipline.away.fouls;
+    }
+    function standardFixtureUpdate() {
+      let data = request.resource.data;
+      let changed = data.diff(resource.data).affectedKeys();
+      let path = /databases/$(database)/documents/communityEvents/$(resource.data.eventId);
+      let event = getAfter(path).data;
+      // The immutable fixture identity and existing aggregate schema remain inherited.
+      return changed.hasOnly(['homeScore','awayScore','homePenalties','awayPenalties','discipline','kickoffAt','timeZone','venue','updatedAt'])
+        && data.updatedAt == request.time && get(path).data.status == 'closed'
+        && event.updatedAt == request.time && event.revision == get(path).data.get('revision',0) + 1
+        && event.status in ['closed','completed']
+        && (!changed.hasAny(['homeScore','awayScore','homePenalties','awayPenalties'])
+          || (data.homeScore == null && data.awayScore == null || data.awayId != ''
+            && data.homeScore is int && data.homeScore >= 0 && data.homeScore <= 99
+            && data.awayScore is int && data.awayScore >= 0 && data.awayScore <= 99
+            && (data.kickoffAt is timestamp ? data.kickoffAt <= request.time : event.startAtMs <= request.time.toMillis()))
+          && validFixturePenalties(data,event.tournamentFormat)
+          && (event.tournamentFormat != 'knockout' || !exists(/databases/$(database)/documents/communityFixtures/$(resource.data.eventId + '_r' + string(resource.data.round + 1) + '-1'))))
+        && (!('discipline' in resource.data) || 'discipline' in data)
+        && (!('discipline' in data) || data.homeScore != null && data.awayId != '')
+        && (!changed.hasAny(['discipline']) || validFixtureDiscipline(data.discipline))
+        && compatiblePlayerTotals(data)
+        && (!changed.hasAny(['kickoffAt','timeZone','venue']) || resource.data.homeScore == null
+          && data.kickoffAt is timestamp && data.kickoffAt > request.time && text(data.timeZone,1,100) && text(data.venue,1,200));
+    }
+    function playerFixtureUpdate() {
+      let data = request.resource.data;
+      let eventPath = /databases/$(database)/documents/communityEvents/$(resource.data.eventId);
+      let event = getAfter(eventPath).data;
+      // All fixture identity, score, schedule and acta fields are immutable on this path.
+      return data.diff(resource.data).affectedKeys().hasOnly(['playerTotals','playerChangeId','playerRevision','updatedAt'])
+        && data.updatedAt == request.time && data.playerRevision == resource.data.get('playerRevision',0) + 1 && validFixturePlayerTotals(data)
+        && validPlayerDelta(data, resource.data)
+        && event.status == 'closed' && event.type == 'tournament' && event.entry == 'teams';
+    }
     match /communityFixtures/{docId} {
       allow read: if relatedEventReadable(resource.data.eventId);
       allow create: if active() && fixtureDocument(request.resource.data, docId) && owner(request.resource.data.ownerId)
-        && request.resource.data.createdAt == request.time && request.resource.data.updatedAt == request.time;
-      allow update: if active() && owner(resource.data.ownerId) && fixtureDocument(request.resource.data, docId)
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['homeScore', 'awayScore', 'kickoffAt', 'timeZone', 'venue', 'updatedAt'])
-        && request.resource.data.updatedAt == request.time
-        && get(/databases/$(database)/documents/communityEvents/$(resource.data.eventId)).data.status == 'closed'
-        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['kickoffAt', 'timeZone', 'venue'])
-          || resource.data.homeScore == null && request.resource.data.kickoffAt is timestamp && request.resource.data.kickoffAt > request.time)
-        && (get(/databases/$(database)/documents/communityEvents/$(resource.data.eventId)).data.tournamentFormat != 'knockout'
-          || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['homeScore', 'awayScore'])
-          || !exists(/databases/$(database)/documents/communityFixtures/$(resource.data.eventId + '_r' + string(resource.data.round + 1) + '-1')));
+        && request.resource.data.createdAt == request.time && request.resource.data.updatedAt == request.time
+        && !request.resource.data.keys().hasAny(['playerTotals','playerChangeId','playerRevision']);
+      allow update: if active() && owner(resource.data.ownerId) && (request.resource.data.diff(resource.data).affectedKeys().hasAny(['playerTotals','playerChangeId','playerRevision']) ? playerFixtureUpdate() : standardFixtureUpdate());
       allow delete: if false;
+      match /playerStats/{playerId} {
+        function parentFixture() { return get(/databases/$(database)/documents/communityFixtures/$(docId)).data; }
+        function canSavePlayer(data) {
+          let fixture = parentFixture();
+          let after = getAfter(/databases/$(database)/documents/communityFixtures/$(docId)).data;
+          return active() && owner(fixture.ownerId) && validPlayerRecord(data, playerId, fixture)
+            && after.updatedAt == request.time && after.playerChangeId == playerId
+            && after.diff(fixture).affectedKeys().hasAny(['playerTotals','playerChangeId','playerRevision'])
+            && fixture.awayId != '' && fixture.homeScore != null && 'discipline' in fixture;
+        }
+        allow read: if relatedEventReadable(parentFixture().eventId);
+        allow create: if canSavePlayer(request.resource.data) && request.resource.data.revision == 1 && request.resource.data.createdAt == request.time;
+        allow update: if canSavePlayer(request.resource.data) && request.resource.data.revision == resource.data.revision + 1 && request.resource.data.createdAt == resource.data.createdAt
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['goals','yellowCards','redCards','fouls','revision','updatedAt']);
+        allow delete: if false;
+      }
     }
 
     function unchangedWaitlist() {

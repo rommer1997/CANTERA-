@@ -490,3 +490,10 @@ test('baja retira una invitación directa recibida y conserva invitaciones ajena
   await h.run(plan);h.advance();assert.equal((await h.run(plan)).phase,'completed');
   assert.ok(!h.records.has(`communityInvitations/${incoming}`));assert.ok(h.records.has(`communityInvitations/${code}`));
 });
+
+test('la revisión de actas admite dorsales anónimos y bloquea campos identificativos desconocidos',()=>{
+  const player={id:'home_7',eventId:'event',fixtureId:'r1-1',side:'home',jersey:7,goals:1,yellowCards:1,redCards:0,fouls:2,revision:1,createdAt:'2026-11-14',updatedAt:'2026-11-14'};
+  assert.equal(knownSharedSchema('playerStats',player),true);
+  for(const extra of [{playerName:'Privado'},{userId:uid},{yellowCards:3},{side:'other'}])assert.equal(knownSharedSchema('playerStats',{...player,...extra}),false);
+  assert.equal(knownSharedSchema('communityFixtures',{discipline:{home:{yellowCards:1,redCards:0,fouls:2,playerName:'Privado'},away:{yellowCards:0,redCards:0,fouls:0}}}),false);
+});

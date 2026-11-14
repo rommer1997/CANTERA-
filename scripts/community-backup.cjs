@@ -19,7 +19,7 @@ const ROOT_COLLECTIONS = Object.freeze([
   'communityProfiles', 'communityPublicProfiles', 'communityReports', 'communityRightsRequests',
   'communityTeamInvites', 'communityTeamJoinRequests', 'communityTeamMembers', 'communityTeams', 'communityVerifications',
 ].sort());
-const NESTED_COLLECTIONS = Object.freeze({ communityConnections: 'members', communityEventAdmissions: 'members', communityConversations: 'messages' });
+const NESTED_COLLECTIONS = Object.freeze({ communityConnections: 'members', communityEventAdmissions: 'members', communityConversations: 'messages', communityFixtures: 'playerStats' });
 const EXCLUDED = Object.freeze(['firebase-auth', 'storage-binaries', 'firestore-rules-and-indexes', 'hosting', 'functions', 'non-community-root-collections']);
 const USAGE = 'Uso: node scripts/community-backup.cjs [--dry-run | --apply --output output/private/respaldo.json]';
 const error = code => { throw new Error(code); };
@@ -142,12 +142,16 @@ function validateBackup(payload) {
   // Accept the exact reviewed pre-read-cursor schema as well. Existing signed
   // backups remain recoverable; arbitrary subsets or new roots still fail.
   const reviewedRoots = [ROOT_COLLECTIONS, ROOT_COLLECTIONS.filter(name => name !== 'communityMessageReads')];
-  const roots = reviewedRoots.find(names => canonicalJson(payload.schema) === canonicalJson({ rootCollections: [...names], nestedCollections: { ...NESTED_COLLECTIONS } }));
+  const { communityFixtures: _fixturePlayers, ...previousNested } = NESTED_COLLECTIONS;
+  const reviewedSchemas = reviewedRoots.flatMap(roots => [NESTED_COLLECTIONS, previousNested].map(nested => ({ roots, nested })));
+  const schema = reviewedSchemas.find(({roots,nested}) => canonicalJson(payload.schema) === canonicalJson({rootCollections:[...roots],nestedCollections:{...nested}}));
+  const roots = schema?.roots;
   if (!roots || canonicalJson(payload.excluded) !== canonicalJson([...EXCLUDED])) error('unreviewed-backup-schema');
   if (!onlyKeys(payload.integrity, ['algorithm', 'sha256']) || Object.keys(payload.integrity).length !== 2 || payload.integrity.algorithm !== 'sha256' || typeof payload.integrity.sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(payload.integrity.sha256)) error('invalid-integrity');
   const actual = Buffer.from(backupHash(payloadBody(payload)), 'hex'), expected = Buffer.from(payload.integrity.sha256, 'hex');
   if (!timingSafeEqual(actual, expected)) error('integrity-mismatch');
   validateCounts(payload.collections, payload.documents, payload.missingDocuments, roots);
+  if (payload.documents.some(item => { const parts=item.path.split('/'); return parts.length===4 && schema.nested[parts[0]]!==parts[2]; }) || payload.collections.some(item => { const parts=item.path.split('/'); return parts.length===3 && schema.nested[parts[0]]!==parts[2]; })) error('unreviewed-backup-schema');
   if (Buffer.byteLength(JSON.stringify(payload, null, 2)) > MAX_FILE_BYTES) error('backup-volume-exceeded');
   return payload;
 }

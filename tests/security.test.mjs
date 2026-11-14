@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { assertFails, assertSucceeds, initializeTestEnvironment } from '@firebase/rules-unit-testing';
 import { initializeApp, deleteApp } from 'firebase/app';
-import { arrayUnion, collection, serverTimestamp, Timestamp, connectFirestoreEmulator, deleteDoc, doc, getDoc, getDocs, getFirestore, limit, orderBy, query, runTransaction, setDoc, updateDoc, where, getCountFromServer, writeBatch } from 'firebase/firestore';
+import { arrayUnion, collection, serverTimestamp, Timestamp, connectFirestoreEmulator, deleteDoc, deleteField, doc, getDoc, getDocs, getFirestore, limit, orderBy, query, runTransaction, setDoc, updateDoc, where, getCountFromServer, writeBatch } from 'firebase/firestore';
 import { makeFixtures } from '../src/community/logic.ts';
 import { fixtureFields } from '../src/community/fixtureRecords.ts';
 import { commitDeliveryBatches } from '../src/community/deliveryBatches.ts';
@@ -1094,4 +1094,40 @@ describe('Códigos de un uso, conexiones y eventos privados', { concurrency: fal
     await assertSucceeds(getDocs(query(collection(bob, 'communityEventNotices'), where('recipientId', '==', 'bob'), orderBy('createdAt', 'desc'))));
     await assertFails(getDoc(doc(verifiedDb('carol'), 'communityEventNotices/secret-notice_1_bob')));
   });
+});
+
+async function playerActaWrite(client,eventId,playerId,input,totals,options={}) {
+  return runTransaction(client,async tx=>{
+    const fr=doc(client,'communityFixtures',`${eventId}_r1-1`),pr=doc(client,'communityFixtures',`${eventId}_r1-1`,'playerStats',playerId);
+    const [fs,ps]=await Promise.all([tx.get(fr),tx.get(pr)]);
+    if(!options.skipFixture)tx.update(fr,{playerTotals:totals,playerChangeId:playerId,playerRevision:(fs.data().playerRevision||0)+1,updatedAt:stamp()});
+    tx.set(pr,{id:playerId,eventId,fixtureId:'r1-1',side:'home',jersey:Number(playerId.split('_')[1]),goals:1,yellowCards:1,redCards:0,fouls:2,...input,revision:ps.exists()?ps.data().revision+1:1,createdAt:ps.exists()?ps.data().createdAt:stamp(),updatedAt:stamp()});
+  });
+}
+describe('Actas de torneo y estadísticas por dorsal', {concurrency:false},()=>{
+  const discipline={home:{yellowCards:2,redCards:1,fouls:8},away:{yellowCards:1,redCards:0,fouls:4}};
+  const totals={home:{goals:1,yellowCards:1,redCards:0,fouls:2},away:{goals:0,yellowCards:0,redCards:0,fouls:0}};
+  async function prepare(id='acta',visibility='public') {const value=event(id,{visibility,entry:'teams',startAt:new Date(Date.now()-3600000).toISOString(),startAtMs:Date.now()-3600000,type:'tournament',participants:{alice:'alice',bob:'bob'},participantIds:['alice','bob'],revision:0,history:[]});await seed(`communityEvents/${id}`,value);await assertSucceeds(canonicalGeneration(db('alice'),value,[fixture]));await assertSucceeds(canonicalUpdate(db('alice'),id,fixture.id,{homeScore:2,awayScore:1,discipline}));return value;}
+  test('la organización registra y corrige un dorsal con acumulados atómicos',async()=>{await prepare();await assertSucceeds(playerActaWrite(db('alice'),'acta','home_7',{},totals));const fr=await getDoc(doc(db('alice'),'communityFixtures/acta_r1-1'));assert.equal(fr.data().playerTotals.home.goals,1);await assertSucceeds(playerActaWrite(db('alice'),'acta','home_7',{goals:2},{...totals,home:{...totals.home,goals:2}}));assert.equal((await getDoc(doc(db('alice'),'communityFixtures/acta_r1-1/playerStats/home_7'))).data().goals,2);await assertSucceeds(canonicalUpdate(db('alice'),'acta',fixture.id,{homeScore:3,awayScore:1,discipline:{...discipline,home:{...discipline.home,fouls:9}}}));});
+  test('los participantes no pueden alterar actas y los totales falsos se rechazan',async()=>{await prepare();await assertFails(playerActaWrite(db('bob'),'acta','home_7',{},totals));await assertFails(playerActaWrite(db('alice'),'acta','home_7',{}, {...totals,home:{...totals.home,goals:2}}));await assertFails(playerActaWrite(db('alice'),'acta','home_7',{},totals,{skipFixture:true}));await assertSucceeds(playerActaWrite(db('alice'),'acta','home_7',{},totals));await assertFails(canonicalUpdate(db('alice'),'acta',fixture.id,{homeScore:0,awayScore:1}));await assertFails(canonicalUpdate(db('alice'),'acta',fixture.id,{discipline:{...discipline,home:{...discipline.home,yellowCards:0}}}));});
+  test('el servidor limita las estadísticas y rechaza datos personales o campos extra',async()=>{await prepare();for(const input of [{goals:-1},{goals:1.5},{yellowCards:3},{redCards:2},{fouls:100},{playerName:'No permitido'}])await assertFails(playerActaWrite(db('alice'),'acta','home_7',input,totals));});
+  test('las actas privadas heredan el acceso del torneo, también para consultas vacías',async()=>{await prepare('private-acta','private');await assertSucceeds(getDoc(doc(db('alice'),'communityFixtures/private-acta_r1-1/playerStats/home_7')));await assertSucceeds(playerActaWrite(db('alice'),'private-acta','home_7',{},totals));await assertSucceeds(getDocs(collection(db('bob'),'communityFixtures/private-acta_r1-1/playerStats')));await assertFails(getDocs(collection(db(),'communityFixtures/private-acta_r1-1/playerStats')));await assertFails(getDocs(collection(db('carol'),'communityFixtures/private-acta_r1-1/playerStats')));});
+  test('las actas no se borran y los acumulados no pueden cambiar sin la fila del jugador',async()=>{
+    await prepare(); const alice=db('alice');
+    await assertFails(canonicalUpdate(alice,'acta',fixture.id,{discipline:deleteField()}));
+    await assertFails(updateDoc(doc(alice,'communityFixtures/acta_r1-1'),{playerTotals:totals,playerChangeId:'home_7',playerRevision:1,updatedAt:stamp()}));
+    await assertFails(playerActaWrite(alice,'acta','home_7',{}, {...totals,away:{...totals.away,fouls:1}}));
+    await assertSucceeds(playerActaWrite(alice,'acta','home_7',{},totals));
+    await assertFails(deleteDoc(doc(alice,'communityFixtures/acta_r1-1/playerStats/home_7')));
+    await seed('communityEvents/acta',{...event('acta'),entry:'teams',type:'tournament',status:'completed'});
+    await assertFails(playerActaWrite(alice,'acta','home_7',{goals:2},{...totals,home:{...totals.home,goals:2}}));
+  });
+  test('los dorsales se reservan a torneos por equipos y requieren resultado y acta',async()=>{
+    await prepare(); await seed('communityEvents/acta',{...event('acta'),entry:'players',type:'tournament',status:'closed'});
+    await assertFails(playerActaWrite(db('alice'),'acta','home_7',{},totals));
+    await prepare('no-acta');
+    await env.withSecurityRulesDisabled(async context=>{await updateDoc(doc(context.firestore(),'communityFixtures/no-acta_r1-1'),{discipline:deleteField()});});
+    await assertFails(playerActaWrite(db('alice'),'no-acta','home_7',{},totals));
+  });
+  test('los penaltis solo resuelven un empate de eliminatoria',async()=>{const value=event('penalties',{startAt:new Date(Date.now()-3600000).toISOString(),startAtMs:Date.now()-3600000,type:'tournament',tournamentFormat:'knockout',participants:{alice:'alice',bob:'bob'},participantIds:['alice','bob'],revision:0,history:[]});await seed('communityEvents/penalties',value);await assertSucceeds(canonicalGeneration(db('alice'),value,[fixture]));await assertFails(canonicalUpdate(db('alice'),'penalties',fixture.id,{homeScore:1,awayScore:1,homePenalties:4,awayPenalties:4}));await assertSucceeds(canonicalUpdate(db('alice'),'penalties',fixture.id,{homeScore:1,awayScore:1,homePenalties:5,awayPenalties:4}));});
 });

@@ -323,3 +323,12 @@ test('archivo local 0600, carpetas 0700, sin sobrescritura, fuera de public ni s
     cli.assertIgnored(root, target);
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
+
+
+test('la exportación conserva penaltis y actas sin añadir nombres privados ni registros de otro torneo', () => {
+  const result = buildAccountExport(source({ events: [row('event', {ownerId:uid, fixtureIds:['r1-1']})], fixtureRecords:[row('event_r1-1',{id:'r1-1',eventId:'event',homeScore:1,awayScore:1,homePenalties:5,awayPenalties:4,discipline:{home:{yellowCards:1,redCards:0,fouls:4,privateName:'SECRET'},away:{yellowCards:0,redCards:0,fouls:2}}})], fixturePlayerRecords:[row('home_7',{eventId:'event',fixtureId:'r1-1',side:'home',jersey:7,goals:1,yellowCards:1,redCards:0,fouls:2,playerName:'SECRET'}),row('home_9',{eventId:'other',fixtureId:'r1-1',jersey:9,playerName:'SECRET'})] }));
+  assert.equal(result.fixturePlayerRecords.length,1); assert.equal(result.fixturePlayerRecords[0].jersey,7);
+  assert.equal(result.fixtureRecords[0].homePenalties,5);
+  assert.deepEqual(result.fixtureRecords[0].discipline,{home:{yellowCards:1,redCards:0,fouls:4},away:{yellowCards:0,redCards:0,fouls:2}});
+  assert.ok(!JSON.stringify(result).includes('SECRET'));
+});

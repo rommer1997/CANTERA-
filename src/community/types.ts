@@ -34,6 +34,10 @@ export interface EventNotice { id: string; eventId: string; recipientId: string;
 export interface RightsRequest { id: string; userId: string; kind: 'export' | 'delete'; status: 'pending' | 'processing' | 'completed' | 'rejected'; createdAt: string; reviewedAt: string; }
 export interface PostInteractionState { loading: boolean; error: string; hasMoreComments: boolean; likesCount: number; commentsCount: number; }
 export type PeopleSearchField = 'name' | 'city' | 'country';
+export interface TeamDiscipline { yellowCards: number; redCards: number; fouls: number; }
+export interface FixtureDiscipline { home: TeamDiscipline; away: TeamDiscipline; }
+export interface FixturePlayerStats { id: string; side: 'home' | 'away'; jersey: number; goals: number; yellowCards: number; redCards: number; fouls: number; }
+export type PlayerStatTotals = Omit<FixturePlayerStats, 'id' | 'side' | 'jersey'>;
 export interface Fixture {
   id: string;
   round: number;
@@ -41,6 +45,13 @@ export interface Fixture {
   awayId: string;
   homeScore: number | null;
   awayScore: number | null;
+  homePenalties?: number;
+  awayPenalties?: number;
+  discipline?: FixtureDiscipline;
+  playerTotals?: { home: PlayerStatTotals; away: PlayerStatTotals };
+  playerChangeId?: string;
+  playerRevision?: number;
+  players?: FixturePlayerStats[];
   startAt?: string;
   timeZone?: string;
   venue?: string;

@@ -19,10 +19,9 @@ function teamSearchKey(value: string) {
 function TeamCard({ team, role }: { team: CommunityTeam; role?: 'owner' | 'manager' | 'member' }) {
   return <Link className="team-card" to={`/teams/${encodeURIComponent(team.id)}`}>
     <span className="team-monogram" aria-hidden="true">{teamInitials(team.name)}</span>
-    <h3>{team.name}</h3><p className="team-card-location"><MapPin size={13} aria-hidden="true" />{team.city}, {team.country}</p>
-    <span className="team-card-level">{team.level === 'professional' ? 'Profesional' : 'Amateur'}</span>
-    {role && <span className="team-badge">{role === 'owner' ? 'Propietario' : role === 'manager' ? 'Responsable' : 'Miembro'}{team.status === 'archived' ? ' · Archivado' : ''}</span>}
-    <span className="team-card-cta">Abrir equipo<ArrowRight size={14} aria-hidden="true" /></span>
+    <div className="team-card-identity"><h3>{team.name}</h3><p className="team-card-location"><MapPin size={14} aria-hidden="true" />{team.city}, {team.country}</p></div>
+    {team.description && <p className="team-card-description">{team.description}</p>}
+    <div className="team-card-footer"><span className="team-card-level">{team.level === 'professional' ? 'Profesional' : 'Amateur'}</span>{role && <span className="team-badge">{role === 'owner' ? 'Propietario' : role === 'manager' ? 'Responsable' : 'Miembro'}{team.status === 'archived' ? ' · Archivado' : ''}</span>}<span className="team-card-cta">Ver equipo<ArrowRight size={17} aria-hidden="true" /></span></div>
   </Link>;
 }
 function TeamForm({ initial = emptyInput, busy, onSave }: { initial?: TeamInput; busy: boolean; onSave(input: TeamInput): void }) {
