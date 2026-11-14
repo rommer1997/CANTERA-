@@ -1,7 +1,7 @@
 import jsQR from 'jsqr';
 import { normalizeInvitationCode } from './invitations.ts';
 
-const productionOrigin = 'https://lacantera.web.app';
+const productionOrigins = new Set(['https://lacantera.com.es', 'https://lacantera.web.app']);
 const maxPayloadLength = 2048;
 const maxSide = 2048;
 const maxPixels = maxSide * maxSide;
@@ -29,7 +29,7 @@ export function parseInvitationQr(value: string, currentOrigin?: string): string
     const url = new URL(value);
     const localOrigin = safeCurrentOrigin(currentOrigin);
     if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password || url.pathname !== '/' || url.search
-      || url.origin !== productionOrigin && url.origin !== localOrigin || url.hash !== `#/invite/${route[1]}`) return null;
+      || !productionOrigins.has(url.origin) && url.origin !== localOrigin || url.hash !== `#/invite/${route[1]}`) return null;
     return normalizeInvitationCode(route[1]);
   } catch { return null; }
 }

@@ -164,7 +164,19 @@ export async function collectErasureSource({ db, auth, uid, projectId, databaseI
   for (const path of [...new Set(own)]) {
     const children = await db.doc(path).listCollections();
     referenceBudget(path, children);
-    for (const child of children) if (!(path === `users/${uid}` && child.id === 'likes')) extras.unknownSubcollections.push(`${path}/${child.id}`);
+    for (const child of children) {
+      if (path === `users/${uid}` && child.id === 'likes') continue;
+      if (/^communityFixtures\/[^/]+$/.test(path) && child.id === 'playerStats') {
+        // Anonymous sporting records survive account erasure. Validate every
+        // field and descendant before treating them as reviewed shared data.
+        const fixture = dedupe([...(source.fixtureRecords || []), ...extras.fixtureReferences]).find(row=>row.path===path);
+        for (const player of await read(db.doc(path).collection('playerStats'))) {
+          if (!fixture || !knownSharedSchema('playerStats',player.data) || player.id!==player.data.id || player.data.eventId!==fixture.data.eventId || player.data.fixtureId!==fixture.data.id) extras.unknownSubcollections.push(player.path);
+          const nested=await db.doc(player.path).listCollections(); referenceBudget(player.path,nested);
+          for (const item of nested) extras.unknownSubcollections.push(`${player.path}/${item.id}`);
+        }
+      } else extras.unknownSubcollections.push(`${path}/${child.id}`);
+    }
   }
   return { ...source, erasure: extras };
 }
@@ -269,7 +281,7 @@ export function buildErasurePlan(source) {
     checkedRecord(row);
     if (row.path !== `communityInvitations/${row.id}` || !/^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{16}$/.test(row.id)) throw new ErasurePolicyError('invalid-invitation');
     if (!knownOwnedSchema('communityInvitations', row.data)) { blockers.add('unknown-owned-schema-review'); continue; }
-    if (row.data.ownerId === uid) add(row);
+    if (row.data.ownerId === uid || row.data.recipientId === uid) add(row);
     else if (row.data.usedBy === uid && row.data.status === 'used') redact(row, 'redact-invitation-consumer');
     else throw new ErasurePolicyError('foreign-invitation');
   }
@@ -415,7 +427,7 @@ function assertOperationScope(operation, uid, data) {
     const identityField = collection === 'users' ? 'uid' : 'id';
     allowed = id === uid && operation.kind === 'delete' && (!data || !Object.hasOwn(data, identityField) || data[identityField] === uid);
   } else if (parts.length === 2 && collection === 'communityInvitations') {
-    allowed = /^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{16}$/.test(id) && (operation.kind === 'delete' && (!data || data.ownerId === uid)
+    allowed = /^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{16}$/.test(id) && (operation.kind === 'delete' && (!data || data.ownerId === uid || data.recipientId === uid)
       || operation.kind === 'redact-invitation-consumer' && (!data || data.status === 'used' && data.usedBy === uid));
   } else if (parts.length === 4 && collection === 'communityConnections' && child === 'members') {
     assertErasureUid(id); assertErasureUid(childId);

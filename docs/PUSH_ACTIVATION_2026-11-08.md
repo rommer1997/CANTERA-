@@ -1,0 +1,60 @@
+# Activación de mensajes e invitaciones con avisos gratuitos
+
+## Resultado actual del ensayo físico
+
+El 8 de noviembre de 2026, después de actualizar la app, el responsable confirmó el ensayo solicitado con LaCantera cerrada y el iPhone bloqueado: «ahora si aparecen las notificaciones ya he hecho la prueba». La recepción de mensajes en segundo plano queda confirmada por el responsable para ese dispositivo. Fuente publicada: `ce1d803fdf52bb6f8976cd4e8066decae86ef617`, shell `db268469f05dc620`, con [460 pruebas aprobadas](https://github.com/rommer1997/CANTERA-/actions/runs/42514558622).
+
+No se extiende ese resultado a otros dispositivos ni al clic del aviso, a la invitación privada o al aviso de aceptación: esos recorridos físicos siguen pendientes. Las secciones posteriores conservan el historial de las incidencias y sus comprobaciones.
+
+## Cambios preparados
+
+Invitación directa a una cuenta conectada, bandeja de recibidas/enviadas, rechazo y cancelación, aceptación con plaza atómica y aviso al organizador. Las directas caducan a los siete días; los QR/códigos existentes siguen durando diez minutos. Los avisos de mensajes e invitaciones son opcionales por dispositivo, con preferencias separadas y baja al cerrar sesión. La pantalla bloqueada no muestra el texto del chat.
+
+## Estado comprobado
+
+- Código de aplicación y Worker en PR #2, rama `codex/lacantera-expo-redesign`. La CI del commit `917882b` pasó: [ejecución 42490015894](https://github.com/rommer1997/CANTERA-/actions/runs/42490015894). Las modificaciones posteriores deben tener su propia comprobación.
+- Pruebas de ese cambio: 346 de dominio, 84 de reglas, 7 del Worker, una integración HTTP con Auth/Firestore Emulator y SQLite con esquema D1; además la suite de limpieza de Node 22 en CI. El proveedor de entrega está simulado; el payload se descifra independientemente con RFC 8291.
+- Recorrido UI local con dos cuentas sintéticas: envío directo, bandeja correcta, aceptación y plaza confirmada. Ajustes revisados a 320 px sin desbordamiento horizontal. No se crearon personas ni encuentros sintéticos en producción.
+- Cuenta Cloudflare `1d93ccbf1186b4d835d92df24396a197`: panel **Free, Current plan, $0** comprobado. No se cambió el plan.
+- Worker publicado: `https://lacantera-push.garitocastizo.workers.dev`. D1 `lacantera-push`, ID `01055525-2120-4e22-aa12-5d6bf5a0e98e`, región WEUR; migración aplicada. Secretos VAPID cargados, nunca incorporados al repositorio. Cron cada minuto.
+- Verificación HTTP del servidor real: `/config` 200 y `ready:true`; `/events` sin identidad devuelve 401; origen ajeno devuelve 403. Esto no demuestra recepción ni CPU durante un envío real.
+- Reglas e índices de Firebase desplegados exclusivamente en `gen-lang-client-0853130215` / `ai-studio-647af55f-499b-43f3-9268-9bf5f62701bb`. La configuración local y la remota contienen 33 índices, incluido `communityInvitations(recipientId, createdAt)`.
+- Preflight remoto de las 14:39:24 UTC: diez GET, todos 200; reglas coincidentes, 33 índices READY y definiciones exactas, cero overrides efectivos, dominio Auth, Google y administrador existente verificados.
+- Lectura pública de runtime: `serviceStatus: open`, `mediaUploadsEnabled: false`. No se cambió runtime, roles, Storage ni Functions.
+
+## Operación que debe mantener el responsable
+
+La política completa está en [OPERATING_POLICY.md](OPERATING_POLICY.md) y la ampliación técnica en [push-worker/README.md](../push-worker/README.md). Cloudflare recibe UID, suscripción del navegador y preferencias; el servidor consulta metadatos de Firebase con el permiso del usuario y excluye el texto del chat. Los proveedores de navegador entregan el aviso cifrado. D1 retira suscripciones tras treinta días sin renovación y las entregas caducan en una hora.
+
+Las solicitudes de derechos incluyen D1: el operador debe completar su exportación o retirada, además de Firestore, antes de cerrar el expediente. La atención del correo, revisión de conservación y custodia cifrada siguen siendo manuales. No se garantiza entrega instantánea, capacidad ilimitada ni recepción si se agotan las cuotas gratuitas. No se amplía automáticamente a un plan de pago.
+
+## Revisión renovada y publicación realizada
+
+El responsable ha respondido expresamente «Renuevo la revisión y autorizo publicar» el 8 de noviembre de 2026. Se registra la renovación en `release-approved.json` conservando las fechas y límites de la evidencia anterior. Autoriza publicar al pasar la CI; esa autorización por sí sola no certifica pruebas físicas, cifrado de copias o restauración real. Hosting se publicó y se verificó contra el build. La confirmación física posterior de mensajes se recoge al inicio de este documento; el historial de la incidencia está en [RELEASE_2026-11-08.md](RELEASE_2026-11-08.md).
+
+Tras publicar, realizar en iPhone instalado desde Safari y después Android:
+
+1. Activar avisos en Perfil → Ajustes; cerrar la app y enviar un mensaje desde la otra cuenta.
+2. Abrir el aviso; debe abrir la conversación de la cuenta destinataria, sin texto privado en pantalla bloqueada.
+3. Enviar invitación directa a un encuentro privado; aceptar y comprobar el aviso al organizador y la plaza.
+4. Desactivar mensajes, conservar invitaciones; después desactivar el dispositivo. Comprobar cierre/cambio de cuenta y bloqueo sin abrir datos ajenos.
+
+Hasta comprobar la recepción física, mantenerla explícitamente pendiente en el recibo de entrega. No renovar de forma ficticia pruebas antiguas ni afirmar que los avisos ya llegan a usuarios.
+
+## Incidencia posterior: alta del dispositivo
+
+El responsable autorizó la prueba a `rommer@garitocastizo.com`, pero al revisar el estado real confirmó «No pudimos conectar las notificaciones. Inténtalo de nuevo». D1 seguía con cero dispositivos: no se envió un mensaje sin posibilidad de entrega.
+
+La traza de Pages confirmó GET de configuración y suscripción 200, y POST de suscripción 503 con 1–2 ms de CPU. Se encontró `redirect: 'error'` en la consulta de Firestore y el envío Web Push, incompatible con workerd. Se cambia a `manual`: cualquier 3xx sigue rechazándose, sin reenviar credenciales al destino de una redirección. La documentación primaria confirma la incompatibilidad: [Request de Cloudflare Workers](https://developers.cloudflare.com/workers/runtime-apis/request/).
+
+La prueba nueva ejecuta la consulta real de `readFirestore` dentro de workerd/Miniflare y comprueba tanto el éxito como el rechazo de una redirección. Al reintroducir temporalmente la opción anterior, la prueba falla; con la corrección pasa. Esto cubre un hueco que las pruebas anteriores de HTTP sobre Node y la comprobación pública de `/config` no detectaban. Los diagnósticos del servidor contienen sólo etapa, código y tipo de recurso; no registran tokens, IDs ni cuerpos privados. Se solicita además seleccionar la cuenta de Google al entrar, para permitir alternar las dos cuentas de prueba.
+
+La corrección pasó su [CI](https://github.com/rommer1997/CANTERA-/actions/runs/42513333222) y se desplegó en Pages, en el Worker que procesa reintentos y en Firebase Hosting. Fuente publicada: `51728451852ff0cd774900a01417ac3720d73c9d`; shell `f4533220d1f8e4e3`. La activación y recepción en iPhone permanecen pendientes hasta verificarse después de ese despliegue.
+
+## Ensayo real y recepción en segundo plano
+
+Tras el despliegue se confirmó un dispositivo de Apple para la cuenta de prueba `rlvc1997@gmail.com`, con mensajes e invitaciones habilitados. El navegador siguió con `rommer@garitocastizo.com`: se verificaron ambas identidades y la conversación antes de enviar el único texto autorizado, «Prueba de aviso de LaCantera». D1 registró el envío como `sent` en un intento. El responsable confirmó una notificación del sistema de iPhone con la app abierta, pero no con ella cerrada. No se considera completada la entrega en segundo plano.
+
+Se encontró una lectura de IndexedDB sin plazo en el receptor del service worker. Se prepara un límite de 750 ms con cierre de conexiones tardías y aviso genérico si el almacenamiento no responde. El clic vuelve a comprobar la cuenta: permite abrir el destino interno si el almacenamiento se ha recuperado; si falla la comprobación, abre Perfil sin revelar conversación o invitación. Un payload ilegible también produce un aviso genérico en vez de una notificación silenciosa. La nueva prueba bloquea IndexedDB, fuerza un fallo de apertura y datos ilegibles: debe mostrarse un aviso sin necesitar abrir la app y recuperar la navegación al estar disponible el almacenamiento. Esta mitigación debe pasar su CI y probarse de nuevo con el iPhone cerrado; aún no se atribuye la causa física a IndexedDB como hecho demostrado.
+
+La mitigación se publicó tras su [CI aprobada](https://github.com/rommer1997/CANTERA-/actions/runs/42514558622), con 460 pruebas, fuente `ce1d803fdf52bb6f8976cd4e8066decae86ef617` y shell `db268469f05dc620`. Se verificaron los bytes de Hosting y la versión de la UI. La prueba adicional con IndexedDB completamente ausente también muestra el aviso genérico. Se pidió al responsable actualizar desde el icono instalado, salir de la app y bloquear el iPhone. Su respuesta posterior confirmó que ya aparecen las notificaciones al realizar ese ensayo; el resultado se registra al inicio.

@@ -1,0 +1,51 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=1080,height=1080"><title>Instala LaCantera en iPhone</title><script src="assets/gsap.min.js"></script>
+<style>
+@font-face{font-family:Manrope;src:url('assets/manrope.woff2') format('woff2');font-weight:200 800;font-display:block}
+*{box-sizing:border-box;margin:0;padding:0}html,body{width:1080px;height:1080px;overflow:hidden;background:#f7f9f7;color:#071b17;font-family:Manrope,sans-serif}
+#root{position:relative;width:1080px;height:1080px;background:#f7f9f7;overflow:hidden}
+.brand{position:absolute;top:32px;left:48px;right:48px;display:flex;align-items:center;gap:14px;z-index:20;font-size:34px;font-weight:800;letter-spacing:-1px}.brand img{width:48px;height:48px}.brand>span:last-child{margin-left:auto;font-size:28px;letter-spacing:0;color:#627078;font-weight:400}
+.scene{position:absolute;inset:0;background:#f7f9f7;overflow:hidden}.scene:not(:first-of-type){opacity:0}
+.scene-content{width:100%;height:100%;padding:128px 48px 96px;display:flex;flex-direction:column;gap:18px}
+.step{display:flex;align-items:center;gap:14px;font-size:28px;font-weight:800;color:#006747;letter-spacing:.04em;font-variant-numeric:tabular-nums}
+.step b{display:grid;place-items:center;width:44px;height:44px;border-radius:50%;background:#d6f65c;color:#071b17;font-size:28px;letter-spacing:0}
+h1,h2{font-size:62px;line-height:1.1;font-weight:800;letter-spacing:-2px;max-width:984px}p{font-size:42px;line-height:1.35;font-weight:400;color:#627078;max-width:900px}.media{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;min-width:0}.shot{position:relative;max-width:100%;width:984px;border-radius:28px;isolation:isolate}.shot img{display:block;width:100%;height:auto;border-radius:28px}.context{width:330px}.context img{border-radius:28px}.focus{width:940px}.media-label{font-size:30px;line-height:1.4;color:#006747;text-align:center;max-width:920px;font-weight:600}.tap{position:absolute;z-index:4;display:block;border:7px solid #d6f65c;box-shadow:0 0 0 7px #006747b3;border-radius:22px;pointer-events:none;transform-origin:center;background:none}
+#s1 .tap{left:18%;top:8%;width:15%;height:80%}#s2 .tap{left:1%;top:6%;width:98%;height:87%}#s3 .tap{left:51%;top:3%;width:26%;height:92%}#s4 .tap{left:80%;top:9%;width:17%;height:38%}#s5 .tap{left:75%;top:7%;width:23%;height:28%}
+.finish-logo{width:160px;height:160px}.intro-hero{display:flex;align-items:center;justify-content:center;flex:1}.intro-hero img{width:180px;height:180px}.route{font-size:38px;color:#006747;font-weight:600;letter-spacing:-1px}.intro h1,.outro h2{font-size:72px;max-width:984px}.intro .step,.outro .step{font-size:28px}.outro .media{gap:24px}
+.footer{position:absolute;bottom:28px;left:48px;right:48px;z-index:20;display:grid;gap:12px}.footer-row{display:flex;justify-content:space-between;align-items:center;font-size:28px;color:#627078}.footer-row strong{font-weight:600;color:#006747}.progress{height:8px;background:#d7dfdd;border-radius:8px;overflow:hidden}.progress>div{height:100%;width:100%;transform-origin:left;background:#006747}
+
+/* Dirección actualizada por petición del responsable; controles originales. */
+.shot{container-type:inline-size}.updated-domain{position:absolute;z-index:3;display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif;font-weight:400;line-height:1;white-space:nowrap;letter-spacing:0}
+.safari-address .updated-domain{left:30.5%;top:28%;width:41%;height:44%;font-size:4.3cqw;background:#2c2c2c;color:#fff;justify-content:flex-end;padding-right:1cqw}
+.confirm-address .updated-domain{left:20%;top:77%;width:72%;height:17%;font-size:4.1cqw;background:#383838;color:#9e9ea3;justify-content:flex-start}
+</style></head><body><div id="root" data-composition-id="main" data-start="0" data-duration="36" data-width="1080" data-height="1080">
+<div class="brand"><img src="assets/logo.svg" alt=""><span>LaCantera</span><span>iPhone · Safari</span></div>
+<section id="s0" class="scene intro" style="z-index:1"><div class="scene-content"><span class="step">GUÍA DE INSTALACIÓN</span><h1>Tu fútbol, a un toque.</h1><p>Añade LaCantera a tu pantalla de inicio en cinco pasos.</p><div class="intro-hero"><img src="assets/logo.svg" alt="LaCantera"></div></div></section>
+<section id="s1" class="scene" style="z-index:2"><div class="scene-content"><span class="step"><b>1</b> ABRE EL MENÚ</span><h2>Empieza en Safari.</h2><p>Abre lacantera.com.es y toca el menú junto a la dirección.</p><div class="media"><div class="shot safari-address"><span class="updated-domain">lacantera.com.es</span><img src="assets/safari-menu.webp" alt="Barra de Safari con el menú de página a la izquierda de lacantera.com.es"><span class="tap" aria-hidden="true"></span></div><span class="media-label">El botón de las líneas, junto a la dirección.</span></div></div></section>
+<section id="s2" class="scene" style="z-index:3"><div class="scene-content"><span class="step"><b>2</b> COMPARTE LA PÁGINA</span><h2>Toca «Compartir».</h2><p>Si ya ves el botón Compartir en Safari, puedes tocarlo directamente.</p><div class="media"><div class="shot context"><img src="assets/share-context.webp" alt="Menú de página de Safari con la acción Compartir"></div><div class="shot focus"><img src="assets/share-action.webp" alt="Detalle de la acción Compartir"><span class="tap" aria-hidden="true"></span></div></div></div></section>
+<section id="s3" class="scene" style="z-index:4"><div class="scene-content"><span class="step"><b>3</b> CREA EL ACCESO</span><h2>Añadir a pantalla de inicio.</h2><p>Busca esta opción en las acciones del menú Compartir.</p><div class="media"><div class="shot"><img src="assets/add-to-home.webp" alt="Acciones de Safari con Añadir a pantalla de inicio"><span class="tap" aria-hidden="true"></span></div><span class="media-label">Si no aparece, revisa «Ver más» o «Editar acciones».</span></div></div></section>
+<section id="s4" class="scene" style="z-index:5"><div class="scene-content"><span class="step"><b>4</b> ACTIVA ESTA OPCIÓN</span><h2>Ábrela como app.</h2><p>Deja activado «Abrir como app web» si aparece.</p><div class="media"><div class="shot"><img src="assets/open-as-app.webp" alt="Abrir como app web activado"><span class="tap" aria-hidden="true"></span></div><span class="media-label">El interruptor debe quedar en verde.</span></div></div></section>
+<section id="s5" class="scene" style="z-index:6"><div class="scene-content"><span class="step"><b>5</b> CONFIRMA</span><h2>Termina con «Añadir».</h2><p>Conserva el nombre LaCantera y pulsa el botón de arriba.</p><div class="media"><div class="shot confirm-address"><span class="updated-domain">https://lacantera.com.es/#/</span><img src="assets/confirm-add.webp" alt="Confirmación de Safari con el nombre LaCantera y el botón Añadir"><span class="tap" aria-hidden="true"></span></div></div></div></section>
+<section id="s6" class="scene outro" style="z-index:7"><div class="scene-content"><span class="step">TU COMUNIDAD, MÁS CERCA</span><h2>Abre desde su icono.</h2><p>Busca LaCantera en tu pantalla de inicio.</p><div class="media"><img class="finish-logo" src="assets/logo.svg" alt="LaCantera"><span class="media-label">Entra con tu cuenta y vuelve al campo.</span></div></div></section>
+<div class="footer"><div class="footer-row"><strong>lacantera.com.es</strong><span>Instalación gratuita</span></div><div class="progress"><div></div></div></div>
+</div><script>
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+const starts=[0,3,8.5,14.5,20.5,26,31.5];
+// The only exits before the last scene are the scene-container crossfades.
+starts.forEach((t,i)=>{
+ const id='#s'+i;
+ if(i>0){tl.to('#s'+(i-1),{opacity:0,duration:.45,ease:'power2.inOut'},t);tl.to(id,{opacity:1,duration:.45,ease:'power2.inOut'},t);}
+ tl.from(id+' .step',{y:12,opacity:0,duration:.4,ease:'power2.out'},t+.18);
+ tl.from(id+' h1,'+id+' h2',{y:28,opacity:i===0?1:0,duration:.5,ease:'power3.out'},t+.28);
+ tl.from(id+' p',{y:14,opacity:0,duration:.45,ease:'sine.out'},t+.45);
+ const media=id+' .shot,'+id+' .intro-hero img,'+id+' .finish-logo';
+ tl.from(media,{y:22,scale:.97,opacity:i===0?1:0,duration:.55,ease:'power2.out',stagger:.12},t+.6);
+ const labels=document.querySelectorAll(id+' .media-label,'+id+' .route');
+ if(labels.length)tl.from(labels,{y:12,opacity:0,duration:.4,ease:'sine.out'},t+.9);
+ if(i>0&&i<6){tl.from(id+' .tap',{opacity:0,scale:.9,duration:.35,ease:'power3.out'},t+1.2);tl.to(id+' .tap',{scale:1.04,duration:.65,ease:'sine.inOut',repeat:3,yoyo:true},t+1.65);}
+});
+tl.from('.brand',{y:-12,opacity:0,duration:.5,ease:'power2.out'},.12);
+tl.from('.footer-row',{opacity:0,duration:.5,ease:'sine.out'},.2);
+tl.from('.progress>div',{scaleX:0,duration:36,ease:'none'},0);
+window.__timelines.main=tl;
+</script></body></html>

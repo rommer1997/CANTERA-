@@ -1,8 +1,9 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { onAuthStateChanged, type User } from 'firebase/auth';
-import { collection, deleteDoc, getCountFromServer, serverTimestamp, doc, getDoc, getDocs, limit, onSnapshot, orderBy, query, runTransaction, setDoc, startAfter, updateDoc, where, writeBatch, type DocumentData, type DocumentSnapshot, type QueryDocumentSnapshot } from 'firebase/firestore';
+import { collection, deleteDoc, getCountFromServer, serverTimestamp, doc, getDoc, getDocs, getDocsFromServer, limit, onSnapshot, orderBy, query, runTransaction, setDoc, startAfter, updateDoc, where, writeBatch, type DocumentData, type DocumentSnapshot, type QueryDocumentSnapshot } from 'firebase/firestore';
 import { deleteObject, getDownloadURL, ref, uploadBytesResumable } from 'firebase/storage';
 import { auth, db, logout, signInWithGoogle, storage } from '../firebase';
+import { disablePushDevice, discardPendingPush } from './pushApi';
 import { useAppStore } from '../store/useAppStore';
 import { deleteLocalMedia, getLocalMedia, readDemo, saveLocalMedia, writeDemo, type DemoData } from './local';
 import { createLocalMediaCache, publishLocalPosts } from './localMediaCache';
@@ -10,6 +11,7 @@ import { createCoalescedRefresh } from './coalescedRefresh';
 import { removeDemoConnection } from './invitationDemo';
 import { legalReady, operator } from './legal';
 import { normalizeFixtureRecord, fixtureFields, sameFixture } from './fixtureRecords';
+import { recordDiscipline, updatePlayerTotals, validPlayerStats } from './tournament';
 import { commitDeliveryBatches } from './deliveryBatches';
 import { TERMS_VERSION } from './policy';
 import { pilotAccountAllowed, type PilotIdentity } from './pilotAccess.ts';
@@ -17,7 +19,7 @@ import { canReadEvent, isPublicEvent } from './eventPrivacy';
 export { TERMS_VERSION } from './policy';
 import { joinParticipants, makeFixtures, recordScore, requireText, validateEvent, validateEventEdit, validateFixtureSchedule, validateMatchResult } from './logic';
 import { normalizeCommentRecord, normalizeDemoData, normalizeEvent, normalizeFollow, normalizeHiddenPostIds, normalizeLike, normalizePost, normalizeProfile, normalizePublicProfile, normalizeReport, normalizeVerification, normalizeNotice, normalizeRightsRequest, normalizeRuntime, profileSearchTokens, searchText } from './normalization';
-import type { CommunityPost, CommunityProfile, ContentReport, EventInput, PlayEvent, PostComment, PostInput, PublicProfile, VerificationRequest, RuntimeConfig, AccountModeration, EventNotice, RightsRequest, FixtureSchedule, MatchResult, Rsvp, EventChange, Fixture, PeopleSearchField, PostInteractionState } from './types';
+import type { CommunityPost, CommunityProfile, ContentReport, EventInput, PlayEvent, PostComment, PostInput, PublicProfile, VerificationRequest, RuntimeConfig, AccountModeration, EventNotice, RightsRequest, FixtureSchedule, FixtureDiscipline, FixturePlayerStats, MatchResult, Rsvp, EventChange, Fixture, PeopleSearchField, PostInteractionState } from './types';
 
 type Mode = 'demo' | 'cloud';
 function noticeRecipientAllowed(event: Pick<PlayEvent, 'visibility' | 'ownerId' | 'participants'>, recipientId: string): boolean {
@@ -43,7 +45,7 @@ interface CommunityAPI {
   verificationRequests: VerificationRequest[]; reports: ContentReport[]; hiddenPostIds: string[];
   profiles: PublicProfile[]; publicProfiles: Record<string, PublicProfile>;
   publicProfileStates: Record<string, 'loading' | 'ready' | 'missing' | 'error'>;
-  followingIds: string[]; peopleLoading: boolean; peopleError: string; peopleHasMore: boolean;
+  followingIds: string[]; peopleAvailable: boolean; peopleLoading: boolean; peopleError: string; peopleHasMore: boolean;
   linkedPostStates: Record<string, 'loading' | 'ready' | 'missing' | 'error'>; watchPost(id: string): () => void;
   loadMorePeople(reset?: boolean): Promise<void>; watchPublicProfile(id: string): () => void; retryPublicProfile(id: string): void; toggleFollow(id: string): Promise<void>;
   login(): Promise<void>; loginAdmin(): Promise<void>; signOut(): Promise<void>; beginDemo(name: string): Promise<void>;
@@ -53,7 +55,10 @@ interface CommunityAPI {
   setRsvp(id: string, response: Rsvp): Promise<void>; joinWaitlist(id: string, name: string): Promise<void>; leaveWaitlist(id: string): Promise<void>;
   saveMatchResult(id: string, result: MatchResult): Promise<void>; scheduleFixture(id: string, fixtureId: string, schedule: FixtureSchedule): Promise<void>;
   addGuest(id: string, name: string): Promise<void>; setEventStatus(id: string, status: PlayEvent['status'], reason?: string): Promise<void>;
-  generateFixtures(id: string): Promise<void>; saveScore(id: string, fixture: string, home: number, away: number): Promise<void>;
+  generateFixtures(id: string): Promise<void>; saveScore(id: string, fixture: string, home: number, away: number, penalties?: {home:number;away:number}): Promise<void>;
+  loadFixturePlayers(id: string, fixture: string): Promise<FixturePlayerStats[]>;
+  savePlayerStats(id: string, fixture: string, input: Omit<FixturePlayerStats, 'id'>): Promise<void>;
+  saveDiscipline(id: string, fixture: string, discipline: FixtureDiscipline): Promise<void>;
   createPost(input: PostInput, progress?: (n: number) => void): Promise<string>; deletePost(id: string): Promise<void>;
   toggleLike(id: string): Promise<void>; addComment(id: string, text: string): Promise<void>;
   reportPost(id: string, reason: string): Promise<void>; hidePost(id: string): void;
@@ -148,6 +153,12 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
   const readReady = dataReadScope.current === readScope && (mode === 'demo' || auth.currentUser?.uid === firebaseUser?.uid);
   const privateReadReady = identityMatches && readReady;
   const adminReadReady = privateReadReady && mode === 'cloud' && isAdmin;
+  const peopleAvailable = serviceOpen && identityMatches && Boolean(profile?.adultConfirmed
+    && profile.acceptedTermsVersion === TERMS_VERSION && Number.isFinite(Date.parse(profile.acceptedTermsAt))
+    && profile.city.trim() && profile.country.trim()) && accountModeration?.status !== 'suspended'
+    && (mode === 'demo' || firebaseUser?.emailVerified === true);
+  const peopleScope = JSON.stringify([mode, firebaseUser?.uid || '', peopleAvailable]);
+  const currentPeopleScope = useRef(peopleScope); currentPeopleScope.current = peopleScope;
   const eventViewer = mode === 'demo' ? profile?.id : firebaseUser?.uid;
   const currentEventViewer = useRef(eventViewer); currentEventViewer.current = eventViewer;
   const fixtureWatches = useRef(new Map<string, symbol>());
@@ -243,7 +254,8 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => () => { postWatches.current.forEach(entry => entry.stop()); postWatches.current.clear(); }, []);
 
   const loadMorePeople = useCallback(async (reset = false) => {
-    if (mode === 'cloud' && !serviceOpen) { setPeoplePage({ mode, profiles: [], loading: false, error: '', hasMore: false }); return; }
+    const scope = peopleScope; const uid = firebaseUser?.uid;
+    if (!peopleAvailable || mode === 'cloud' && auth.currentUser?.uid !== uid) { setPeoplePage({ mode, profiles: [], loading: false, error: '', hasMore: false }); return; }
     if (reset || peopleCursor.current.mode !== mode) peopleCursor.current = { mode, cursor: null, offset: 0, sequence: peopleCursor.current.sequence + 1, busy: false };
     const paging = peopleCursor.current;
     if (paging.busy) return;
@@ -263,12 +275,18 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
         records = snapshot.docs.map(item => normalizePublicProfile(item.data(), item.id)).filter((item): item is PublicProfile => item !== null);
         paging.cursor = snapshot.docs.at(-1) || paging.cursor; hasMore = snapshot.size === peoplePageSize;
       }
-      if (currentMode.current !== mode || peopleCursor.current.sequence !== sequence) return;
+      if (currentMode.current !== mode || currentPeopleScope.current !== scope || mode === 'cloud' && auth.currentUser?.uid !== uid || peopleCursor.current.sequence !== sequence) return;
       setPeoplePage(previous => ({ mode, profiles: [...new Map([...(previous.mode === mode ? previous.profiles : []), ...records].map(item => [item.id, item])).values()], loading: false, error: '', hasMore }));
       setPublicCaches(previous => ({ ...previous, [mode]: { ...previous[mode], ...Object.fromEntries(records.map(item => [item.id, item])) } }));
-    } catch (err) { if (currentMode.current === mode && peopleCursor.current.sequence === sequence) setPeoplePage(previous => ({ ...previous, mode, loading: false, error: friendlyError(err) })); }
+    } catch (err) { if (currentMode.current === mode && currentPeopleScope.current === scope && peopleCursor.current.sequence === sequence) setPeoplePage(previous => ({ ...previous, mode, loading: false, error: friendlyError(err) })); }
     finally { if (peopleCursor.current === paging) paging.busy = false; }
-  }, [mode, serviceOpen]);
+  }, [mode, peopleAvailable, peopleScope, firebaseUser?.uid]);
+
+  useEffect(() => {
+    if (peopleAvailable) return;
+    peopleCursor.current = { mode, cursor: null, offset: 0, sequence: peopleCursor.current.sequence + 1, busy: false };
+    setPeoplePage({ mode, profiles: [], loading: false, error: '', hasMore: peopleAvailable });
+  }, [mode, peopleScope, peopleAvailable]);
 
   const searchPeople = useCallback(async (value: string, field: PeopleSearchField, reset = true) => { peopleSearch.current = { value: searchText(value), field }; await loadMorePeople(reset); }, [loadMorePeople]);
 
@@ -668,7 +686,7 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
   }
   async function updateRuntimeStatus(status: RuntimeConfig['serviceStatus']) {
     sessionActor(); if (!isAdmin || mode !== 'cloud' || !['setup', 'open', 'paused'].includes(status)) throw new Error('Esta acción requiere la cuenta administradora.');
-    if (status === 'open' && import.meta.env.VITE_SERVICE_OPEN !== 'true') throw new Error('Esta versión sólo permite un piloto privado. La apertura pública requiere su propia revisión.');
+    if (status === 'open' && import.meta.env.VITE_SERVICE_OPEN !== 'true') throw new Error('Esta versión solo permite un piloto privado. La apertura pública requiere su propia revisión.');
     if (status === 'open' && !legalReady) throw new Error('Completa el nombre, país y contacto del responsable antes de abrir el servicio.');
     await setDoc(doc(db, 'communityConfiguration', 'runtime'), { serviceStatus: status, mediaUploadsEnabled: false, contactEmail: operator.email || runtimeConfig.contactEmail, updatedAt: serverTimestamp() });
   }
@@ -685,7 +703,7 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
     const key = `${user.id}:${id}`;
     let state = deliveryCursors.current.get(key);
     if (!state) { state = { stage: 'changes', cursor: null, candidates: [], busy: false }; deliveryCursors.current.set(key, state); }
-    if (state.busy) throw new Error('Ya se están recuperando los avisos de este encuentro.');
+    if (state.busy) throw new Error('Ya se están recuperando los avisos de este partido.');
     state.busy = true;
     try {
       while (state.candidates.length < 200 && state.stage !== 'done') {
@@ -719,7 +737,7 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
         await commitDeliveryBatches(missing, async candidates => {
           const current = await getDoc(doc(db, 'communityEvents', id));
           const latest = current.exists() ? normalizeEvent(current.data(), id) : null;
-          if (!latest || latest.ownerId !== user.id) throw new Error('El encuentro ya no está disponible para entregar avisos.');
+          if (!latest || latest.ownerId !== user.id) throw new Error('El partido ya no está disponible para entregar avisos.');
           const eligible = candidates.filter(candidate => noticeRecipientAllowed(latest, candidate.value.recipientId));
           if (!eligible.length) return;
           const batch = writeBatch(db);
@@ -768,10 +786,10 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
     return profile;
   }
   function mutateDemo(change: (data: DemoData) => DemoData) { writeDemo(normalizeDemoData(change(normalizeDemoData(readDemo())))); }
-  async function mutateEvent(id: string, change: (event: PlayEvent, user: CommunityProfile) => PlayEvent, ownerOnly = false, reason = 'Se ha actualizado el encuentro.', withdrawal = false, notifyOnly?: string[]) {
+  async function mutateEvent(id: string, change: (event: PlayEvent, user: CommunityProfile) => PlayEvent, ownerOnly = false, reason = 'Se ha actualizado el partido.', withdrawal = false, notifyOnly?: string[]) {
     const user = withdrawal ? sessionActor() : actor();
     const apply = (event: PlayEvent) => {
-      if (!canReadEvent(event, user.id)) throw new Error('Necesitas una invitación para acceder a este encuentro privado.');
+      if (!canReadEvent(event, user.id)) throw new Error('Necesitas una invitación para acceder a este partido privado.');
       if (ownerOnly && event.ownerId !== user.id) throw new Error('Solo el organizador puede realizar esta acción.');
       const changed = change(event, user);
       const promoted = Object.keys(changed.participants).find(uid => !event.participants[uid] && event.waitlist?.[uid]);
@@ -817,7 +835,7 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
         // still verify the recipient's current membership at delivery time.
         const current = user.id === notificationOwnerId ? await getDoc(doc(db, 'communityEvents', id)) : null;
         const latest = current ? current.exists() ? normalizeEvent(current.data(), id) : null : notificationEvent;
-        if (!latest || latest.ownerId !== notificationOwnerId) throw new Error('El encuentro ya no está disponible para entregar avisos.');
+        if (!latest || latest.ownerId !== notificationOwnerId) throw new Error('El partido ya no está disponible para entregar avisos.');
         const eligible = notices.filter(notice => noticeRecipientAllowed(latest, notice.value.recipientId));
         if (!eligible.length) return;
         const batch = writeBatch(db);
@@ -843,7 +861,7 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
     }
   }
   async function loginAdmin() { setError(''); const user = await signInWithGoogle(); const token = await user.getIdTokenResult(true); if (token.claims.admin !== true) { await logout(); throw new Error('Esta cuenta no tiene el permiso de administración.'); } }
-  async function signOut() { await logout(); localStorage.removeItem('cantera-demo-active'); setFirebaseUser(null); setPilotIdentity(null); setProfile(null); setLegacyUser(null); setMode('cloud'); }
+  async function signOut() { const uid=auth.currentUser?.uid; await disablePushDevice().catch(()=>undefined); if(uid)discardPendingPush(uid); await logout(); localStorage.removeItem('cantera-demo-active'); setFirebaseUser(null); setPilotIdentity(null); setProfile(null); setLegacyUser(null); setMode('cloud'); }
   async function beginDemo(name: string) {
     if (!demoEnabled) throw new Error('El modo de prueba no está disponible en producción.');
     if (auth.currentUser) await logout();
@@ -912,7 +930,7 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
     return id;
   }
   async function createEventSeries(inputs: EventInput[]) {
-    const user = actor(); if (inputs.length < 2 || inputs.length > 12) throw new Error('La serie admite entre 2 y 12 encuentros.');
+    const user = actor(); if (inputs.length < 2 || inputs.length > 12) throw new Error('La serie admite entre 2 y 12 partidos.');
     const records = inputs.map(input => { const cleaned = validateEvent(input); const id = newId(); return { ...cleaned, id, ownerId: user.id, ownerName: user.name, startAtMs: Date.parse(cleaned.startAt), status: 'open' as const, participants: {}, participantIds: [], fixtures: [], waitlist: {}, waitlistOrder: [], rsvps: {}, revision: 0, history: [], createdAt: stamp(), updatedAt: stamp() }; });
     if (mode === 'demo') mutateDemo(data => ({ ...data, events: [...records, ...data.events] }));
     else { const batch = writeBatch(db); for (const record of records) batch.set(doc(db, 'communityEvents', record.id), { ...record, createdAt: serverTimestamp(), updatedAt: serverTimestamp() }); await batch.commit(); }
@@ -936,16 +954,16 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
       const source = mode === 'demo' ? normalizeDemoData(readDemo()).events.find(event => event.id === id) : await getDoc(doc(db, 'communityEvents', id)).then(snapshot => snapshot.exists() ? normalizeEvent(snapshot.data(), id) : null);
       if (!source || source.status !== 'open' || source.fixtures.length || Date.parse(source.startAt) <= Date.now() || Object.keys(source.participants).length >= source.capacity || !(source.waitlistOrder || []).length) return;
       const uid = source.waitlistOrder![0];
-      await mutateEvent(id, event => { const first = event.waitlistOrder?.[0]; if (!first || Object.keys(event.participants).length >= event.capacity || event.status !== 'open') throw new Error('La lista de espera ha cambiado. Actualiza el encuentro.'); const waitlist = { ...(event.waitlist || {}) }; const name = waitlist[first].name; delete waitlist[first]; return { ...event, participants: { ...event.participants, [first]: name }, waitlist, waitlistOrder: event.waitlistOrder!.slice(1) }; }, true, 'Has conseguido una plaza al ampliar la convocatoria.', false, [uid]);
+      await mutateEvent(id, event => { const first = event.waitlistOrder?.[0]; if (!first || Object.keys(event.participants).length >= event.capacity || event.status !== 'open') throw new Error('La lista de espera ha cambiado. Actualiza el partido.'); const waitlist = { ...(event.waitlist || {}) }; const name = waitlist[first].name; delete waitlist[first]; return { ...event, participants: { ...event.participants, [first]: name }, waitlist, waitlistOrder: event.waitlistOrder!.slice(1) }; }, true, 'Has conseguido una plaza al ampliar la convocatoria.', false, [uid]);
     }
   }
   async function updateEvent(id: string, input: EventInput, changeReason: string) { await mutateEvent(id, event => ({ ...event, ...validateEventEdit(event, input, changeReason), startAtMs: Date.parse(input.startAt) }), true, changeReason); try { await promoteWaitingPlayers(id); } catch { throw new Error('El cambio se ha guardado, pero queda una promoción pendiente. Vuelve a guardar el aforo para reintentarlo.'); } }
   async function setEventStatus(id: string, status: PlayEvent['status'], reason?: string) {
     if (!['open', 'closed', 'cancelled', 'completed'].includes(status)) throw new Error('Estado inválido.');
-    await mutateEvent(id, event => { if (status === 'open' && (event.fixtures.length || Date.parse(event.startAt) <= Date.now())) throw new Error('No puedes reabrir un calendario ya generado o celebrado.'); if (status === 'completed') { if (Date.parse(event.startAt) > Date.now()) throw new Error('El encuentro todavía no ha comenzado.'); if (event.status === 'cancelled') throw new Error('Un encuentro cancelado no puede marcarse celebrado.'); if (event.type === 'match' && !event.result) throw new Error('Registra primero el resultado del partido.'); if (event.type === 'tournament' && (!event.fixtures.length || event.fixtures.some(f => f.awayId && f.homeScore === null) || event.tournamentFormat === 'knockout' && event.fixtures.filter(f => f.round === Math.max(...event.fixtures.map(f => f.round))).length !== 1)) throw new Error('Completa los resultados del torneo.'); } return { ...event, status }; }, true, reason || (status === 'cancelled' ? 'El organizador ha cancelado el encuentro.' : `El organizador ha cambiado el estado a ${status}.`)); if (status === 'open') { try { await promoteWaitingPlayers(id); } catch { throw new Error('Se han abierto las inscripciones, pero queda una promoción pendiente. Vuelve a abrirlas para reintentarlo.'); } }
+    await mutateEvent(id, event => { if (status === 'open' && (event.fixtures.length || Date.parse(event.startAt) <= Date.now())) throw new Error('No puedes reabrir un calendario ya generado o celebrado.'); if (status === 'completed') { if (Date.parse(event.startAt) > Date.now()) throw new Error('El partido todavía no ha comenzado.'); if (event.status === 'cancelled') throw new Error('Un partido cancelado no puede marcarse celebrado.'); if (event.type === 'match' && !event.result) throw new Error('Registra primero el resultado del partido.'); if (event.type === 'tournament' && (!event.fixtures.length || event.fixtures.some(f => f.awayId && f.homeScore === null) || event.tournamentFormat === 'knockout' && event.fixtures.filter(f => f.round === Math.max(...event.fixtures.map(f => f.round))).length !== 1)) throw new Error('Completa los resultados del torneo.'); } return { ...event, status }; }, true, reason || (status === 'cancelled' ? 'El organizador ha cancelado el partido.' : `El organizador ha cambiado el estado a ${status}.`)); if (status === 'open') { try { await promoteWaitingPlayers(id); } catch { throw new Error('Se han abierto las inscripciones, pero queda una promoción pendiente. Vuelve a abrirlas para reintentarlo.'); } }
   }
   async function setRsvp(id: string, response: Rsvp) { if (!['yes', 'no', 'maybe'].includes(response)) throw new Error('Respuesta inválida.'); await mutateEvent(id, (event, user) => {
-    if (!event.participants[user.id]) throw new Error('Primero inscríbete en el encuentro.');
+    if (!event.participants[user.id]) throw new Error('Primero inscríbete en el partido.');
     if (Date.parse(event.startAt) <= Date.now() || event.status === 'cancelled' || event.status === 'completed') throw new Error('La convocatoria ha terminado.');
     if (response === 'no' && event.fixtures.length) throw new Error('El calendario ya está cerrado. Contacta con el organizador.');
     return { ...(response === 'no' ? releasePlace(event, user.id) : event), rsvps: { ...(event.rsvps || {}), [user.id]: response } };
@@ -958,10 +976,40 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
     return { ...event, waitlist: { ...(event.waitlist || {}), [user.id]: { name: requireText(name, 'Nombre', 100), joinedAt: stamp() } }, waitlistOrder: [...(event.waitlistOrder || []), user.id] };
   }); }
   async function leaveWaitlist(id: string) { await mutateEvent(id, (event, user) => { const waitlist = { ...(event.waitlist || {}) }; delete waitlist[user.id]; return { ...event, waitlist, waitlistOrder: (event.waitlistOrder || []).filter(uid => uid !== user.id) }; }, false, '', true); }
-  async function saveMatchResult(id: string, result: MatchResult) { await mutateEvent(id, event => { if (event.type !== 'match' || event.status === 'cancelled' || Date.parse(event.startAt) > Date.now()) throw new Error('Sólo se pueden registrar resultados de partidos celebrados.'); return { ...event, result: validateMatchResult(result), status: 'completed' }; }, true, 'El organizador ha registrado el resultado del partido.'); }
+  async function saveMatchResult(id: string, result: MatchResult) { await mutateEvent(id, event => { if (event.type !== 'match' || event.status === 'cancelled' || Date.parse(event.startAt) > Date.now()) throw new Error('Solo se pueden registrar resultados de partidos celebrados.'); return { ...event, result: validateMatchResult(result), status: 'completed' }; }, true, 'El organizador ha registrado el resultado del partido.'); }
   async function scheduleFixture(id: string, fixtureId: string, schedule: FixtureSchedule) { await mutateEvent(id, event => { const cleaned = validateFixtureSchedule(schedule); const fixture = event.fixtures.find(f => f.id === fixtureId); if (!fixture || !fixture.awayId || fixture.homeScore !== null || event.status === 'cancelled' || event.status === 'completed') throw new Error('No se puede programar este cruce.'); return { ...event, fixtures: event.fixtures.map(f => f.id === fixtureId ? { ...f, ...cleaned } : f) }; }, true, 'El organizador ha actualizado la fecha, hora o campo de un cruce.'); }
   async function generateFixtures(id: string) { await mutateEvent(id, event => { if (event.type !== 'tournament') throw new Error('Los cruces son para torneos.'); return { ...event, fixtures: makeFixtures(event), status: 'closed' }; }, true, 'El organizador ha publicado los cruces del torneo.'); }
-  async function saveScore(id: string, fixture: string, home: number, away: number) { await mutateEvent(id, event => ({ ...event, fixtures: recordScore(event, fixture, home, away) }), true, 'El organizador ha registrado un resultado del torneo.'); }
+  async function saveScore(id: string, fixture: string, home: number, away: number, penalties?: {home:number;away:number}) { await mutateEvent(id, event => ({ ...event, fixtures: recordScore(event, fixture, home, away, Date.now(), penalties) }), true, 'El organizador ha registrado un resultado del torneo.'); }
+  const loadFixturePlayers=useCallback(async (id: string, fixture: string): Promise<FixturePlayerStats[]> => {
+    if (mode === 'demo') return normalizeDemoData(readDemo()).events.find(event=>event.id===id)?.fixtures.find(item=>item.id===fixture)?.players || [];
+    const response = await getDocsFromServer(query(collection(db,'communityFixtures',`${id}_${fixture}`,'playerStats'),limit(201)));
+    if (response.size > 200) throw new Error('El acta de jugadores necesita revisión.');
+    return response.docs.map(record=>{ const data=record.data(); const value={id:record.id,side:data.side,jersey:data.jersey,goals:data.goals,yellowCards:data.yellowCards,redCards:data.redCards,fouls:data.fouls}; if (!validPlayerStats(value) || data.eventId !== id || data.fixtureId !== fixture || record.id !== `${data.side}_${data.jersey}`) throw new Error('El acta de jugadores contiene un registro inválido.'); return value; });
+  },[mode]);
+  async function savePlayerStats(id: string, fixtureId: string, input: Omit<FixturePlayerStats,'id'>) {
+    const user=actor(); const playerId=`${input.side}_${input.jersey}`; const next={...input,id:playerId};
+    if (!validPlayerStats(next)) throw new Error('Revisa el dorsal, los goles, las tarjetas y las faltas.');
+    const updatedFixture=(event:PlayEvent, fixture:Fixture, previous:FixturePlayerStats|null) => {
+      if (event.ownerId !== user.id || event.type !== 'tournament' || event.entry !== 'teams' || event.status !== 'closed' || !fixture.awayId || Date.parse(fixture.startAt || event.startAt)>Date.now()) throw new Error('Solo la organización puede editar el acta de un partido iniciado de un torneo en curso.');
+      return {...fixture,playerTotals:updatePlayerTotals(fixture,previous,next),playerChangeId:playerId,playerRevision:(fixture.playerRevision||0)+1};
+    };
+    if (mode==='demo') { await mutateEvent(id,event=>{const fixture=event.fixtures.find(item=>item.id===fixtureId); if (!fixture) throw new Error('Cruce no encontrado.'); const players=fixture.players||[]; const updated=updatedFixture(event,fixture,players.find(item=>item.id===playerId)||null); return {...event,fixtures:event.fixtures.map(item=>item.id===fixtureId?{...updated,players:[...players.filter(item=>item.id!==playerId),next]}:item)};},true,'El organizador ha actualizado las estadísticas por dorsal.'); return; }
+    await runTransaction(db,async tx=>{
+      const eventRef=doc(db,'communityEvents',id), fixtureRef=doc(db,'communityFixtures',`${id}_${fixtureId}`), playerRef=doc(db,'communityFixtures',`${id}_${fixtureId}`,'playerStats',playerId);
+      const [eventSnap,fixtureSnap,playerSnap]=await Promise.all([tx.get(eventRef),tx.get(fixtureRef),tx.get(playerRef)]);
+      const event=eventSnap.exists()?normalizeEvent(eventSnap.data(),id):null;
+      const fixture=fixtureSnap.exists()?normalizeFixtureRecord(fixtureSnap.data(),id):null;
+      if (!event || !fixture) throw new Error('El torneo o el cruce no está disponible.');
+      const previous=playerSnap.exists()?{...playerSnap.data(),id:playerId}:null;
+      if (previous && !validPlayerStats(previous)) throw new Error('El registro anterior necesita revisión.');
+      if (previous && (['goals','yellowCards','redCards','fouls'] as const).every(key=>previous[key]===next[key])) return;
+      const updated=updatedFixture(event,fixture,previous as FixturePlayerStats|null);
+      tx.update(fixtureRef,{playerTotals:updated.playerTotals,playerChangeId:playerId,playerRevision:updated.playerRevision,updatedAt:serverTimestamp()});
+      tx.set(playerRef,{...next,eventId:id,fixtureId,revision:playerSnap.exists()?(playerSnap.data().revision||0)+1:1,createdAt:playerSnap.exists()?playerSnap.data().createdAt:serverTimestamp(),updatedAt:serverTimestamp()});
+    });
+  }
+
+  async function saveDiscipline(id: string, fixture: string, discipline: FixtureDiscipline) { await mutateEvent(id, event => ({ ...event, fixtures: recordDiscipline(event, fixture, discipline) }), true, 'El organizador ha actualizado el acta disciplinaria de un partido.'); }
 
   async function createPost(input: PostInput, progress?: (n: number) => void) {
     const user = actor(); const id = newId();
@@ -980,7 +1028,7 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
         const parent = await getDoc(doc(db, 'communityEvents', input.eventId));
         associated = parent.exists() ? normalizeEvent(parent.data(), parent.id) : null;
       }
-      if (!associated || !isPublicEvent(associated)) throw new Error('Las publicaciones son públicas: sólo puedes asociar un encuentro público disponible.');
+      if (!associated || !isPublicEvent(associated)) throw new Error('Las publicaciones son públicas: solo puedes asociar un partido público disponible.');
     }
     let mediaUrl = '', mediaPath = '';
     try {
@@ -1076,10 +1124,10 @@ export function CommunityProvider({ children }: { children: React.ReactNode }) {
     await updateDoc(doc(db, 'communityReports', id), { status: 'resolved' });
   }
   const value: CommunityAPI = { profile, accountEmail: identityMatches && mode === 'cloud' && firebaseUser?.uid === profile?.id ? firebaseUser?.email || null : null, mode, loading, error, isAdmin: identityMatches && mode === 'cloud' && isAdmin, demoEnabled, pilotEnabled, serviceAvailable: serviceOpen, accountModeration: privateReadReady ? accountModeration : null, mediaUploadsEnabled: mode === 'demo', runtimeConfig: mode === 'demo' ? { serviceStatus: 'open', mediaUploadsEnabled: true, contactEmail: '', updatedAt: '' } : { ...runtimeConfig, serviceStatus: runtimeConfig.serviceStatus === 'pilot' ? 'pilot' : serviceOpen ? 'open' : runtimeConfig.serviceStatus === 'paused' ? 'paused' : 'setup' }, adminRightsRequests: adminReadReady ? adminRightsRequests : [], adminQueueHasMore, adminQueueLoading, loadMoreAdminQueue, suspendAccount, reviewRightsRequest, updateRuntimeStatus, ownEvents: privateReadReady ? readableOwnEvents : [], ownEventsHasMore: false, ownEventsLoading: loading, loadMoreOwnEvents, ...pages, loadMoreEvents, loadMorePosts, fixtureData: readReady ? fixtureData : {}, fixtureStates: readReady ? fixtureStates : {}, watchFixtureData, eventHistories: readReady ? eventHistories : {}, watchEventHistory, eventNotices: privateReadReady ? eventNotices.filter(notice => notice.recipientId === profile?.id) : [], rightsRequests: privateReadReady ? rightsRequests.filter(request => request.userId === profile?.id) : [], blockedIds: privateReadReady ? blockedIds : [], toggleBlock, markNoticeRead, requestRights, retryEventNotices, postInteractionStates, watchPostInteractions, loadMoreComments, deleteComment, reportComment, searchPeople, events: serviceOpen ? availableEvents : [], posts: serviceOpen ? availablePosts : [], likes, comments, verificationRequests: privateReadReady ? (adminReadReady ? verificationRequests : verificationRequests.filter(request => request.userId === profile?.id)) : [], reports: adminReadReady ? reports : [], hiddenPostIds: privateReadReady ? hiddenPostIds : [],
-    profiles: serviceOpen && peoplePage.mode === mode ? peoplePage.profiles : [], publicProfiles: serviceOpen ? publicCaches[mode] : {}, publicProfileStates: profileStates[mode], followingIds: privateReadReady ? followingIds : [],
-    peopleLoading: peoplePage.mode === mode && peoplePage.loading, peopleError: peoplePage.mode === mode ? peoplePage.error : '', peopleHasMore: peoplePage.mode !== mode || peoplePage.hasMore,
+    profiles: peopleAvailable && peoplePage.mode === mode ? peoplePage.profiles : [], publicProfiles: serviceOpen ? publicCaches[mode] : {}, publicProfileStates: profileStates[mode], followingIds: privateReadReady ? followingIds : [],
+    peopleAvailable, peopleLoading: peopleAvailable && peoplePage.mode === mode && peoplePage.loading, peopleError: peopleAvailable && peoplePage.mode === mode ? peoplePage.error : '', peopleHasMore: peopleAvailable && (peoplePage.mode !== mode || peoplePage.hasMore),
     loadMorePeople, watchPublicProfile, retryPublicProfile, toggleFollow, watchPost, linkedPostStates: linkedStates[mode],
-    login, loginAdmin, signOut, beginDemo, saveProfile, createEvent, createEventSeries, updateEvent, removeGuest, setRsvp, joinWaitlist, leaveWaitlist, saveMatchResult, scheduleFixture, joinEvent, leaveEvent, addGuest, setEventStatus, generateFixtures, saveScore,
+    login, loginAdmin, signOut, beginDemo, saveProfile, createEvent, createEventSeries, updateEvent, removeGuest, setRsvp, joinWaitlist, leaveWaitlist, saveMatchResult, scheduleFixture, joinEvent, leaveEvent, addGuest, setEventStatus, generateFixtures, saveScore, saveDiscipline, loadFixturePlayers, savePlayerStats,
     createPost, deletePost, toggleLike, addComment, reportPost, hidePost, requestVerification, reviewVerification, resolveReport };
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }

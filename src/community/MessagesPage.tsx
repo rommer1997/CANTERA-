@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ArrowDown, ArrowLeft, ArrowRight, Ban, ChevronRight, LoaderCircle, LockKeyhole, MessageCircle, Search, Send, ShieldCheck, Trash2, Users, WifiOff } from 'lucide-react';
 import { useCommunity, usePublicProfile } from './CommunityContext';
 import { useInvitations } from './InvitationsContext';
@@ -7,8 +7,10 @@ import { useConversation, useMessaging } from './MessagingContext';
 import { conversationParticipants, MESSAGE_MAX_LENGTH, safeMessagingError } from './messagingLogic';
 import type { MessagingConversation, MessagingMessage } from './messagingTypes';
 import './messages.css';
+import { ScreenHeading } from './screen-heading';
 import { messageIsAfterRead } from './messagingLogic';
 import { profileInitials } from './experience';
+import { safeReturnTo } from './teamLogic';
 
 const dayFormatter = new Intl.DateTimeFormat('es', { day: 'numeric', month: 'long', year: 'numeric' });
 const timeFormatter = new Intl.DateTimeFormat('es', { hour: '2-digit', minute: '2-digit' });
@@ -39,8 +41,11 @@ function useOnline() {
   return online;
 }
 
-function MessagesStatus({ title, children, login = false }: { title: string; children: React.ReactNode; login?: boolean }) {
-  return <section className="cm-page"><header className="cm-page-heading"><div><h1>Mensajes</h1></div></header><div className="cm-empty cm-status"><span className="cm-empty-icon"><LockKeyhole size={28} aria-hidden="true" /></span><h2>{title}</h2><p>{children}</p><Link className="c-button" to={login ? '/profile?returnTo=%2Fmessages' : '/profile'}>{login ? 'Entrar a mi cuenta' : 'Mi cuenta'}<ArrowRight size={17} aria-hidden="true" /></Link></div></section>;
+function MessagesStatus({ title, children, login = false, resume = false }: { title: string; children: React.ReactNode; login?: boolean; resume?: boolean }) {
+  const location = useLocation();
+  const returnTo = safeReturnTo(location.pathname + location.search) || '/messages';
+  const accountLink = login || resume ? `/profile?${new URLSearchParams({ returnTo })}` : '/profile';
+  return <section className="cm-page"><header className="cm-page-heading"><div><h1>Mensajes</h1></div></header><div className="cm-empty cm-status"><span className="cm-empty-icon"><LockKeyhole size={28} aria-hidden="true" /></span><h2>{title}</h2><p>{children}</p><Link className="c-button" to={accountLink}>{login ? 'Entrar a mi cuenta' : 'Mi cuenta'}<ArrowRight size={17} aria-hidden="true" /></Link></div></section>;
 }
 
 function conversationIdForContact(peerId: string, conversations: MessagingConversation[]) { return conversations.find(item => item.participantIds.includes(peerId))?.id || ''; }
@@ -71,11 +76,11 @@ function ConversationSidebar({ selectedId, online }: { selectedId?: string; onli
     catch (err) { if (mounted.current) setError(safeMessagingError(err)); }
     finally { if (mounted.current) setOpening(''); }
   }
-  return <aside className="cm-sidebar" aria-label="Contactos con quienes puedes conversar"><header className="cm-sidebar-heading"><h2>Conversaciones</h2><span><LockKeyhole size={13} aria-hidden="true" />Privada</span></header><label className="cm-search"><Search size={17} aria-hidden="true" /><span className="cm-sr-only">Buscar en tus contactos cargados</span><input type="search" placeholder="Buscar un contacto" value={search} onChange={event => setSearch(event.target.value)} maxLength={100} /></label>
+  return <aside className="cm-sidebar" aria-label="Contactos con quienes puedes conversar"><header className="cm-sidebar-heading"><h2>Conversaciones</h2><span><LockKeyhole size={13} aria-hidden="true" />Privada</span></header><label className="cm-search"><Search size={17} aria-hidden="true" /><span className="cm-sr-only">Buscar contactos</span><input type="search" placeholder="Buscar contactos" value={search} onChange={event => setSearch(event.target.value)} maxLength={100} /></label>
     {messaging.loading ? <p className="cm-list-note" role="status">Cargando tus contactos…</p> : null}
     {messaging.error || error ? <p className="c-error" role="alert">{error || messaging.error}</p> : null}
-    <div className="cm-sidebar-scroll"><h3 className="cm-list-label cm-sr-only">Escribir a una conexión</h3><ul className="cm-contact-list">{conversations.map(item => <ContactRow key={item.id} peerId={peerOf(item, uid)} selected={item.id === selectedId} opening={opening === peerOf(item, uid)} hidden={!matches(peerOf(item, uid))} disabled={!!opening || !online || !messaging.eligible} onOpen={id => void open(id)} />)}</ul>{!matchedCount && !messaging.loading ? <p className="cm-list-note" role="status">{searchPending ? 'Buscando en los perfiles que se están cargando…' : search.trim() ? 'No hay contactos con ese nombre entre los cargados.' : 'Acepta una invitación para conectar con alguien y escribirle.'}</p> : null}
-    </div>{messaging.readsError && <p className="c-error" role="alert">{messaging.readsError}</p>}{messaging.previewsHasMore && <div className="cm-preview-pagination"><p className="c-small">Las vistas previas y pendientes corresponden a las conversaciones cargadas.</p><button className="c-button secondary" onClick={messaging.loadMorePreviews}>Cargar más conversaciones</button></div>}<Link className="cm-connect-link" to="/connect"><Users size={17} aria-hidden="true" />Gestionar conexiones<ArrowRight size={16} aria-hidden="true" /></Link>
+    <div className="cm-sidebar-scroll"><h3 className="cm-list-label cm-sr-only">Escribir a una conexión</h3><ul className="cm-contact-list">{conversations.map(item => <ContactRow key={item.id} peerId={peerOf(item, uid)} selected={item.id === selectedId} opening={opening === peerOf(item, uid)} hidden={!matches(peerOf(item, uid))} disabled={!!opening || !online || !messaging.eligible} onOpen={id => void open(id)} />)}</ul>{!matchedCount && !messaging.loading ? <p className="cm-list-note" role="status">{searchPending ? 'Buscando en los perfiles que se están cargando…' : search.trim() ? 'No hay coincidencias en esta vista.' : 'Acepta una invitación para conectar con alguien y escribirle.'}</p> : null}
+    </div>{messaging.readsError && <p className="c-error" role="alert">{messaging.readsError}</p>}{messaging.previewsHasMore && <div className="cm-preview-pagination"><p className="c-small">Muestra más conversaciones para consultar las anteriores.</p><button className="c-button secondary" onClick={messaging.loadMorePreviews}>Cargar más conversaciones</button></div>}<Link className="cm-connect-link" to="/connect"><Users size={17} aria-hidden="true" />Gestionar conexiones<ArrowRight size={16} aria-hidden="true" /></Link>
   </aside>;
 }
 
@@ -181,8 +186,8 @@ function MessagesContent() {
   if (!community.profile) return <MessagesStatus title="Habla con tus conexiones" login>Entra con tu propia cuenta. Solo tú y la otra persona podréis consultar vuestra conversación.</MessagesStatus>;
   if (community.accountModeration?.status === 'suspended') return <MessagesStatus title="Tu cuenta tiene el acceso limitado">Consulta el estado de tu cuenta o contacta con el administrador desde tu perfil.</MessagesStatus>;
   if (!invitations.emailVerified) return <MessagesStatus title="Verifica tu correo">Verifica el correo de tu cuenta antes de enviar o consultar mensajes.</MessagesStatus>;
-  if (!messaging.eligible) return <MessagesStatus title="Completa tu cuenta para conversar">Completa tu perfil, ubicación y aceptación de los términos para escribir a tus conexiones.</MessagesStatus>;
-  return <section className={`cm-page ${conversationId ? 'has-conversation' : ''}`}><header className="cm-page-heading"><div><h1>Mensajes</h1><p>Tu gente, a un mensaje.</p></div><Link className="c-button secondary" to="/connect"><Users size={17} aria-hidden="true" />Conexiones</Link></header>{!online ? <p className="cm-notice cm-offline" role="status"><WifiOff size={18} aria-hidden="true" />Sin conexión. Los mensajes se actualizarán al recuperar la conexión; el envío queda pausado.</p> : null}<div className="cm-workspace"><ConversationSidebar selectedId={conversationId} online={online} />{conversationId ? <ConversationThread key={conversationId} conversationId={conversationId} online={online} /> : <div className="cm-welcome"><span className="cm-empty-icon"><MessageCircle size={32} aria-hidden="true" /></span><h2>Hablemos de fútbol</h2><p>Elige una conversación y prepara el próximo encuentro.</p><span className="cm-privacy-note"><LockKeyhole size={15} aria-hidden="true" />Los mensajes no aparecen en el feed.</span></div>}</div></section>;
+  if (!messaging.eligible) return <MessagesStatus title="Completa tu cuenta para conversar" resume>Completa tu perfil, ubicación y aceptación de los términos para escribir a tus conexiones.</MessagesStatus>;
+  return <section className={`cm-page ${conversationId ? 'has-conversation' : ''}`}><ScreenHeading className="cm-page-heading" eyebrow="EL VESTUARIO" title="Mensajes." description="Una conversación. El próximo plan."><Link className="c-button secondary" to="/connect"><Users size={17} aria-hidden="true" />Conexiones</Link></ScreenHeading>{!online ? <p className="cm-notice cm-offline" role="status"><WifiOff size={18} aria-hidden="true" />Sin conexión. Los mensajes se actualizarán al recuperar la conexión; el envío queda pausado.</p> : null}<div className="cm-workspace"><ConversationSidebar selectedId={conversationId} online={online} />{conversationId ? <ConversationThread key={conversationId} conversationId={conversationId} online={online} /> : <div className="cm-welcome"><span className="cm-empty-icon"><MessageCircle size={32} aria-hidden="true" /></span><h2>Hablemos de fútbol</h2><p>Elige una conversación y prepara el próximo partido.</p><span className="cm-privacy-note"><LockKeyhole size={15} aria-hidden="true" />Los mensajes no aparecen en el feed.</span></div>}</div></section>;
 }
 
 export default function MessagesPage() {

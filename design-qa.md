@@ -1,74 +1,65 @@
-## Equipos, Mensajes y Perfiles — acabado compartido, 16 octubre 2026
+# LaCantera — fidelidad a las cinco referencias móviles
 
-Revisión local completada: superficies blancas, cabeceras y pestañas comunes, filtros agrupados de Equipos, chat con compositor dentro de pantalla y perfiles propios/públicos coherentes. Pruebas en emuladores con dos cuentas sintéticas verifican envío, recepción y respuesta; un equipo sintético verifica creación/edición. 336 pruebas locales aprobadas y TypeScript/build correctos. No se escriben datos de prueba en producción. Publicado: fuente `92d43ee`, CI 38870263401 aprobada (433 pruebas), Hosting `2917c33cae21e8da`, release `1792137484491000`, 54 archivos idénticos al build. Pantallas reales comprobadas sin crear contenido nuevo; consola consultada sin errores. Recibo y límites físicos: `docs/APP_FINISH_2026-10-16.md`.
+Fecha: 8 de noviembre de 2026. **final result: passed**.
 
-## Publicación de Juega y Comunidad — 16 octubre 2026
+La guía visual de instalación añadida después de este pase tiene verificación independiente en [INSTALLATION_TUTORIAL_2026-11-08.md](docs/INSTALLATION_TUTORIAL_2026-11-08.md): MP4 cuadrado de 36 segundos adaptado al móvil, cinco pasos con las capturas reales de Safari, reproducción y adaptación móvil verificadas. La nueva guía requiere confirmación física de reproducción en iPhone.
 
-Fuente `ab3a063`, CI 38851843424 aprobada: 432 pruebas. Hosting `618738acccf9d446`, release `1792125785946000` (06:43 Madrid); 54 archivos idénticos al build. CUA en producción confirma actualización PWA, tarjetas privadas propias, estado público vacío, recomendaciones reales y compositor con retorno del foco. Comunidad sin desbordamiento a 320 px. No se escribe contenido de prueba en producción. Detalles en `docs/DISCOVERY_DESIGN_2026-10-16.md`.
+## Fuentes y normalización
 
-# LaCantera — Juega y Comunidad según las nuevas referencias
+La fuente visual son las cinco imágenes seleccionadas por el usuario, de 852 × 1846 px:
 
-16 de octubre de 2026.
+- Inicio: `/Users/usuario/Documents/Chuchelandia-Fotos-Flow/PROYECTOS-AUTOGUARDADOS/LaCantera_ fútbol amateur en Madrid-1.png`.
+- Juega: `/Users/usuario/Documents/Chuchelandia-Fotos-Flow/PROYECTOS-AUTOGUARDADOS/Encuentra tu partido en Madrid.png`.
+- Comunidad: `/Users/usuario/Documents/Chuchelandia-Fotos-Flow/PROYECTOS-AUTOGUARDADOS/LaCantera_ comunidad de fútbol amateur-3.png`.
+- Tu gente: `/var/folders/h8/csnlrb6j5xn4j0nk7cnz006r0000gn/T/codex-clipboard-0136e263-8f8b-4058-a01a-995be1f01cf4.png`.
+- Crear: `/var/folders/h8/csnlrb6j5xn4j0nk7cnz006r0000gn/T/codex-clipboard-25f3e417-6eca-42f7-ab27-d77aa43308a3.png`.
 
-**final result: passed** — inspección visual local de las dos superficies, con funciones existentes conservadas. Alcance y verificación publicados en `docs/DISCOVERY_DESIGN_2026-10-16.md`.
+Implementación inspeccionada en el navegador integrado: `http://localhost:4174`, proyecto Auth/Firestore emulado `demo-cantera-ux`. Usuario sintético identificado con una conexión, tres encuentros y dos publicaciones de prueba. No se utiliza la cuenta ni la base de producción para estas acciones.
 
-La fuente son las dos últimas referencias móviles del usuario de este turno. El objetivo es su jerarquía y composición, con contenido y servicios reales. Juega agrupa filtros en selectores y reserva la pantalla a partidos; Comunidad presenta compositor y stream con pestañas subrayadas. Blanco, verde #006747, bordes finos, fotos existentes y controles nativos. Las dos primeras capturas del usuario documentan el problema anterior; no se usan como objetivo.
+Se normalizan las fuentes a 393 × 852 para compararlas con un viewport DOM confirmado de 393 × 852 CSS px. El navegador de este equipo reporta DPR 0,75: la capacidad se ajustó a 295 × 639 para obtener ese viewport. Las capturas originales contienen un margen exterior blanco adicional; las copias de comparación recortan exclusivamente ese margen hasta el rectángulo visible del viewport, sin pintar ni alterar la interfaz. También se comprueban 320 × 780, 1024 × 900 y 1440 × 1000 CSS px. No se simulan status bar, batería ni chrome de Safari.
 
-Capturas nuevas de CUA en `output/design/discovery-2026-10-16/`: juega-320, juega-430, comunidad-430, comunidad-comentarios-320, comunidad-busqueda-320 y adaptaciones desktop. Se verifican dimensiones en DOM. Sin desbordamiento del documento en las vistas probadas. Se corrige durante la inspección el espacio del selector Formato a 320 px y la flecha centrada; el botón del compositor mantiene una sola zona de interacción que abarca texto y +.
+Evidencia completa en `output/design/reference-2026-11-08/`: `home-reference.png`, `play-reference.png`, `feed-reference.png`, `connect-reference.png`, `create-reference.png`; las capturas `*-final-raw.png`, sus copias `*-final.png` y las comparaciones conjuntas `*-comparison-final.png`. Las comparaciones enfocadas `home-focus.png`, `play-focus.png`, `feed-focus.png`, `connect-focus.png` y `create-focus.png` permiten evaluar imágenes, tipos, controles y agrupación. El montaje `app-review.png` contiene exclusivamente capturas reales del entorno local.
 
-Se inspeccionan cabecera, escala tipográfica, orden, distancia entre controles, tarjetas con nombres/lugares largos, estados vacíos, selección, modal y retorno de foco. Las tarjetas usan participantes/iniciales e inscripciones reales del evento, nunca las caras/precios del ejemplo. Los accesos a Mensajes/QR/equipos conservan su función sin duplicar filas en la parte superior. No se añade un botón de mapa sin mapa funcional. La búsqueda no promete buscar personas dentro del feed.
+## Hallazgos corregidos e historial
 
-Las capturas locales con registros sintéticos se distinguen de las capturas de producción. La diferencia de contenido (ausencia de partidos/posts públicos) no se rellena con ejemplos inventados. Una recomendación de instalación sigue presente en navegador hasta descartarla. Las pruebas físicas de Safari/VoiceOver siguen fuera de este pase.
+1. [P1, corregido] La propuesta previa usaba fondo cálido y navegación flotante oscura. Se sustituyen por superficies claras, barra inferior blanca, botón circular verde y punto de selección, siguiendo las nuevas fuentes.
+2. [P2, corregido] La primera comparación tenía filas de agenda excesivamente altas, metadatos del hero en dos líneas y repetición del encuentro destacado. Se compactan las fechas y filas, se conserva la línea de participantes cuando cabe y se excluye el destacado de las filas siguientes. Evidencia anterior: `home-comparison-pass1.png`; posterior: `home-comparison-final.png`, `home-focus.png`.
+3. [P2, corregido] Comunidad dejaba un salto vacío entre título y pestañas, mostraba filtros como una fila permanente y alargaba la tarjeta enlazada. Se limita la cabecera a una línea, se conservan búsqueda/filtros en controles desplegables y se sitúa el CTA del encuentro en su foto. Evidencia anterior: `feed-comparison-pass1.png`; posterior: `feed-comparison-final.png`, `feed-focus.png`.
+4. [P2, corregido] Tu gente heredaba dirección vertical en la cabecera y el buscador, y el botón Unirme se estiraba por el margen de la etiqueta. Se explicitan filas horizontales y se igualan alturas del código y la acción. Evidencia anterior: `connect-pass1-raw.png`; posterior: `connect-comparison-final.png`.
+5. [P2, corregido] Crear conservaba los márgenes laterales nativos de dialog y filas demasiado altas. Se hace ancho completo en móvil, se destaca el partido y se compactan los dos grupos sin eliminar destinos. Evidencia anterior: `create-comparison-pass1.png`; posterior: `create-comparison-final.png`, `create-focus.png`.
+6. [P2, corregido] Juega acumulaba cabecera de marca y ubicación y sobraba separación antes de resultados. La ubicación pasa a la cabecera móvil con el mismo control funcional, se reduce el salto y se compacta el pie de las tarjetas. Evidencia anterior: `play-pass1-raw.png`; posterior: `play-comparison-final.png`, `play-focus.png`.
 
-La valoración previa queda archivada a continuación como historial del pase anterior, no como aceptación del nuevo diseño.
+Las comparaciones finales completas y enfocadas se abren y revisan después de cada corrección. No quedan P0/P1/P2 accionables dentro del alcance de estas referencias y de las funciones existentes.
 
----
+## Cinco superficies de fidelidad
 
-# LaCantera — cierre de las correcciones de auditoría
+- **Tipografía:** se conserva Manrope Variable local, con títulos de peso alto, texto secundario gris y controles de 14–16 px. Se revisan interlineado, nombres largos y envoltura a 320 px. La fuente exacta del mock no viene identificada; no se afirma una equivalencia tipográfica exacta. Los cuerpos de entrada mantienen 16 px para evitar el zoom automático de Safari.
+- **Espacio y composición:** márgenes móviles de 16 px, hero fotográfico de aproximadamente 250 px, fotos horizontales en tarjetas de partidos, separadores de feed y listas, hoja Crear con grupos y navegación fija fuera del contenido. Se priorizan áreas táctiles utilizables frente a algunos controles más pequeños del mock. El compositor de chat termina en y=748 con la navegación en y=772 en 393 × 852: no queda tapado.
+- **Colores:** tokens compartidos claros (`#f7f9f7`, blanco), verde `#006747`, texto `#071b17`, secundario `#627078`, líneas `#d7dfdd` y lima `#d6f65c`. La textura verde de la imagen no se recrea con dibujos o imágenes nuevas; el color del control usa el token de marca. Se mantienen foco visible y estados seleccionados.
+- **Imágenes:** se reutilizan los WebP y el logo existentes sin cambiar sus bytes. No se usan capturas rasterizadas como interfaz. El recorte de la foto nocturna es el del recurso actual, que difiere del campo dibujado en la referencia. El organizador conserva la elección de portada. No se reemplazan fotos reales por nuevas caras ni se atribuyen imágenes genéricas a participantes reales.
+- **Texto y contenido:** se replican los títulos y la agrupación aplicables. Horarios, nombres, plazas, equipos y contadores proceden de los registros; no se inventan distancias ni actividad pública. «Tu agenda» y «Partidos para ti» se usan cuando corresponde en vez de prometer proximidad calculada. Las invitaciones son los códigos activos creados por la cuenta: el backend actual no tiene una bandeja de solicitudes entrantes entre personas como la ilustrada con Ana y David. La aceptación mediante QR/código conserva su verificación explícita.
 
-15 de octubre de 2026, Europe/Madrid.
+## Interacciones y estados verificados
 
-**final result: passed** — revisión visual local del alcance F01–F14. No equivale a una certificación WCAG ni a una prueba física en Safari. La verificación de publicación se registra en `docs/AUDIT_CORRECTIONS_2026-10-15.md`.
+Navegación entre Inicio/Juega/Comunidad/Perfil y destinos secundarios; Crear → partido y Crear → publicación; validación requerida del nombre del encuentro y retorno de foco al cerrar; filtros de ubicación desde la cabecera, fecha/formato (3 resultados → 1 → 3); búsqueda del feed sin coincidencias y recuperación; filtro Logros y vuelta a Todo; me gusta local y apertura de comentarios; conexión → conversación existente; buscador de conexiones con resultado vacío; creación y reapertura de código con QR/contador; pestaña de invitaciones con cuenta real de códigos activos; código inválido con error; apertura y cierre del lector QR sin conceder permisos de cámara.
 
-## Referencia y fidelidad
+Se conservan los estados de carga/error, elegibilidad y mantenimiento, las marcas de privacidad, la gestión de organizadores y las acciones de desconexión, moderación y derechos. Consola del navegador consultada sin errores. TypeScript, 340 pruebas de aplicación y build de revisión correctos; el build de revisión usa apertura y modo demo desactivados y no se publica.
 
-Se conserva el diseño aprobado: marca C con balón, verde/blanco/menta, Manrope, fotografías genéricas existentes, tarjetas, cabecera y cinco destinos inferiores. Referencia de acabado: tablero adjunto de once pantallas `codex-clipboard-0485365f-d8a6-4715-ac4b-d21a4ac88a3a.png`. No se generan ni sustituyen imágenes en este pase. Las funciones disponibles, los permisos de eventos privados y el cierre de multimedia hasta patrocinio se conservan.
+## Diferencias intencionales y límites
 
-La referencia inmediata de los defectos es `output/design/product-audit-2026-10-15/`; las capturas posteriores están en `output/design/audit-corrections-2026-10-15/`. Son capturas nuevas de CUA, con dimensiones verificadas en DOM. Escrituras de prueba sólo en localhost/demo o Firebase Emulator `demo-cantera-ux`, con identidades sintéticas. Los datos locales no se publican.
+Las capturas de QA muestran una franja que identifica el emulador; no se oculta para que la prueba no parezca producción. Esta franja cambia la posición vertical frente al mock y no aparece en una compilación pública. Las cuentas sin foto usan sus iniciales existentes; no se incorporan las caras de ejemplo. No se fabrican las dos invitaciones pendientes ni el grupo fotografiado del mock. Se conserva la funcionalidad de seguir cuentas y el aviso sobre cargas multimedia pendientes de financiación. La adaptación de escritorio conserva una barra lateral, ya que las fuentes proporcionadas sólo especifican móvil.
 
-## Comparación visual
+[P3] La tipografía exacta y la textura fotográfica del verde del mock pueden ajustarse en una iteración de identidad; los recursos actuales y las proporciones principales ya se conservan. La instalación/actualización PWA, cámara QR real, teclado, safe areas y VoiceOver requieren prueba física en iPhone: esta revisión no la sustituye.
 
-- `comparacion-retirada.png`: antes/después a 1280×720. La explicación ya tiene todo el ancho lateral y las dos acciones se apilan, en lugar de comprimirla entre botones. Prueba móvil adicional `23-retirada-movil.png`.
-- `comparacion-registro.png`: antes/después a 1280×720. Cambiar de acceso a registro vuelve al comienzo de la pantalla. Se preservan la franja fotográfica y el retorno interno.
-- `comparacion-feed.png`: antes/después a 320×780. Misma publicación con comentarios abiertos y enlace copiado, conservando tarjeta y formulario; texto auxiliar y nombre accesible más claros. La portada y navegación nueva se comprueban por separado en `28-feed-320.png`. Se conserva la misma escala; el encuadre vertical cambia por el espacio adicional de búsqueda y avisos.
-- `comparacion-resultados.png`: antes/después a 1280×800. Diferentes torneos sintéticos; se compara el estado de resultado futuro, no el contenido. Sin entradas de marcador antes del comienzo.
+Publicación no realizada. El acta de apertura y el control de release quedan intactos, igual que reglas, índices, permisos, almacenamiento y facturación. Historial anterior: `docs/DESIGN_QA_HISTORY_2026-10-29.md`.
 
-Se normaliza sólo escala proporcional y rótulos externos. No se retoca el contenido de las pantallas. Los pares se inspeccionan junto a las capturas originales; no se afirma igualdad de píxel con el tablero reducido.
+## Checklist de cierre
 
-## Hallazgos corregidos durante este pase
+- [x] Comparación conjunta de las cinco fuentes y las capturas finales.
+- [x] Revisión enfocada de tarjetas, fotos, tipos, menú Crear y conexión.
+- [x] Corrección y nueva captura de los P1/P2 encontrados.
+- [x] Navegación, formularios, filtros y flujos principales conservados.
+- [x] Comprobación móvil, tablet, escritorio y consola.
+- [ ] Prueba física del nuevo diseño en iPhone.
 
-| Área | Resultado y evidencia |
-|---|---|
-| Navegación móvil | Mensajes persistente y Perfil abajo; Feed/Personas/Equipos/QR accesibles. `13-bandeja-pendiente-movil.png`, `28-feed-320.png`. |
-| Perfil público | Mensaje como acción principal del contacto y bloqueo en Más opciones. `16-perfil-contacto.png`. |
-| Equipos y Juega | Pestañas visibles y filtros de fechas separados de formatos. `05-equipos-propios.png`, `06-equipos-descubrir.png`, `07-juega.png`, `29-equipos-320.png`, `31-juega-tablet.png`. |
-| Organización | Gestión e invitación/enlace accesibles; recuperación secundaria. Revisión explícita de participantes y sistema antes de cerrar la convocatoria, con foco y margen bajo cabecera. `21-revision-cruces-movil.png`. |
-| Agenda y avisos | Próximos/Historial, cuenta por fecha y cancelación; Avisos como destino de campana. `04-agenda.png`, `32-historial-movil.png`. |
-| Chat | Vistas previas reales, fecha y pendientes; lectura sincronizada entre dos pestañas. `09-bandeja-emulador.png` a `15-lectura-sincronizada.png`. |
-| QR | Entrada QR/código separada; decodificación local de una imagen, identidad previa y conexión aceptada. `25-invitacion-qr-emulador.png` a `27-qr-conexion-aceptada.png`. |
-| Administración | Sólo transición de estado aplicable y búsqueda por nombre, identificador técnico secundario. `17-admin-estado.png`, `18-admin-buscar.png`. No se aplican decisiones a cuentas reales. |
-| Legibilidad | Iniciales consistentes, organizador espaciado, auxiliares aumentados, ubicación con fondo opaco e índice legal con foco. `30-privacidad-indice-320.png`. |
-
-La lectura del CSS efectivo tras publicación detectó además una regla antigua con `!important` que mantenía gris la ubicación sobre verde; se retiró esa prioridad para aplicar blanco sobre fondo opaco. La inspección detectó y corrigió una pestaña de Equipos sin estilo al entrar directamente, un título de confirmación bajo la cabecera y un alcance de búsqueda todavía recortado a 1×1 px por CSS cargado de forma diferida. Las capturas finales sustituyen esas iteraciones. En el build de producción se corrigió también el enlace de vuelta al registro a 320 px: ahora tiene 44 px de altura y no se parte en dos fragmentos, conservando su texto. Sin desbordamiento horizontal en las vistas comprobadas a 320, 390, 768 y 1280 px; no se deduce ausencia de overflow en cada estado imaginable.
-
-## Controles y límites
-
-Se prueban ambos caminos de la retirada local, revisión/cierre del torneo en Firebase SDK emulado, bloqueo de resultado futuro, aceptación QR de imagen entre dos cuentas, envío/respuesta y lectura del chat, cambio de identidad sin contenido anterior, selección administrativa y salto legal con foco. Los tests de reglas cubren accesos ajenos, bloqueos y resultados prematuros.
-
-Pendiente de dispositivo físico: cámara/permiso QR en iPhone, instalación y actualización desde pantalla de inicio, Google OAuth real y teclado virtual/VoiceOver. Se prueba autenticación de identidades sintéticas mediante Auth Emulator; no se presenta como una nueva prueba de OAuth de Google. Multimedia cloud sigue cerrada hasta patrocinio, como condición de operación existente.
-
-## Comprobación publicada
-
-Fuente funcional `83c2a1991fd9d9b4525f40abb38a56c482e26d98`, Hosting `820fd1a828211254`, 55 archivos idénticos al build, reglas e índices verificados. La ubicación publicada usa blanco sobre verde opaco (no gris heredado), y el documento a 390×844 no tiene desbordamiento horizontal. Consola final: cero entradas de error en la consulta realizada.
-
-La sesión real actualiza la PWA y conserva el acceso. La bandeja carga el último mensaje guardado y retira el pendiente al leer; Mensaje del perfil conectado abre el hilo existente. Agenda separa 0 próximos y 2 pasados. Se conservan estado abierto, administración y datos reales. No se envían mensajes ni crean contenidos nuevos en producción. Las capturas `37-inicio-produccion.png` y `39-chat-produccion.png` a `42-juega-produccion.png` están en la carpeta de evidencia. CI final: 432 pruebas aprobadas, sin omisiones, además de TypeScript/build.
+**final result: passed**

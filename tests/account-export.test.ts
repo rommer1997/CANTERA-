@@ -12,6 +12,13 @@ const timestamp = { toDate: () => new Date('2026-10-06T12:00:00.000Z') };
 const row = (id: string, data: Record<string, unknown>): ExportRecord => ({ id, data });
 const source = (extra: Partial<AccountExportSource> = {}): AccountExportSource => ({ uid, projectId: 'demo-cantera', databaseId: 'test', startedAt: '2026-10-06T12:00:00.000Z', completedAt: '2026-10-06T12:01:00.000Z', ...extra });
 
+test('la exportación incluye invitaciones directas recibidas sin exponer al remitente ni el código',()=>{
+  const result=buildAccountExport(source({collections:{communityInvitations:[row('23456789ABCDEFGH',{ownerId:'SECRET_SENDER',recipientId:uid,kind:'event',eventId:'private-event',status:'active',createdAt:timestamp,usedBy:'',usedAt:''})]}}));
+  assert.equal(result.counts.communityInvitations,1);
+  assert.equal(result.collections.communityInvitations[0].recipientId,uid);
+  assert.ok(!JSON.stringify(result).includes('SECRET_SENDER'));assert.ok(!JSON.stringify(result).includes('23456789ABCDEFGH'));
+});
+
 test('identidad Auth mantiene datos propios y excluye contraseñas, claims y credenciales OAuth', () => {
   const auth = projectAuthIdentity({ uid, email: 'propio@example.invalid', emailVerified: true, disabled: false, customClaims: { admin: true }, passwordHash: 'SECRET_HASH', passwordSalt: 'SECRET_SALT', refreshToken: 'SECRET_REFRESH', metadata: { creationTime: 'date', lastSignInTime: 'date2', credential: 'SECRET_METADATA' }, providerData: [{ uid: 'provider-id', providerId: 'google.com', email: 'propio@example.invalid', accessToken: 'SECRET_OAUTH' }], multiFactor: { enrolledFactors: [{ uid: 'factor-id', factorId: 'phone', phoneNumber: '+100000000', secret: 'SECRET_FACTOR' }] } }, uid)!;
   assert.equal(auth.email, 'propio@example.invalid');
@@ -37,7 +44,7 @@ test('exportación no exige aceptar términos nuevos y filtra autoría de cada c
   assert.equal(result.scope.mediaBinariesIncluded, false);
 });
 
-test('encuentros exportan sólo inscripción, RSVP y espera propias incluso para el organizador', () => {
+test('partidos exportan solo inscripción, RSVP y espera propias incluso para el organizador', () => {
   const event = row('event', { ownerId: uid, title: 'Partido', teamId: 'team', participants: { [uid]: 'Yo', other: 'SECRET_PARTICIPANT' }, participantIds: [uid, 'SECRET_OTHER_UID'], rsvps: { [uid]: 'maybe', other: 'SECRET_RSVP' }, waitlist: { [uid]: { name: 'Yo en espera', joinedAt: timestamp, email: 'SECRET_EMAIL' }, other: { name: 'SECRET_WAIT', joinedAt: timestamp } }, waitlistOrder: ['other', uid], fixtures: [{ id: 'fixture', round: 1, homeId: uid, awayId: 'SECRET_OTHER_UID', homeScore: 2, awayScore: 1, startAt: '2026-10-10T12:00:00.000Z', privateRoster: 'SECRET_ROSTER' }], privateParticipants: 'SECRET_PRIVATE', result: { homeName: 'Local', awayName: 'Visitante', homeScore: 2, awayScore: 1, emails: 'SECRET_RESULT' } });
   const result = buildAccountExport(source({ events: [event, event, row('unrelated', { ownerId: 'other', participants: { other: 'SECRET_UNRELATED' } })] }));
   assert.equal(result.events.length, 1);
@@ -58,7 +65,7 @@ test('respuestas tras retirada y registros antiguos conservan datos personales s
   assert.ok(!JSON.stringify(result).includes('SECRET_NAME'));
 });
 
-test('exportación conserva la portada genérica del encuentro sin proyectar URLs ni datos de participantes ajenos', () => {
+test('exportación conserva la portada genérica del partido sin proyectar URLs ni datos de participantes ajenos', () => {
   for (const coverId of ['day', 'night', 'tournament']) {
     const result = buildAccountExport(source({ events: [row('with-cover', { ownerId: uid, coverId, participants: { [uid]: 'Yo', other: 'SECRET_PARTICIPANT' }, coverUrl: 'SECRET_URL' })] }));
     assert.equal(result.events[0].coverId, coverId);
@@ -108,7 +115,7 @@ test('historial vinculado, promociones propias y recibos del organizador excluye
   assert.ok(!JSON.stringify(result).includes('SECRET'));
 });
 
-test('equipos incluyen metadatos vinculados, sólo membresía/solicitud propia e invitaciones creadas', () => {
+test('equipos incluyen metadatos vinculados, solo membresía/solicitud propia e invitaciones creadas', () => {
   const result = buildAccountExport(source({ collections: {
     communityTeamMembers: [row('mine-member', { teamId: 'team', userId: uid, name: 'Yo', role: 'member' }), row('other-member', { teamId: 'team', userId: 'other', name: 'SECRET_ROSTER' })],
     communityTeamJoinRequests: [row('mine-request', { teamId: 'requested', userId: uid, name: 'Yo', inviteId: 'SECRET_OTHER_INVITE', status: 'pending' }), row('other-request', { teamId: 'team', userId: 'other', name: 'SECRET_REQUEST' })],
@@ -249,7 +256,8 @@ test('lecturas por UID paginan toda la colección y recuperan mapas antiguos con
   assert.equal(result.counts.communityEventAdmissions, 205);
   assert.equal(reads.filter(collection => collection === `communityConnections/${uid}/members`).length, 2);
   assert.equal(reads.filter(collection => collection === '**/members').length, 2);
-  assert.equal(reads.filter(collection => collection === 'communityInvitations').length, 2);
+  assert.equal(reads.filter(collection => collection === 'communityInvitations').length, 3);
+  assert.ok(filters.some(entry=>entry.collection==='communityInvitations'&&entry.conditions.some(condition=>condition.field==='recipientId'&&condition.value===uid)));
   for (const query of filters.filter(entry => entry.collection === '**/members')) assert.deepEqual(query.conditions, [{ field: 'userId', op: '==', value: uid }]);
   for (const query of filters.filter(entry => entry.collection === `communityConnections/${uid}/members`)) assert.deepEqual(query.conditions, [{ field: 'ownerId', op: '==', value: uid }]);
   assert.ok(!reads.includes('communityConnections')); assert.ok(!reads.includes('communityEventAdmissions'));
@@ -280,7 +288,7 @@ test('índice de recibos ausente aborta sin consultar miembros o cuentas sin fil
   assert.ok(!reads.some(read => ['members', 'communityEventAdmissions', 'communityConnections', 'users'].includes(read.scope)));
 });
 
-test('CLI de exportación sólo admite el proyecto y la base nombrada autorizados antes de cargar Admin', () => {
+test('CLI de exportación solo admite el proyecto y la base nombrada autorizados antes de cargar Admin', () => {
   const expected = { projectId: 'gen-lang-client-0853130215', firestoreDatabaseId: 'ai-studio-647af55f-499b-43f3-9268-9bf5f62701bb' };
   assert.doesNotThrow(() => cli.validateExportConfig(expected));
   for (const config of [null, {}, { ...expected, projectId: 'other-project' }, { ...expected, firestoreDatabaseId: '(default)' }, { ...expected, firestoreDatabaseId: 'ai-studio-9d2b1bbc-aff5-458a-bdf8-f2475620add0' }]) assert.throws(() => cli.validateExportConfig(config), /base nombrada autorizados/);
@@ -314,4 +322,13 @@ test('archivo local 0600, carpetas 0700, sin sobrescritura, fuera de public ni s
     fs.writeFileSync(path.join(root, '.gitignore'), 'output/private/\n');
     cli.assertIgnored(root, target);
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+
+test('la exportación conserva penaltis y actas sin añadir nombres privados ni registros de otro torneo', () => {
+  const result = buildAccountExport(source({ events: [row('event', {ownerId:uid, fixtureIds:['r1-1']})], fixtureRecords:[row('event_r1-1',{id:'r1-1',eventId:'event',homeScore:1,awayScore:1,homePenalties:5,awayPenalties:4,discipline:{home:{yellowCards:1,redCards:0,fouls:4,privateName:'SECRET'},away:{yellowCards:0,redCards:0,fouls:2}}})], fixturePlayerRecords:[row('home_7',{eventId:'event',fixtureId:'r1-1',side:'home',jersey:7,goals:1,yellowCards:1,redCards:0,fouls:2,playerName:'SECRET'}),row('home_9',{eventId:'other',fixtureId:'r1-1',jersey:9,playerName:'SECRET'})] }));
+  assert.equal(result.fixturePlayerRecords.length,1); assert.equal(result.fixturePlayerRecords[0].jersey,7);
+  assert.equal(result.fixtureRecords[0].homePenalties,5);
+  assert.deepEqual(result.fixtureRecords[0].discipline,{home:{yellowCards:1,redCards:0,fouls:4},away:{yellowCards:0,redCards:0,fouls:2}});
+  assert.ok(!JSON.stringify(result).includes('SECRET'));
 });

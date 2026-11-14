@@ -1,0 +1,138 @@
+/* Lanzamiento: ajustes sobre los tokens y componentes compartidos. */
+.c-app.c-studio .lc-landing-hero { min-height:560px; }
+.c-app.c-studio .lc-landing-image { height:540px; }
+.c-app.c-studio .lc-landing-copy h1 { font-size:clamp(52px,5.6vw,84px); line-height:1.03; letter-spacing:-.065em; margin:24px 0; }
+.c-app.c-studio .lc-landing-copy>p { max-width:43ch; }
+.c-app.c-studio .lc-landing-copy>.lc-landing-promise { font-size:13px; font-weight:650; margin:0 0 12px; }
+@media(max-width:767px) {
+ .c-app.c-studio .lc-landing-hero { min-height:0; }
+ .c-app.c-studio .lc-landing-copy h1 { font-size:clamp(42px,10.5vw,64px); margin:20px 0; }
+ .c-app.c-studio .lc-landing-image { height:360px; }
+}
+@media(max-width:440px) {
+ .c-app.c-studio .lc-landing-actions { flex-direction:column; align-items:stretch; gap:12px; margin-block:20px 16px; }
+ .c-app.c-studio .lc-landing-actions :is(a,button) { justify-content:center; min-height:48px; }
+}
+
+.lc-how { padding-block:48px; border-block:1px solid var(--c-line); }
+.c-studio .lc-how h2 { font-size:clamp(28px,4vw,42px); letter-spacing:-.045em; margin:10px 0 28px; }
+.lc-how ol { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:24px; list-style:none; padding:0; margin:0; }
+.lc-how li { min-width:0; display:flex; flex-direction:column; align-items:flex-start; }
+.lc-how-number { display:grid; place-items:center; width:40px; height:40px; border-radius:50%; background:var(--c-surface); color:var(--c-green); font-size:14px; font-weight:800; }
+.lc-how h3 { font-size:20px; line-height:1.4; margin:16px 0 8px; }
+.lc-how p { font-size:15px; line-height:1.6; color:var(--c-muted); margin:0 0 20px; }
+.lc-how figure { margin:0; width:100%; max-width:390px; }
+.lc-how img { display:block; width:100%; height:auto; border:1px solid var(--c-line); border-radius:var(--c-radius-lg); background:#fff; }
+.lc-how figcaption { font-size:12px; color:var(--c-muted); margin-top:8px; }
+@media(min-width:768px) { .lc-how li>p { min-height:72px; } }
+@media(min-width:1024px) { .lc-how li>p { min-height:48px; } }
+@media(max-width:767px) { .lc-how ol { grid-template-columns:1fr; gap:40px; } .lc-how figure { max-width:390px; align-self:center; } }
+
+.lc-faq { max-width:880px; margin:64px auto; }
+.c-studio .lc-faq h2 { font-size:clamp(28px,4vw,42px); line-height:1.2; letter-spacing:-.04em; margin:12px 0 28px; }
+.lc-faq details { border-bottom:1px solid var(--c-line); padding:20px 0; }
+.lc-faq summary { cursor:pointer; font-size:17px; font-weight:750; line-height:1.5; padding-right:12px; }
+.lc-faq summary:focus-visible { outline:3px solid var(--c-green); outline-offset:5px; border-radius:4px; }
+.lc-faq details p { font-size:15px; color:var(--c-muted); line-height:1.75; margin:16px 0 0; }
+.lc-faq a { color:var(--c-green); text-decoration:underline; }
+
+.lc-public-contact { margin-top:16px; }
+.lc-social-links { display:flex; align-items:center; gap:8px; }
+.lc-social-links :is(a,span) { display:inline-flex; align-items:center; justify-content:center; width:44px; height:44px; border:1px solid var(--c-line); border-radius:50%; color:var(--c-green); }
+.lc-social-links>span { border-style:dashed; color:var(--c-muted); }
+.c-app.c-studio .lc-social-note { font-size:12px; line-height:1.5; color:var(--c-muted); margin:8px 0 12px; }
+.lc-feedback-link { display:inline-flex; align-items:center; min-height:44px; font-size:14px; font-weight:650; color:var(--c-green); text-decoration:underline; text-underline-offset:3px; }
+
+/* E1: botón claro de Google, independiente de la acción principal de marca. */
+.c-app.c-studio .c-auth-content .c-google-login { background:#fff; color:#1f1f1f; border:1.5px solid #cfd8d3; min-height:52px; border-radius:14px; font-weight:700; }
+.c-app.c-studio .c-auth-content .c-google-login:hover { background:#f8faf9; color:#1f1f1f; border-color:#8c9d93; }
+.c-app.c-studio .c-auth-content .c-google-login:focus-visible { outline:3px solid var(--c-green); outline-offset:4px; }
+
+/* E2: acceso móvil con imagen completa y formulario en una tarjeta superpuesta. */
+@media(max-width:767px) {
+ .c-app.c-studio .c-auth-layout { display:flex; flex-direction:column; width:calc(100% + 32px); margin:0 -16px 24px; min-height:0; border:0; border-radius:0; overflow:visible; background:transparent; }
+ .c-app.c-studio .c-auth-art { display:block; position:relative; width:100%; height:300px; min-height:300px; overflow:hidden; border-radius:0; }
+ .c-app.c-studio .c-auth-art>img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:50% 40%; }
+ .c-app.c-studio .c-auth-art::after { content:''; position:absolute; inset:auto 0 0; height:150px; background:linear-gradient(transparent,rgba(10,30,20,.72)); }
+ .c-app.c-studio .c-auth-art>div { position:absolute; z-index:1; left:20px; right:20px; bottom:44px; padding:0; background:none; border-radius:0; }
+ .c-app.c-studio .c-auth-art .c-eyebrow { display:inline-block; padding:7px 10px; border-radius:999px; background:var(--c-accent); color:#10231b; font-size:12px!important; font-weight:800; letter-spacing:.08em; }
+ .c-app.c-studio .c-auth-art p { color:#fff; font-size:34px; font-weight:800; letter-spacing:-.03em; line-height:1.05; margin:12px 0 0; }
+ .c-app.c-studio .c-auth-content { position:relative; z-index:2; width:100%; margin-top:-24px; padding:28px 20px; border-radius:24px 24px 0 0; background:#fff; display:flex; flex-direction:column; gap:16px; }
+ .c-app.c-studio .c-auth-heading h1 { font-size:26px; font-weight:800; line-height:1.2; margin:0; }
+ .c-app.c-studio .c-auth-heading p { font-size:15px; color:#4d5e56; line-height:1.6; margin:12px 0 0; }
+ .c-app.c-studio .c-auth-content :is(.c-google-login,.c-small,.c-auth-note,.c-auth-switch) { margin:0; }
+ .c-app.c-studio .c-auth-content :is(.c-small,.c-auth-note p) { font-size:13px; line-height:1.6; color:#4d5e56; }
+ .c-app.c-studio .c-auth-note { display:flex; align-items:flex-start; gap:10px; padding:0; }
+ .c-app.c-studio .c-auth-note>svg { flex-shrink:0; margin-top:2px; color:var(--c-green); }
+ .c-app.c-studio .c-auth-switch { text-align:center; font-size:14px; line-height:1.6; }
+ .c-app.c-studio .c-auth-switch a { font-weight:750; }
+}
+.c-auth-divider { height:1px; width:100%; border:0; background:#e3e9e5; margin:0; }
+
+/* E3: la imagen mantiene al menos 280 px en el acceso de tablet/escritorio. */
+@media(min-width:768px) {
+ .c-app.c-studio .c-auth-layout { display:grid; grid-template-columns:minmax(280px,.85fr) minmax(0,1.15fr); width:min(960px,100%); min-height:500px; margin:32px auto; border-radius:24px; }
+ .c-app.c-studio .c-auth-art { position:relative; min-height:500px; overflow:hidden; }
+ .c-app.c-studio .c-auth-art>img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:50% 40%; }
+ .c-app.c-studio .c-auth-art::after { content:''; position:absolute; inset:0; background:linear-gradient(transparent 40%,rgba(10,30,20,.72)); }
+ .c-app.c-studio .c-auth-art>div { position:absolute; z-index:1; left:24px; right:24px; bottom:36px; padding:0; background:none; }
+ .c-app.c-studio .c-auth-art .c-eyebrow { display:inline-block; padding:7px 10px; border-radius:999px; background:var(--c-accent); color:#10231b; font-size:12px!important; letter-spacing:.08em; }
+ .c-app.c-studio .c-auth-art p { font-size:34px; line-height:1.05; font-weight:800; letter-spacing:-.03em; margin:16px 0 0; color:#fff; }
+ .c-app.c-studio .c-auth-content { display:flex; flex-direction:column; justify-content:center; gap:16px; padding:36px 32px; }
+ .c-app.c-studio .c-auth-heading h1 { font-size:28px; line-height:1.2; margin:0; }
+ .c-app.c-studio .c-auth-heading p { color:#4d5e56; font-size:15px; line-height:1.65; margin:12px 0 0; }
+ .c-app.c-studio .c-auth-content :is(.c-google-login,.c-small,.c-auth-note,.c-auth-switch) { margin:0; }
+ .c-app.c-studio .c-auth-content :is(.c-small,.c-auth-note p) { font-size:13px; color:#4d5e56; line-height:1.6; }
+ .c-app.c-studio .c-auth-note { display:flex; align-items:flex-start; gap:10px; }
+ .c-app.c-studio .c-auth-note>svg { flex-shrink:0; margin-top:2px; }
+ .c-app.c-studio .c-auth-switch { text-align:center; font-size:14px; }
+ .c-app.c-studio .c-auth-switch a { font-weight:750; }
+}
+
+/* E4: mismo marco público; el vestuario lateral se reserva a cuentas con sesión. */
+.c-app.c-studio.lc-public-shell { padding-left:0; }
+.lc-public-shell .lc-sidebar,.lc-public-shell .lc-top-context { display:none; }
+@media(min-width:1100px) {
+ .c-app.c-studio.lc-public-shell .c-header { max-width:1380px; margin-inline:auto; position:relative; }
+ .c-app.c-studio.lc-public-shell .c-header>.c-brand { display:flex; }
+ .c-app.c-studio.lc-public-shell .c-nav { display:flex; }
+}
+
+/* F1: texto secundario legible; sin opacidades que rebajen el contraste. */
+.c-app.c-studio :is(.lc-photo-label,.lc-rail-credit,.lc-rail-label,.lc-rail-brand small,.lc-rail-account small,.c-brand-credit,.c-footer>div>span) { font-size:12px; opacity:1; }
+.c-app.c-studio .lc-photo-label { background:#163b2c; color:#fff; }
+.c-app.c-studio .lc-sidebar :is(.lc-rail-credit,.lc-rail-label,.lc-rail-brand small,.lc-rail-account small) { color:#fff; }
+.c-app.c-studio .lc-purpose p { color:#fff; opacity:1; }
+.c-app.c-studio :is(.c-footer,.c-mobile-info,.c-auth-content) { overflow-wrap:anywhere; }
+.c-app.c-studio .c-legal-index a { min-height:44px; display:inline-flex; align-items:center; }
+
+/* F2: etiquetas por encima de los ejemplos de entrada. */
+.c-app.c-studio :is(form label,.ce-field,.c-profile-fields>label,.team-form label,.people-search label,.people-type-label) { font-size:14px; font-weight:600; color:var(--c-ink); }
+.c-app.c-studio :is(input,textarea,select) { font-size:14px; }
+.c-app.c-studio :is(input,textarea)::placeholder { color:#63746b; opacity:1; font-size:14px; font-weight:400; }
+.c-app.c-studio :is(input,textarea,select):disabled { opacity:1; }
+
+/* E2/E3: un único separador entre identificación e información de acceso. */
+.c-app.c-studio .c-auth-note { border:0; background:transparent; padding:0; }
+
+/* E2/E3: anula el margen heredado de la hoja de autenticación anterior. */
+.c-app.c-studio .c-auth-content .c-auth-switch { margin:0!important; }
+
+
+/* El visitante navega por la web; la barra inferior pertenece al espacio con sesión. */
+@media(max-width:767px) {
+ .c-app.c-studio.lc-public-shell { padding-bottom:calc(20px + env(safe-area-inset-bottom,0px)); }
+ .c-app.c-studio.lc-public-shell>.c-main { margin-bottom:0; }
+ .c-app.c-studio.lc-public-shell .c-header { display:grid; grid-template-columns:minmax(0,1fr) auto; grid-template-areas:"brand tools" "nav nav"; height:auto; gap:0 12px; padding-top:env(safe-area-inset-top,0px); }
+ .c-app.c-studio.lc-public-shell .c-header>.c-brand { display:flex; grid-area:brand; min-height:68px; }
+ .c-app.c-studio.lc-public-shell #lc-mobile-place { display:none; }
+ .c-app.c-studio.lc-public-shell .c-header-tools { grid-area:tools; margin:0; gap:0; }
+ .c-app.c-studio.lc-public-shell .c-header-tools>:is(.c-discover-link,.c-header-join,.c-mobile-account-icon) { display:none; }
+ .c-app.c-studio.lc-public-shell .c-header-login { display:inline-flex; min-height:44px; padding:10px 14px; border:1px solid var(--c-control-border); border-radius:var(--c-control-radius); background:var(--c-paper); color:var(--c-ink); font-size:13px; font-weight:650; }
+ .c-app.c-studio.lc-public-shell .c-header-login>.c-desktop-only { display:none; }
+ .c-app.c-studio.lc-public-shell .c-header-login>.c-mobile-only { display:inline; }
+ .c-app.c-studio.lc-public-shell .c-nav { grid-area:nav; display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); position:static; width:100%; height:44px; gap:4px; padding:0; margin:0; }
+ .c-app.c-studio.lc-public-shell .c-nav>a { display:flex; justify-content:center; align-items:center; position:relative; min-width:0; min-height:44px; padding:0 2px; border:0; border-radius:0; background:none; color:var(--c-muted); font-size:13px; font-weight:550; letter-spacing:-.01em; }
+ .c-app.c-studio.lc-public-shell .c-nav>a.active { color:var(--c-control-brand); font-weight:750; }
+ .c-app.c-studio.lc-public-shell .c-nav>a.active::after { content:''; position:absolute; inset:auto 12px 0; height:2px; border-radius:2px; background:var(--c-control-brand); }
+}

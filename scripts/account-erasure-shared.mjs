@@ -6,9 +6,10 @@ const dataObject = value => !!value && typeof value === 'object' && !Array.isArr
 const keysOnly = (value, keys) => dataObject(value) && Object.keys(value).every(key => keys.includes(key));
 const sameDistinctKeys = (ids, map) => Array.isArray(ids) && ids.every(id => typeof id === 'string')
   && new Set(ids).size === ids.length && ids.length === Object.keys(map).length && ids.every(id => Object.hasOwn(map, id));
-const eventKeys = ['id', 'ownerId', 'ownerName', 'title', 'type', 'format', 'level', 'city', 'country', 'timeZone', 'venue', 'startAt', 'startAtMs', 'capacity', 'entry', 'description', 'status', 'tournamentFormat', 'participants', 'participantIds', 'fixtures', 'fixtureIds', 'createdAt', 'updatedAt', 'revision', 'history', 'rsvps', 'waitlist', 'waitlistOrder', 'result', 'teamId', 'visibility', 'coverId'];
-const fixtureKeys = ['id', 'eventId', 'ownerId', 'round', 'homeId', 'awayId', 'homeScore', 'awayScore', 'kickoffAt', 'timeZone', 'venue', 'createdAt', 'updatedAt'];
-const embeddedFixtureKeys = ['id', 'round', 'homeId', 'awayId', 'homeScore', 'awayScore', 'startAt', 'timeZone', 'venue'];
+const eventKeys = ['id', 'ownerId', 'ownerName', 'title', 'type', 'format', 'level', 'city', 'country', 'timeZone', 'venue', 'startAt', 'startAtMs', 'capacity', 'entry', 'description', 'status', 'tournamentFormat', 'participants', 'participantIds', 'fixtures', 'fixtureIds', 'createdAt', 'updatedAt', 'revision', 'history', 'rsvps', 'waitlist', 'waitlistOrder', 'result', 'teamId', 'visibility', 'coverId', 'skillLevel'];
+const actaKeys = ['homePenalties', 'awayPenalties', 'discipline', 'playerTotals', 'playerChangeId', 'playerRevision'];
+const fixtureKeys = [...actaKeys, 'id', 'eventId', 'ownerId', 'round', 'homeId', 'awayId', 'homeScore', 'awayScore', 'kickoffAt', 'timeZone', 'venue', 'createdAt', 'updatedAt'];
+const embeddedFixtureKeys = [...actaKeys, 'id', 'round', 'homeId', 'awayId', 'homeScore', 'awayScore', 'startAt', 'timeZone', 'venue'];
 const ownKeys = {
   communityProfiles: ['id', 'name', 'bio', 'city', 'country', 'position', 'team', 'level', 'adultConfirmed', 'verification', 'entityType', 'createdAt', 'acceptedTermsVersion', 'acceptedTermsAt', 'photoURL', 'avatarPath'],
   communityPublicProfiles: ['id', 'name', 'bio', 'city', 'country', 'position', 'team', 'level', 'verification', 'entityType', 'createdAt', 'searchTokens'],
@@ -22,23 +23,37 @@ const ownKeys = {
   communityTeamMembers: ['id', 'teamId', 'userId', 'name', 'role', 'joinedAt'],
   communityTeamJoinRequests: ['id', 'teamId', 'userId', 'name', 'inviteId', 'status', 'createdAt', 'reviewedAt'],
   communityTeamInvites: ['id', 'teamId', 'createdBy', 'revoked', 'expiresAt', 'createdAt'],
-  communityInvitations: ['id', 'ownerId', 'kind', 'eventId', 'status', 'createdAt', 'usedBy', 'usedAt'],
+  communityInvitations: ['id', 'ownerId', 'kind', 'eventId', 'status', 'createdAt', 'usedBy', 'usedAt', 'recipientId'],
   communityMessageReads: ['userId', 'conversationId', 'lastReadAt', 'lastReadMessageId', 'updatedAt'],
   communityConnections: ['ownerId', 'peerId', 'inviteId', 'createdAt'],
   communityEventAdmissions: ['eventId', 'userId', 'inviteId', 'createdAt'],
 };
 export const knownOwnedSchema = (collection, data) => Object.hasOwn(ownKeys, collection) ? keysOnly(data, ownKeys[collection]) : knownSharedSchema(collection, data);
+const count = (v, max) => Number.isInteger(v) && v >= 0 && v <= max;
+function knownActa(data) {
+  const side = (value, goals) => keysOnly(value, goals ? ['goals','yellowCards','redCards','fouls'] : ['yellowCards','redCards','fouls']) && (!goals || count(value.goals,99)) && count(value.yellowCards,64) && count(value.redCards,32) && count(value.fouls,199);
+  return (!Object.hasOwn(data,'discipline') || keysOnly(data.discipline,['home','away']) && side(data.discipline.home,false) && side(data.discipline.away,false))
+    && (!Object.hasOwn(data,'playerTotals') || keysOnly(data.playerTotals,['home','away']) && side(data.playerTotals.home,true) && side(data.playerTotals.away,true))
+    && (!Object.hasOwn(data,'homePenalties') || count(data.homePenalties,99)) && (!Object.hasOwn(data,'awayPenalties') || count(data.awayPenalties,99))
+    && (!Object.hasOwn(data,'playerChangeId') || /^(home|away)_(0|[1-9][0-9]?)$/.test(data.playerChangeId))
+    && (!Object.hasOwn(data,'playerRevision') || Number.isSafeInteger(data.playerRevision) && data.playerRevision>0);
+}
 export function knownSharedSchema(collection, data) {
   if (collection === 'communityEvents') return keysOnly(data, eventKeys)
+    && (!Object.hasOwn(data, 'skillLevel') || ['any', 'beginner', 'intermediate', 'advanced'].includes(data.skillLevel))
     && (!Object.hasOwn(data, 'coverId') || ['day', 'night', 'tournament'].includes(data.coverId))
     && dataObject(data.participants) && (!data.rsvps || dataObject(data.rsvps))
     && (!data.waitlist || dataObject(data.waitlist) && Object.values(data.waitlist).every(value => keysOnly(value, ['name', 'joinedAt'])))
     && (!data.history || Array.isArray(data.history) && data.history.every(value => keysOnly(value, ['revision', 'changedAt', 'summary'])))
     && (!data.result || keysOnly(data.result, ['homeName', 'awayName', 'homeScore', 'awayScore']))
-    && Array.isArray(data.fixtures) && data.fixtures.every(value => keysOnly(value, embeddedFixtureKeys))
+    && Array.isArray(data.fixtures) && data.fixtures.every(value => keysOnly(value, embeddedFixtureKeys) && knownActa(value))
     && (!Object.hasOwn(data, 'participantIds') || sameDistinctKeys(data.participantIds, data.participants))
     && (!Object.hasOwn(data, 'waitlistOrder') || sameDistinctKeys(data.waitlistOrder, data.waitlist || {}));
-  if (collection === 'communityFixtures') return keysOnly(data, fixtureKeys);
+  if (collection === 'communityFixtures') return keysOnly(data, fixtureKeys) && knownActa(data);
+  if (collection === 'playerStats') return keysOnly(data,['id','eventId','fixtureId','side','jersey','goals','yellowCards','redCards','fouls','revision','createdAt','updatedAt'])
+    && ['home','away'].includes(data.side) && count(data.jersey,99) && data.id === `${data.side}_${data.jersey}`
+    && count(data.goals,99) && count(data.yellowCards,2) && count(data.redCards,1) && count(data.fouls,99)
+    && Number.isSafeInteger(data.revision) && data.revision>0 && Object.hasOwn(data,'createdAt') && Object.hasOwn(data,'updatedAt');
   if (collection === 'communityEventChanges') return keysOnly(data, ['id', 'eventId', 'ownerId', 'revision', 'summary', 'title', 'createdAt', 'audienceIds']) && Array.isArray(data.audienceIds);
   if (collection === 'communityEventPromotions') return keysOnly(data, ['eventId', 'authorId', 'recipientId', 'title', 'summary', 'createdAt']);
   if (collection === 'communityEventDeliveries') return keysOnly(data, ['actorId', 'eventId', 'recipientId', 'createdAt']);

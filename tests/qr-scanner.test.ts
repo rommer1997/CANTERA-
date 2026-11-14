@@ -111,7 +111,7 @@ test('una cámara que responde tarde se detiene tras cierre, desmontaje, invisib
  }
 });
 
-test('la cámara decodifica a 4 fps y 640 px, rechaza QR externos y sólo abre una invitación validada', async () => {
+test('la cámara decodifica a 4 fps y 640 px, rechaza QR externos y solo abre una invitación validada', async () => {
  const state = scannerHarness(); state.camera(); const stream = state.media(); state.mediaRequests[0].resolve(stream); await settle();
  state.payload('https://arbitrary.example/private'); state.tick(0); state.tick(125);
  assert.equal(state.decodedSizes.length, 1); assert.equal(Math.max(...state.decodedSizes[0]), 640); assert.deepEqual(state.emitted, []); assert.match(state.alert(), /no es una invitación/);

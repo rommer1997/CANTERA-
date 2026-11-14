@@ -1,3 +1,10 @@
+# Parches de seguridad compatibles con las API utilizadas por los padres.
+# Retirar cuando los padres dejen de fijar las versiones vulnerables.
+# GHSA-m9gg-hp2v-232j y GHSA-27r3-jxmh-p828.
+overrides:
+  '@firebase/firestore>@grpc/grpc-js': 1.14.7
+  'body-parser@^1.20.0': 1.20.9
+  'body-parser@^2.0.0': 2.4.0
 allowBuilds:
   # Prepara y verifica los binarios usados por Vite y sus herramientas.
   'esbuild@0.25.12 || 0.28.2': true

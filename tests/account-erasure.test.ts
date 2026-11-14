@@ -59,7 +59,7 @@ function harness(initial: Record<string, Record<string, any>> = {}, identity: an
   const source = () => {
     const all = rows(), collections: any = {};
     for (const [name, field] of Object.entries(policies)) collections[name] = all.filter(record => record.path.split('/').length === 2 && record.path.split('/')[0] === name && record.data[field] === uid);
-    collections.communityInvitations = all.filter(record => record.path.startsWith('communityInvitations/') && (record.data.ownerId === uid || record.data.usedBy === uid));
+    collections.communityInvitations = all.filter(record => record.path.startsWith('communityInvitations/') && (record.data.ownerId === uid || record.data.usedBy === uid || record.data.recipientId === uid));
     collections.communityConnections = all.filter(record => record.path.startsWith(`communityConnections/${uid}/members/`) && record.data.ownerId === uid);
     collections.communityEventAdmissions = all.filter(record => record.path.startsWith('communityEventAdmissions/') && record.path.split('/').length === 4 && record.data.userId === uid);
     const direct = (name: string) => all.find(record => record.path === `${name}/${uid}`) || null;
@@ -85,7 +85,7 @@ function harness(initial: Record<string, Record<string, any>> = {}, identity: an
     race: (hook: () => void) => { beforeCommit = hook; } };
 }
 
-test('plan determinista privado: sólo UID/rutas/huellas; identifica bloqueos sin modificar la cuenta', () => {
+test('plan determinista privado: solo UID/rutas/huellas; identifica bloqueos sin modificar la cuenta', () => {
   const h = harness({ [`communityProfiles/${uid}`]: { id: uid, name: 'SECRET_NAME' }, 'communityPosts/own': { authorId: uid, text: 'SECRET_POST', mediaUrl: '' } });
   const plan = buildErasurePlan(h.source());
   assert.deepEqual(buildErasurePlan(h.source()), plan);
@@ -128,7 +128,7 @@ test('congela y revoca primero, espera tokens, retira pares atómicamente y elim
     [`communityConnections/${uid}/members/${peer}`]: { ownerId: uid, peerId: peer, inviteId: incoming },
     [`communityConnections/${peer}/members/${uid}`]: { ownerId: peer, peerId: uid, inviteId: incoming },
     [`communityEventAdmissions/old/members/${uid}`]: { eventId: 'old', userId: uid, inviteId: incoming },
-    'communityConversations/orphan/messages/own': { senderId: uid, text: 'Sólo propio' }, 'communityConversations/orphan/messages/other': { senderId: peer, text: 'Ajeno' },
+    'communityConversations/orphan/messages/own': { senderId: uid, text: 'Solo propio' }, 'communityConversations/orphan/messages/other': { senderId: peer, text: 'Ajeno' },
     [`users/${uid}`]: { uid }, [`users/${uid}/likes/legacy`]: { timestamp: '2025-01-01' },
   });
   const plan = buildErasurePlan(h.source()); assert.deepEqual(plan.blockers, []);
@@ -334,7 +334,7 @@ test('CLI exige plan/huella/diario y conserva archivos privados sin enlaces ni s
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
-const actualEvent = (id: string, overrides: Record<string, unknown> = {}) => ({ id, ownerId: peer, ownerName: 'Organización superviviente', title: 'Encuentro privado de prueba', type: 'tournament', format: '7', level: 'amateur', city: 'Madrid', country: 'España', timeZone: 'Europe/Madrid', venue: 'Campo de prueba', startAt: '2026-10-07T10:00:00Z', startAtMs: Date.parse('2026-10-07T10:00:00Z'), capacity: 4, entry: 'players', description: 'Descripción del organizador', status: 'completed', tournamentFormat: 'league', participants: { [uid]: 'NOMBRE_SOLICITANTE', [peer]: 'Participante superviviente' }, participantIds: [uid, peer], fixtures: [], fixtureIds: ['game'], rsvps: { [uid]: 'yes', [peer]: 'yes' }, waitlist: {}, waitlistOrder: [], createdAt: '2026-10-06T10:00:00Z', ...overrides });
+const actualEvent = (id: string, overrides: Record<string, unknown> = {}) => ({ id, ownerId: peer, ownerName: 'Organización superviviente', title: 'Partido privado de prueba', type: 'tournament', format: '7', level: 'amateur', city: 'Madrid', country: 'España', timeZone: 'Europe/Madrid', venue: 'Campo de prueba', startAt: '2026-10-07T10:00:00Z', startAtMs: Date.parse('2026-10-07T10:00:00Z'), capacity: 4, entry: 'players', description: 'Descripción del organizador', status: 'completed', tournamentFormat: 'league', participants: { [uid]: 'NOMBRE_SOLICITANTE', [peer]: 'Participante superviviente' }, participantIds: [uid, peer], fixtures: [], fixtureIds: ['game'], rsvps: { [uid]: 'yes', [peer]: 'yes' }, waitlist: {}, waitlistOrder: [], createdAt: '2026-10-06T10:00:00Z', ...overrides });
 
 test('portadas genéricas válidas no bloquean la baja y se conservan al anonimizar la organización y sus cruces', async () => {
   assert.equal(knownSharedSchema('communityEvents', actualEvent('legacy')), true);
@@ -476,4 +476,24 @@ test('baja retira los dos cursores de la conversación cerrada sin afectar otras
   assert.ok(plan.operations.some(op => op.path === `communityMessageReads/${uid}:peer:${uid}` && op.kind === 'delete'));
   assert.ok(plan.operations.some(op => op.path === `communityMessageReads/peer:peer:${uid}` && op.kind === 'delete'));
   assert.ok(!plan.operations.some(op => op.path === 'communityMessageReads/peer:other:peer'));
+});
+
+
+test('baja retira una invitación directa recibida y conserva invitaciones ajenas', async () => {
+  const h=harness({
+    [`communityInvitations/${incoming}`]:{id:incoming,ownerId:peer,recipientId:uid,kind:'event',eventId:'private',status:'active',createdAt:'old',usedBy:'',usedAt:''},
+    [`communityInvitations/${code}`]:{id:code,ownerId:peer,recipientId:'another',kind:'event',eventId:'private',status:'active',createdAt:'old',usedBy:'',usedAt:''},
+  });
+  const plan=buildErasurePlan(h.source());assert.deepEqual(plan.blockers,[]);
+  assert.ok(plan.operations.some(op=>op.path===`communityInvitations/${incoming}`));
+  assert.ok(!plan.operations.some(op=>op.path===`communityInvitations/${code}`));
+  await h.run(plan);h.advance();assert.equal((await h.run(plan)).phase,'completed');
+  assert.ok(!h.records.has(`communityInvitations/${incoming}`));assert.ok(h.records.has(`communityInvitations/${code}`));
+});
+
+test('la revisión de actas admite dorsales anónimos y bloquea campos identificativos desconocidos',()=>{
+  const player={id:'home_7',eventId:'event',fixtureId:'r1-1',side:'home',jersey:7,goals:1,yellowCards:1,redCards:0,fouls:2,revision:1,createdAt:'2026-11-14',updatedAt:'2026-11-14'};
+  assert.equal(knownSharedSchema('playerStats',player),true);
+  for(const extra of [{playerName:'Privado'},{userId:uid},{yellowCards:3},{side:'other'}])assert.equal(knownSharedSchema('playerStats',{...player,...extra}),false);
+  assert.equal(knownSharedSchema('communityFixtures',{discipline:{home:{yellowCards:1,redCards:0,fouls:2,playerName:'Privado'},away:{yellowCards:0,redCards:0,fouls:0}}}),false);
 });

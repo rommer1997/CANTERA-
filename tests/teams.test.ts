@@ -11,8 +11,9 @@ test('Los enlaces caducados, revocados y de otros equipos no admiten incorporaci
  assert.throws(() => assertInvite(invite, { ...team, status: 'archived' }, 0));
 });
 test('Retorno tras registro permite flujos internos y rechaza redirecciones externas', () => {
- for (const link of ['/play/event1', '/teams/join/token', '/play?create=1&type=match', '/feed?create=achievement']) assert.equal(safeReturnTo(link), link);
+ for (const link of ['/play/event1', '/teams/join/token', '/play?create=1&type=match', '/feed?create=achievement', '/feed?post=shared', '/activity', '/messages', '/messages/alice:bob', '/messages/alice%3Abob']) assert.equal(safeReturnTo(link), link);
  for (const link of [null, 'https://evil.test', '//evil.test', '/\\evil', '/admin', '/profile', '/teams/x#external', '/play/\nsecret']) assert.equal(safeReturnTo(link), '');
+ for (const link of ['/messages/https://evil.test', '/messages/alice/bob', '/messages/alice%2Fbob', '/messages/alice:bob#external', '/feed?post=' + 'x'.repeat(2048)]) assert.equal(safeReturnTo(link), '');
 });
 test('La identidad del equipo no mezcla roles y limpia campos obligatorios', () => {
  assert.equal(memberId('team1', 'uid'), 'team1_uid'); assert.equal(isTeamManager('member'), false); assert.equal(isTeamManager('manager'), true);

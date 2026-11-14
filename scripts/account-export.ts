@@ -8,7 +8,7 @@ export interface AccountExportSource {
   auth?: unknown; privateProfile?: ExportRecord | null; publicProfile?: ExportRecord | null;
   moderation?: ExportRecord | null; legacyProfile?: ExportRecord | null;
   collections?: Partial<Record<ExportCollection, ExportRecord[]>>;
-  events?: ExportRecord[]; fixtureRecords?: ExportRecord[]; teams?: ExportRecord[]; legacyLikes?: ExportRecord[];
+  events?: ExportRecord[]; fixtureRecords?: ExportRecord[]; fixturePlayerRecords?: ExportRecord[]; teams?: ExportRecord[]; legacyLikes?: ExportRecord[];
 }
 type Data = Record<string, unknown>;
 const isData = (value: unknown): value is Data => !!value && typeof value === 'object' && !Array.isArray(value);
@@ -83,7 +83,7 @@ const collectionPolicies: Record<ExportCollection, { owner: string; fields: stri
 export const accountQueryPolicies = Object.fromEntries(exportCollections.map(collection => [collection, collectionPolicies[collection].owner])) as Record<ExportCollection, string>;
 
 function privateRecordBelongs(record: ExportRecord, collection: ExportCollection, uid: string): boolean {
-  if (collection === 'communityInvitations') return record.data.ownerId === uid || record.data.usedBy === uid;
+  if (collection === 'communityInvitations') return record.data.ownerId === uid || record.data.usedBy === uid || record.data.recipientId === uid;
   if (collection === 'communityConnections') {
     if (record.data.ownerId !== uid) return false;
     if (record.path === undefined) return true;
@@ -120,6 +120,7 @@ export function projectAccountEvent(record: ExportRecord, uid: string): Data | n
   const participating = owns(data.participants, uid), waiting = owns(data.waitlist, uid), responded = owns(data.rsvps, uid);
   if (data.ownerId !== uid && !participating && !waiting && !responded) return null;
   const result = projected(record, ['ownerId', 'ownerName', 'title', 'type', 'format', 'level', 'city', 'country', 'timeZone', 'venue', 'startAt', 'startAtMs', 'capacity', 'entry', 'description', 'status', 'tournamentFormat', 'createdAt', 'updatedAt', 'revision', 'teamId', 'visibility']);
+  if (['any', 'beginner', 'intermediate', 'advanced'].includes(data.skillLevel as string)) result.skillLevel = data.skillLevel;
   if (['day', 'night', 'tournament'].includes(data.coverId as string)) result.coverId = data.coverId;
   result.organizer = data.ownerId === uid;
   result.participants = participating ? { [uid]: scalar((data.participants as Data)[uid]) ?? null } : {};
@@ -135,6 +136,12 @@ export function projectAccountEvent(record: ExportRecord, uid: string): Data | n
   return result;
 }
 
+function sportActa(data: Data): Data {
+  const result = pick(data, ['homePenalties', 'awayPenalties']);
+  if (isData(data.discipline)) result.discipline = Object.fromEntries(['home', 'away'].map(side => [side, pick((data.discipline as Data)[side], ['yellowCards', 'redCards', 'fouls'])]));
+  return result;
+}
+
 export function buildAccountExport(source: AccountExportSource) {
   assertExportUid(source.uid);
   const eventRecords = unique(source.events);
@@ -142,15 +149,16 @@ export function buildAccountExport(source: AccountExportSource) {
   const eventIds = new Set(events.map(record => record.id));
   const fixtureRecords: Data[] = unique(source.fixtureRecords).filter(record => eventIds.has(record.data.eventId)).map(record => ({
     ...projected(record, ['eventId', 'round', 'homeScore', 'awayScore', 'kickoffAt', 'timeZone', 'venue', 'createdAt', 'updatedAt']),
-    fixtureId: scalar(record.data.id) ?? null, bye: record.data.awayId === '',
+    ...sportActa(record.data), fixtureId: scalar(record.data.id) ?? null, bye: record.data.awayId === '',
     ...(record.data.homeId === source.uid ? { ownSide: 'home' } : record.data.awayId === source.uid ? { ownSide: 'away' } : {}),
   }));
+  const fixturePlayerRecords = unique(source.fixturePlayerRecords).filter(record => fixtureRecords.some(fixture => fixture.eventId === record.data.eventId && fixture.fixtureId === record.data.fixtureId)).map(record => projected(record, ['eventId', 'fixtureId', 'side', 'jersey', 'goals', 'yellowCards', 'redCards', 'fouls', 'revision', 'createdAt', 'updatedAt']));
   for (const event of events) {
     const original = eventRecords.find(record => record.id === event.id)?.data;
     const canonical = fixtureRecords.filter(record => record.eventId === event.id);
     if (canonical.length || Array.isArray(original?.fixtureIds) && original.fixtureIds.length) {
       event.fixtureSource = 'communityFixtures';
-      event.fixtures = canonical.map(record => ({ id: record.fixtureId, ...pick(record, ['round', 'homeScore', 'awayScore', 'timeZone', 'venue', 'bye', 'ownSide']), ...(typeof record.kickoffAt === 'string' ? { startAt: record.kickoffAt } : {}) }));
+      event.fixtures = canonical.map(record => ({ id: record.fixtureId, ...sportActa(record), ...pick(record, ['round', 'homeScore', 'awayScore', 'timeZone', 'venue', 'bye', 'ownSide']), ...(typeof record.kickoffAt === 'string' ? { startAt: record.kickoffAt } : {}) }));
       if (Array.isArray(original?.fixtureIds)) event.fixtureExpectedCount = original.fixtureIds.length;
       event.fixtureAvailableCount = canonical.length;
     } else event.fixtureSource = 'event-document';
@@ -184,6 +192,7 @@ export function buildAccountExport(source: AccountExportSource) {
           result.exportReference = invitationReferences.get(record.id);
           result.createdBySelf = record.data.ownerId === source.uid;
           result.usedBySelf = record.data.usedBy === source.uid;
+          if(record.data.recipientId===source.uid)result.recipientId=source.uid;
           if (result.createdBySelf) result.ownerId = source.uid;
           if (result.usedBySelf) result.usedBy = source.uid;
           const peerId = result.createdBySelf ? record.data.usedBy : record.data.ownerId;
@@ -222,12 +231,12 @@ export function buildAccountExport(source: AccountExportSource) {
   const collectionCounts = Object.fromEntries(exportCollections.map(name => [name, collections[name].length])) as Record<ExportCollection, number>;
   const counts = {
     auth: Number(auth !== null), privateProfile: Number(account.privateProfile !== null), publicProfile: Number(account.publicProfile !== null), moderation: Number(account.moderation !== null), legacyProfile: Number(account.legacyProfile !== null),
-    ...collectionCounts, events: events.length, fixtureRecords: fixtureRecords.length, teams: teams.length, legacyLikes: legacyLikes.length,
+    ...collectionCounts, events: events.length, fixtureRecords: fixtureRecords.length, fixturePlayerRecords: fixturePlayerRecords.length, teams: teams.length, legacyLikes: legacyLikes.length,
   };
   return {
     format: 'cantera-account-export', version: 1, uid: source.uid,
     source: { projectId: source.projectId, databaseId: source.databaseId, startedAt: source.startedAt, completedAt: source.completedAt },
     scope: { ownRecordsOnly: true, otherParticipantsRemoved: true, otherTeamPrivateRecordsRemoved: true, credentialsRemoved: true, mediaBinariesIncluded: false, shortInvitationTokensRemoved: true, privateConnectionPeerIdsRemoved: true },
-    counts, account, collections, events, fixtureRecords, teams, legacyLikes,
+    counts, account, collections, events, fixtureRecords, fixturePlayerRecords, teams, legacyLikes,
   };
 }

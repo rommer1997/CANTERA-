@@ -17,7 +17,7 @@
 .team-card-level{color:var(--c-muted,#6c7a73);font-size:12px}
 .team-card-cta{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;min-height:44px;margin-top:9px;padding:9px 10px;border-radius:8px;background:#e7f3ec;color:#07543b;font-size:12px;font-weight:750}
 .team-card:hover .team-card-cta{background:#d8ebdf}
-.team-badge{display:inline-flex;align-items:center;max-width:100%;padding:3px 8px;border-radius:6px;background:var(--c-surface,#e9f3ed);color:#3d6650;font-size:11px;font-weight:650;line-height:1.5}
+.team-badge{display:inline-flex;align-items:center;max-width:100%;padding:3px 8px;border-radius:6px;background:var(--c-surface,#e9f3ed);color:#3d6650;font-size:12px;font-weight:650;line-height:1.5}
 .team-monogram{width:56px;height:56px;background:#e3f0e8;color:#07543b;display:grid;place-items:center;border:1px solid #cfe5d7;border-radius:14px;font-size:19px;font-weight:800;letter-spacing:-.04em;flex-shrink:0}
 .team-discovery-head{margin-top:32px}
 .team-discovery-head>.c-small{margin:0 0 16px}
@@ -63,7 +63,7 @@
 .team-page .c-section-head h1,.team-profile-head h1{font-size:28px;letter-spacing:-.8px;margin:0 0 8px}
 .team-page h2,.team-section h2{font-size:20px}
 .team-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:16px 0 24px}
-.team-card{padding:20px 12px 12px;gap:6px}.team-card h3{font-size:14px}.team-card .team-card-location{font-size:11px}.team-card .team-card-location>svg{display:none}.team-card-cta{font-size:11px}.team-discovery-filters{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.team-discovery-filters>.team-search-field{grid-column:1/-1}
+.team-card{padding:20px 12px 12px;gap:6px}.team-card h3{font-size:14px}.team-card .team-card-location{font-size:12px}.team-card .team-card-location>svg{display:none}.team-card-cta{font-size:12px}.team-discovery-filters{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.team-discovery-filters>.team-search-field{grid-column:1/-1}
 .team-profile-head{align-items:flex-start;gap:16px;margin:16px 0 24px}
 .team-member{flex-direction:column;gap:12px}
 .team-member>div{width:100%}

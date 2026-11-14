@@ -14,7 +14,7 @@ export function assertInvite(invite: TeamInvite | null, team: CommunityTeam | nu
   if (!invite || !team || invite.teamId !== team.id || invite.revoked || team.status !== 'active' || !Number.isFinite(Date.parse(invite.expiresAt)) || Date.parse(invite.expiresAt) <= now) throw new Error('Esta invitación ha caducado o ya no está disponible. Pide un enlace nuevo al organizador.');
 }
 export function safeReturnTo(value: string | null) {
-  if (!value || !value.startsWith('/') || value.startsWith('//') || /[\\\u0000-\u001f]/.test(value)) return '';
-  if (!/^\/(play(?:\/[^?/#]+)?|teams(?:\/(?:join\/)?[^?/#]+)?|feed|connect|invite\/[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{16}|people(?:\/[^?/#]+)?)(?:\?[^#]*)?$/.test(value)) return '';
+  if (!value || value.length > 2048 || !value.startsWith('/') || value.startsWith('//') || /[\\\u0000-\u001f]/.test(value)) return '';
+  if (!/^\/(play(?:\/[^?/#]+)?|teams(?:\/(?:join\/)?[^?/#]+)?|feed|connect|activity|messages(?:\/[A-Za-z0-9_-]{1,128}(?::|%3[Aa])[A-Za-z0-9_-]{1,128})?|invite\/[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{16}|people(?:\/[^?/#]+)?)(?:\?[^#]*)?$/.test(value)) return '';
   return value;
 }

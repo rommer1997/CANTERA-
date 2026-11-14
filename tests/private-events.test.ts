@@ -15,7 +15,7 @@ const event: PlayEvent = {
   participantIds: ['player', 'guest_local'], fixtures: [], createdAt: '2026-10-07T00:00:00.000Z',
 };
 
-test('un encuentro privado sólo se muestra a su organización y cuentas inscritas, nunca a externos o invitados sin UID', () => {
+test('un partido privado solo se muestra a su organización y cuentas inscritas, nunca a externos o invitados sin UID', () => {
   const privateEvent = { ...event, visibility: 'private' as const, waitlist: { waiting: { name: 'En espera', joinedAt: event.createdAt } } };
   assert.equal(canReadEvent(privateEvent, 'owner'), true);
   assert.equal(canReadEvent(privateEvent, 'player'), true);
@@ -35,7 +35,7 @@ test('normalización conserva privacidad, rechaza valores ambiguos y permite det
   for (const visibility of ['hidden', '', null, true, { private: true }]) assert.equal(normalizeEvent({ ...event, visibility }), null);
 });
 
-test('descubrimiento público excluye encuentros privados incluso para sus propios organizadores', () => {
+test('descubrimiento público excluye partidos privados incluso para sus propios organizadores', () => {
   const privateEvent = normalizeEvent({ ...event, id: 'private', visibility: 'private' }, 'private')!;
   const publicEvent = normalizeEvent({ ...event, id: 'public', visibility: 'public' }, 'public')!;
   const legacy = normalizeEvent({ ...event, id: 'legacy' }, 'legacy')!;

@@ -1,10 +1,11 @@
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter, Routes, Route } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
 import { TeamsProvider } from './community/TeamsContext';
 import { CommunityProvider } from './community/CommunityContext';
 import { InvitationsProvider } from './community/InvitationsContext';
 import { MessagingProvider } from './community/MessagingContext';
-import { AboutPage, AdminPage, CommunityHome, CommunityLayout, LegalPage, ProfilePage } from './community/CommunityPages';
+import { PushSession } from './community/PushSettings';
+import { AboutPage, AdminPage, CommunityHome, CommunityLayout, LegalPage, NotFoundPage, ProfilePage } from './community/CommunityPages';
 const EventsPage = lazy(() => import('./community/EventsPage'));
 const FeedPage = lazy(() => import('./community/FeedPage'));
 const TeamsPage = lazy(() => import('./community/TeamsPage'));
@@ -14,7 +15,7 @@ const ConnectionsPage = lazy(() => import('./community/ConnectionsPage'));
 const MessagesPage = lazy(() => import('./community/MessagesPage'));
 
 export default function App() {
-  return <HashRouter><CommunityProvider><InvitationsProvider><MessagingProvider><TeamsProvider><Suspense fallback={<div className="c-empty" role="status">Cargando LaCantera…</div>}><Routes><Route element={<CommunityLayout />}>
+  return <HashRouter><CommunityProvider><PushSession/><InvitationsProvider><MessagingProvider><TeamsProvider><Suspense fallback={<div className="c-empty" role="status">Cargando LaCantera…</div>}><Routes><Route element={<CommunityLayout />}>
     <Route index element={<CommunityHome />} />
     <Route path="play" element={<EventsPage />} /><Route path="play/:eventId" element={<EventsPage />} />
     <Route path="feed" element={<FeedPage />} /><Route path="profile" element={<ProfilePage />} />
@@ -23,6 +24,6 @@ export default function App() {
     <Route path="connect" element={<ConnectionsPage />} /><Route path="invite/:code" element={<ConnectionsPage />} />
     <Route path="messages" element={<MessagesPage />} /><Route path="messages/:conversationId" element={<MessagesPage />} />
     <Route path="admin" element={<AdminPage />} /><Route path="about" element={<AboutPage />} />
-    <Route path="legal/:kind" element={<LegalPage />} /><Route path="*" element={<Navigate to="/" replace />} />
+    <Route path="legal/:kind" element={<LegalPage />} /><Route path="*" element={<NotFoundPage />} />
   </Route></Routes></Suspense></TeamsProvider></MessagingProvider></InvitationsProvider></CommunityProvider></HashRouter>;
 }

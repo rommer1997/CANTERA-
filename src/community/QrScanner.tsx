@@ -132,7 +132,7 @@ export function QrScanner({ onCode, onClose }: { onCode(code: string): void; onC
      try {
       const result = readImage(element, element.videoWidth, element.videoHeight, 640);
       if (result.code) { found(result.code, token); return; }
-      if (result.hasQr && !invalidNotified) { invalidNotified = true; setError('Este QR no es una invitación de LaCantera. Prueba con el QR de un código de conexión o de un encuentro privado.'); }
+      if (result.hasQr && !invalidNotified) { invalidNotified = true; setError('Este QR no es una invitación de LaCantera. Prueba con el QR de un código de conexión o de un partido privado.'); }
      } catch {
       stopResources(); setStatus('idle'); setError('No se ha podido leer la cámara. Puedes iniciarla de nuevo o elegir una imagen del QR.'); return;
      }
@@ -179,7 +179,7 @@ export function QrScanner({ onCode, onClose }: { onCode(code: string): void; onC
    const result = readImage(image, image.naturalWidth, image.naturalHeight, 960);
    if (result.code) { found(result.code, token); return; }
    setStatus('idle');
-   setError(result.hasQr ? 'Este QR no es una invitación de LaCantera. Elige la imagen de un código de conexión o de un encuentro privado.' : 'No se ha encontrado un QR legible. Prueba con una imagen más nítida o usa la cámara.');
+   setError(result.hasQr ? 'Este QR no es una invitación de LaCantera. Elige la imagen de un código de conexión o de un partido privado.' : 'No se ha encontrado un QR legible. Prueba con una imagen más nítida o usa la cámara.');
   } catch {
    if (current(token)) { setStatus('idle'); setError('No se ha podido leer esta imagen. Elige otra imagen del QR.'); }
   } finally {
@@ -193,7 +193,7 @@ export function QrScanner({ onCode, onClose }: { onCode(code: string): void; onC
  const statusText = status === 'starting' ? 'Solicitando acceso a la cámara…' : status === 'camera' ? 'Sitúa el QR dentro del recuadro.' : status === 'image' ? 'Leyendo la imagen en tu dispositivo…' : status === 'paused' ? 'El lector está en pausa. Puedes iniciar la cámara o elegir una imagen.' : 'Elige cómo leer el QR de tu invitación.';
  return <dialog ref={dialog} className="cqr-dialog" aria-labelledby={titleId} aria-describedby={descriptionId} onCancel={event => { event.preventDefault(); close(); }} onClick={event => { if (event.target === event.currentTarget) { const box = event.currentTarget.getBoundingClientRect(); if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) close(); } }}>
   <header className="cqr-head"><div><p className="c-eyebrow">CONECTA CON TU GENTE</p><h2 id={titleId}>Escanear QR</h2></div><button type="button" className="cqr-close" aria-label="Cerrar lector QR" autoFocus onClick={close}><X size={21} /></button></header>
-  <p id={descriptionId} className="cqr-description">Lee el QR de una invitación para conectar o entrar en un encuentro privado. Después podrás revisarla y decidir si la aceptas.</p>
+  <p id={descriptionId} className="cqr-description">Lee el QR de una invitación para conectar o entrar en un partido privado. Después podrás revisarla y decidir si la aceptas.</p>
   <div className={`cqr-preview ${status === 'camera' ? 'active' : ''}`} aria-busy={status === 'starting' || status === 'image'}>
    <video ref={video} muted playsInline aria-hidden={status !== 'camera'} aria-label="Vista de la cámara para leer el QR" className="cqr-video" />
    {status !== 'camera' ? <div className="cqr-placeholder"><ScanLine size={46} aria-hidden="true" /><span>{status === 'image' ? 'Leyendo imagen…' : status === 'starting' ? 'Iniciando cámara…' : 'Tu invitación empieza con un QR'}</span></div> : <div className="cqr-guide" aria-hidden="true" />}

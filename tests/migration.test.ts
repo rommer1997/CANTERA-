@@ -7,6 +7,11 @@ import { profileSearchTokens } from '../src/community/normalization.ts';
 const require = createRequire(import.meta.url);
 const { parseArguments, migrateDocument, runMigration, PAGE_SIZE, DATABASE_ID } = require('../scripts/migrate-community.cjs');
 const iso = '2026-10-05T12:30:15.123Z';
+test('la migración exige proyecto y base exactos antes de inicializar credenciales o escrituras', () => {
+  const { validateMigrationTarget, PROJECT_ID } = require('../scripts/migrate-community.cjs');
+  assert.doesNotThrow(() => validateMigrationTarget({ projectId: PROJECT_ID, firestoreDatabaseId: DATABASE_ID }));
+  for (const config of [null, {}, { projectId: 'other-project', firestoreDatabaseId: DATABASE_ID }, { projectId: PROJECT_ID, firestoreDatabaseId: '(default)' }]) assert.throws(() => validateMigrationTarget(config));
+});
 const profile = { id: 'alice', name: 'José Martínez', bio: '', city: 'A Coruña', country: 'España', position: '', team: '', level: 'amateur', verification: 'unverified', entityType: 'individual', createdAt: iso };
 
 class FakeTimestamp {

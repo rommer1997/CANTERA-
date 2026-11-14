@@ -42,13 +42,15 @@ function profileHarness(initial: any, returnTo = '') {
   const modules: Record<string, any> = { react, 'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
     'react-router-dom': { Link: 'Link', useNavigate: () => navigate, useSearchParams: () => [routeParams, (next: URLSearchParams) => { routeParams = new URLSearchParams(next); dirty = true; }] },
     '../components/BrandMark': { default: 'BrandMark' },
+    './analytics': { trackAnalytics() {} },
+    './PushSettings': { PushSettings: () => null },
     'lucide-react': {}, './CommunityContext': { useCommunity: () => api, TERMS_VERSION, friendlyError: (error: Error) => error.message },
     './experience': experience, './useClock': { useClock: () => Date.now() }, './TeamsContext': { useTeams: () => ({ ownTeams: [] }) }, './teamLogic': { safeReturnTo }, './GeographyFields': { CountryInput: 'CountryInput' },
     './geography': { canonicalCountry }, './legal': { legalReady: true, operator: { email: 'support@example.test' } } };
   const source = readFileSync(new URL('../src/community/ProfilePage.tsx', import.meta.url), 'utf8');
   const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
   const exports: any = {};
-  new Function('exports', 'require', 'window', compiled)(exports, (name: string) => modules[name], { addEventListener() {}, removeEventListener() {}, requestAnimationFrame(fn: () => void) { return setImmediate(fn); }, cancelAnimationFrame(id: NodeJS.Immediate) { clearImmediate(id); } });
+  new Function('exports', 'require', 'window', compiled)(exports, (name: string) => modules[name], { dispatchEvent() {}, addEventListener() {}, removeEventListener() {}, requestAnimationFrame(fn: () => void) { return setImmediate(fn); }, cancelAnimationFrame(id: NodeJS.Immediate) { clearImmediate(id); } });
   let tree: any;
   function render() {
     for (let attempt = 0; attempt < 15; attempt++) {
@@ -83,7 +85,7 @@ test('alternar registro e inicio conserva el enlace de invitación sin crear per
     const h = profileHarness(null, destination);
     try {
       assert.match(h.text(), /Únete a la comunidad/);
-      assert.ok(h.nodes().some(node => node.type === 'BrandMark'));
+      assert.ok(!h.nodes().some(node => node.type === 'BrandMark'), 'el acceso no repite el logo de la cabecera');
       const login = h.nodes().find(node => node.type === 'Link' && node.props.children === 'Inicia sesión');
       assert.ok(login); assert.equal(new URL(login.props.to, 'https://cantera.example').searchParams.get('returnTo'), destination);
       h.followLink(login.props.to); assert.match(h.text(), /Bienvenido de vuelta/);
@@ -119,7 +121,7 @@ test('edad, términos actuales, fecha y ubicación siguen siendo necesarios para
   }
 });
 
-test('cuenta Google nueva empieza vacía sin consentimientos y sólo envía aceptación después de sus cambios explícitos', async () => {
+test('cuenta Google nueva empieza vacía sin consentimientos y solo envía aceptación después de sus cambios explícitos', async () => {
   const h = profileHarness(fixture(), '/feed');
   try {
     assert.equal(h.label('Ciudad').props.value, ''); assert.equal(h.label('País').props.value, '');

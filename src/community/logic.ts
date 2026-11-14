@@ -1,5 +1,7 @@
+import { fixtureWinner, validPenalties } from './tournament.ts';
 import type { EventInput, Fixture, FixtureSchedule, MatchResult, PlayEvent, Standing } from './types';
 import { eventVisibility } from './eventPrivacy.ts';
+import { isSkillLevel } from './skillLevels.ts';
 import { isEventCoverId } from './eventCovers.ts';
 
 export function requireText(value: string, label: string, max = 200): string {
@@ -13,6 +15,7 @@ export function validateEvent(input: EventInput, now = Date.now()): EventInput {
     !['amateur', 'professional'].includes(input.level) || !['players', 'teams'].includes(input.entry) ||
     !['league', 'knockout'].includes(input.tournamentFormat) ||
     input.visibility !== undefined && !['public', 'private'].includes(input.visibility) ||
+    input.skillLevel !== undefined && !isSkillLevel(input.skillLevel) ||
     input.coverId !== undefined && !isEventCoverId(input.coverId)) throw new Error('Formato de evento inválido.');
   if (!Number.isInteger(input.capacity) || input.capacity < 2 || input.capacity > 64) throw new Error('El aforo debe estar entre 2 y 64.');
   if (input.type === 'tournament' && input.capacity > 32) throw new Error('Los torneos admiten hasta 32 participantes para generar el calendario.');
@@ -24,14 +27,14 @@ export function validateEvent(input: EventInput, now = Date.now()): EventInput {
 }
 
 export function validateEventEdit(event: PlayEvent, input: EventInput, reason: string, now = Date.now()): EventInput {
-  if (event.status === 'completed') throw new Error('Un encuentro celebrado no se puede reprogramar.');
+  if (event.status === 'completed') throw new Error('Un partido celebrado no se puede reprogramar.');
   requireText(reason, 'Motivo del cambio', 500);
   const cleaned = validateEvent(input, now);
-  if (cleaned.visibility !== eventVisibility(event)) throw new Error('La privacidad del encuentro no se puede cambiar después de crearlo.');
+  if (cleaned.visibility !== eventVisibility(event)) throw new Error('La privacidad del partido no se puede cambiar después de crearlo.');
   if (cleaned.capacity < Object.keys(event.participants).length) throw new Error('El aforo no puede ser menor que el número de inscripciones.');
-  if (Object.keys(event.participants).length && (cleaned.type !== event.type || cleaned.entry !== event.entry)) throw new Error('Con participantes inscritos no puedes cambiar el tipo de encuentro ni de inscripción.');
+  if (Object.keys(event.participants).length && (cleaned.type !== event.type || cleaned.entry !== event.entry)) throw new Error('Con participantes inscritos no puedes cambiar el tipo de partido ni de inscripción.');
   if (event.fixtures.length && (cleaned.type !== event.type || cleaned.entry !== event.entry || cleaned.format !== event.format || cleaned.tournamentFormat !== event.tournamentFormat)) throw new Error('Los cruces generados fijan el formato de la competición.');
-  if (cleaned.teamId !== event.teamId) throw new Error('No puedes cambiar el equipo organizador de un encuentro publicado.');
+  if (cleaned.teamId !== event.teamId) throw new Error('No puedes cambiar el equipo organizador de un partido publicado.');
   return cleaned;
 }
 
@@ -58,7 +61,7 @@ export function joinParticipants(event: PlayEvent, id: string, name: string, now
 
 export function makeFixtures(event: PlayEvent): Fixture[] {
   const ids = Object.keys(event.participants);
-  if (event.status === 'cancelled' || event.status === 'completed') throw new Error('No puedes generar cruces en un encuentro cancelado o celebrado.');
+  if (event.status === 'cancelled' || event.status === 'completed') throw new Error('No puedes generar cruces en un partido cancelado o celebrado.');
   if (event.fixtures.length) throw new Error('Ya se ha generado el calendario.');
   if (ids.length < 2 || ids.length > 32) throw new Error('El calendario admite entre 2 y 32 participantes.');
   if (event.tournamentFormat === 'knockout') {
@@ -88,20 +91,21 @@ export function makeFixtures(event: PlayEvent): Fixture[] {
   return fixtures;
 }
 
-export function recordScore(event: PlayEvent, fixtureId: string, home: number, away: number, now = Date.now()): Fixture[] {
-  if (event.status === 'cancelled') throw new Error('El evento está cancelado.');
+export function recordScore(event: PlayEvent, fixtureId: string, home: number, away: number, now = Date.now(), penalties?: { home: number; away: number }): Fixture[] {
+  if (event.status === 'cancelled' || event.status === 'completed') throw new Error('El evento está cancelado o finalizado.');
   if (![home, away].every(n => Number.isInteger(n) && n >= 0 && n <= 99)) throw new Error('Introduce goles enteros entre 0 y 99.');
   const fixture = event.fixtures.find(f => f.id === fixtureId);
   if (!fixture || !fixture.awayId) throw new Error('Partido no encontrado o pase libre.');
   const kickoff = Date.parse(fixture.startAt || event.startAt);
   if (!Number.isFinite(kickoff) || kickoff > now) throw new Error('El cruce todavía no ha comenzado. Registra el resultado después de su hora de inicio.');
-  if (event.tournamentFormat === 'knockout' && home === away) throw new Error('En eliminatorias introduce el marcador decisivo, incluidos los penaltis si los hubo.');
+  if (fixture.playerTotals && (fixture.playerTotals.home.goals > home || fixture.playerTotals.away.goals > away)) throw new Error('El marcador no puede quedar por debajo de los goles registrados por jugador.');
+  if (!validPenalties({ homeScore:home, awayScore:away, homePenalties:penalties?.home, awayPenalties:penalties?.away }, event.tournamentFormat === 'knockout')) throw new Error('Introduce un marcador decisivo o, en eliminatorias empatadas, un desempate por penaltis válido.');
   if (event.tournamentFormat === 'knockout' && event.fixtures.some(f => f.round > fixture.round)) throw new Error('No puedes cambiar un resultado que ya generó la siguiente ronda.');
-  const updated = event.fixtures.map(f => f.id === fixtureId ? { ...f, homeScore: home, awayScore: away } : f);
+  const updated = event.fixtures.map(f => { if (f.id !== fixtureId) return f; const { homePenalties:_h, awayPenalties:_a, ...current } = f; return { ...current, homeScore:home, awayScore:away, ...(penalties ? {homePenalties:penalties.home,awayPenalties:penalties.away} : {}) }; });
   if (event.tournamentFormat !== 'knockout') return updated;
   const lastRound = updated.filter(f => f.round === fixture.round);
   if (lastRound.length < 2 || lastRound.some(f => f.awayId && (f.homeScore === null || f.awayScore === null))) return updated;
-  const winners = lastRound.map(f => !f.awayId || f.homeScore! > f.awayScore! ? f.homeId : f.awayId);
+  const winners = lastRound.map(f => fixtureWinner(f)!);
   for (let i = 0; i < winners.length; i += 2) updated.push({ id: `r${fixture.round + 1}-${i / 2 + 1}`, round: fixture.round + 1,
     homeId: winners[i], awayId: winners[i + 1], homeScore: null, awayScore: null });
   return updated;
@@ -138,7 +142,7 @@ export function isoToZonedDateTime(iso: string, timeZone: string): string {
 export type EventRecurrence = 'weekly' | 'biweekly' | 'monthly';
 export function expandEventSeries(input: EventInput, frequency: EventRecurrence, count: number, now = Date.now()): EventInput[] {
   if (!['weekly', 'biweekly', 'monthly'].includes(frequency)) throw new Error('Frecuencia de repetición inválida.');
-  if (!Number.isInteger(count) || count < 2 || count > 12) throw new Error('Una serie debe tener entre 2 y 12 encuentros.');
+  if (!Number.isInteger(count) || count < 2 || count > 12) throw new Error('Una serie debe tener entre 2 y 12 partidos.');
   const original = validateEvent(input, now);
   const local = isoToZonedDateTime(original.startAt, original.timeZone);
   const [year, month, day] = local.slice(0, 10).split('-').map(Number);
@@ -154,7 +158,7 @@ export function expandEventSeries(input: EventInput, frequency: EventRecurrence,
     const nextLocal = `${date.toISOString().slice(0, 10)}${local.slice(10)}`;
     let startAt: string;
     try { startAt = new Date(Date.parse(zonedDateTimeToIso(nextLocal, original.timeZone)) + minuteRemainder).toISOString(); }
-    catch (error) { throw new Error(`El encuentro ${index + 1} no tiene una hora válida (${nextLocal.replace('T', ' ')}). ${error instanceof Error ? error.message : 'Elige otra hora.'}`); }
+    catch (error) { throw new Error(`El partido ${index + 1} no tiene una hora válida (${nextLocal.replace('T', ' ')}). ${error instanceof Error ? error.message : 'Elige otra hora.'}`); }
     return validateEvent({ ...original, startAt, ...(original.startAtMs === undefined ? {} : { startAtMs: Date.parse(startAt) }) }, now);
   });
 }
@@ -166,7 +170,7 @@ export function buildEventCalendar(event: PlayEvent, invitation: string, fixture
   const fixture = fixtureId ? scheduled.find(item => item.id === fixtureId) : undefined;
   if (fixtureId && !fixture) throw new Error('Este cruce todavía no tiene un horario asignado.');
   const appointments = fixture ? [fixture] : scheduled.length ? scheduled : [null];
-  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Cantera//Encuentros//ES', 'CALSCALE:GREGORIAN', ...appointments.flatMap(item => {
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Cantera//Partidos//ES', 'CALSCALE:GREGORIAN', ...appointments.flatMap(item => {
     const start = Date.parse(item?.startAt || event.startAt);
     const summary = item ? `${event.title}: ${event.participants[item.homeId]} – ${event.participants[item.awayId]}` : event.title;
     return ['BEGIN:VEVENT', `UID:${event.id}${item ? `-${item.id}` : ''}@cantera`, `DTSTAMP:${stamp(now)}`, `SEQUENCE:${event.revision || 0}`, `DTSTART:${stamp(start)}`, `DTEND:${stamp(start + 90 * 60_000)}`, `SUMMARY:${escape(summary)}`, `LOCATION:${escape(`${item?.venue || event.venue}, ${event.city}, ${event.country}`)}`, `DESCRIPTION:${escape(`${event.description}\n${invitation}\nZona horaria: ${item?.timeZone || event.timeZone}. Duración orientativa: 90 minutos. Confirmar con la organización.`)}`, `STATUS:${event.status === 'cancelled' ? 'CANCELLED' : 'CONFIRMED'}`, 'END:VEVENT'];

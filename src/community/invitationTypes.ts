@@ -1,5 +1,5 @@
 export type InvitationKind = 'connection' | 'event';
-export type InvitationStatus = 'active' | 'used' | 'revoked';
+export type InvitationStatus = 'active' | 'used' | 'revoked' | 'declined';
 
 export interface CommunityInvitation {
   id: string;
@@ -10,6 +10,7 @@ export interface CommunityInvitation {
   createdAt: string;
   usedBy: string;
   usedAt: string;
+  recipientId?: string;
 }
 
 export interface CommunityConnection {

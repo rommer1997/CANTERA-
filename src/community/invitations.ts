@@ -5,6 +5,7 @@ import type { CommunityConnection, CommunityInvitation, InvitationActor, Invitat
 export const INVITATION_CODE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
 export const INVITATION_CODE_LENGTH = 16;
 export const INVITATION_TTL_MS = 10 * 60 * 1000;
+export const DIRECT_INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const codePattern = /^[2-9A-HJ-NP-Z]{16}$/;
 
 const messages: Record<InvitationErrorCode, string> = {
@@ -76,11 +77,12 @@ function identifier(value: unknown): value is string {
     && !/[\/\\\u0000-\u001f\u007f]/.test(value);
 }
 
-export function invitationExpiresAt(createdAt: number | string | Date): string {
+export function invitationExpiresAt(createdAt: number | string | Date, direct = false): string {
   const iso = typeof createdAt === 'string' ? timestamp(createdAt) : null;
   const epoch = createdAt instanceof Date ? createdAt.getTime() : typeof createdAt === 'number' ? createdAt : iso ? Date.parse(iso) : NaN;
-  if (!Number.isSafeInteger(epoch) || epoch < 0 || !Number.isFinite(new Date(epoch + INVITATION_TTL_MS).getTime())) throw new InvitationError('unavailable');
-  return new Date(epoch + INVITATION_TTL_MS).toISOString();
+  const ttl = direct ? DIRECT_INVITATION_TTL_MS : INVITATION_TTL_MS;
+  if (!Number.isSafeInteger(epoch) || epoch < 0 || !Number.isFinite(new Date(epoch + ttl).getTime())) throw new InvitationError('unavailable');
+  return new Date(epoch + ttl).toISOString();
 }
 
 export function invitationSecondsRemaining(expiresAt: string, now = Date.now()): number {
@@ -100,15 +102,19 @@ export function normalizeInvitation(value: unknown, documentId?: string): Commun
   const createdAt = timestamp(data.createdAt);
   const createdAtMs = createdAt ? Date.parse(createdAt) : NaN;
   const usedAt = data.usedAt === '' ? '' : timestamp(data.usedAt);
+  const direct = data.recipientId !== undefined;
+  const ttl = direct ? DIRECT_INVITATION_TTL_MS : INVITATION_TTL_MS;
   if (typeof data.id !== 'string' || !codePattern.test(data.id) || documentId !== undefined && documentId !== data.id
     || !['connection', 'event'].includes(data.kind as string) || !identifier(data.ownerId)
     || (data.kind === 'connection' ? data.eventId !== '' : !identifier(data.eventId))
-    || !['active', 'used', 'revoked'].includes(data.status as string) || !createdAt
-    || createdAtMs < 0 || !Number.isFinite(new Date(createdAtMs + INVITATION_TTL_MS).getTime())
-    || (data.status === 'used' ? !identifier(data.usedBy) || data.usedBy === data.ownerId || !usedAt || Date.parse(usedAt) < createdAtMs || Date.parse(usedAt) >= createdAtMs + INVITATION_TTL_MS : data.usedBy !== '' || usedAt !== '')) return null;
+    || !['active', 'used', 'revoked', 'declined'].includes(data.status as string) || !createdAt
+    || direct && (!identifier(data.recipientId) || data.recipientId === data.ownerId || data.kind !== 'event')
+    || data.status === 'declined' && !direct
+    || createdAtMs < 0 || !Number.isFinite(new Date(createdAtMs + ttl).getTime())
+    || (data.status === 'used' ? !identifier(data.usedBy) || data.usedBy === data.ownerId || direct && data.usedBy !== data.recipientId || !usedAt || Date.parse(usedAt) < createdAtMs || Date.parse(usedAt) >= createdAtMs + ttl : data.usedBy !== '' || usedAt !== '')) return null;
   return { id: data.id, kind: data.kind as CommunityInvitation['kind'], ownerId: data.ownerId,
     eventId: data.eventId as string, status: data.status as CommunityInvitation['status'], createdAt,
-    usedBy: data.usedBy as string, usedAt: usedAt as string };
+    usedBy: data.usedBy as string, usedAt: usedAt as string, ...(direct ? { recipientId: data.recipientId as string } : {}) };
 }
 
 // The document path contains both user IDs, so underscores in either UID cannot
@@ -130,6 +136,6 @@ export function validateInvitationAcceptance(invitation: CommunityInvitation | n
   if (actor.emailVerified !== true) throw new InvitationError('email-verification-required');
   const current = normalizeInvitation(invitation);
   const now = actor.now ?? Date.now();
-  if (!current || current.status !== 'active' || !Number.isFinite(now) || now < Date.parse(current.createdAt) || now >= Date.parse(current.createdAt) + INVITATION_TTL_MS) throw new InvitationError('unavailable');
+  if (!current || current.status !== 'active' || current.recipientId && current.recipientId !== actor.userId || !Number.isFinite(now) || now < Date.parse(current.createdAt) || now >= Date.parse(invitationExpiresAt(current.createdAt, !!current.recipientId))) throw new InvitationError('unavailable');
   if (current.ownerId === actor.userId) throw new InvitationError('self-invitation');
 }

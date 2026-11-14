@@ -119,7 +119,7 @@ test('aceptar una conexión consume una vez y guarda ambos extremos en una sola 
   assert.equal(storage.writes, 1);
 });
 
-test('un código usado propio sólo admite reintento mientras existen los dos contactos actuales', () => {
+test('un código usado propio solo admite reintento mientras existen los dos contactos actuales', () => {
   seed(); acceptDemoConnection(code, actor);
   const used = readInvitationDemo();
   writeInvitationDemo({ ...used, connections: used.connections.slice(0, 1) });

@@ -114,11 +114,11 @@ test('error o perfil retirado bloquean una invitación nueva y permiten reintent
   }
 });
 
-test('el encuentro privado muestra sólo la identidad pública antes de inscribir', async () => {
+test('el partido privado muestra solo la identidad pública antes de inscribir', async () => {
   const h = acceptanceHarness(invite({ kind: 'event', eventId: 'private-event' }));
   try {
     await h.confirm(); h.profile('bob', 'Organizador público');
-    assert.match(h.text(), /Organizador público/); assert.match(h.text(), /Te invita a un encuentro privado/);
+    assert.match(h.text(), /Organizador público/); assert.match(h.text(), /Te invita a un partido privado/);
     assert.doesNotMatch(h.text(), /private-event/);
     assert.ok(h.links().includes('/people/bob'));
     assert.equal(h.button('Aceptar e inscribirme').props.disabled, false);

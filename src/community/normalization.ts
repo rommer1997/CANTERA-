@@ -1,3 +1,4 @@
+import { validDiscipline, validPenalties, validPlayerStats, consistentPlayerTotals } from './tournament.ts';
 import type { DemoData } from './local';
 import { validPilotUserIds } from './pilotAccess.ts';
 import type { CommunityPost, CommunityProfile, ContentReport, Fixture, FollowRecord, PlayEvent, EventNotice, RightsRequest, RuntimeConfig, PostComment, PublicProfile, VerificationRequest } from './types';
@@ -101,6 +102,7 @@ export function normalizeEvent(value: unknown, documentId?: string): PlayEvent |
   value = dates(value);
   if (!object(value) || !documentIdentity(value, documentId) || value.teamId !== undefined && value.teamId !== '' && !id(value.teamId) || !id(value.ownerId) || !text(value.ownerName, 1, 100)
     || !text(value.title, 1, 100) || value.visibility !== undefined && !enumValue(value.visibility, ['public', 'private'] as const)
+    || value.skillLevel !== undefined && !enumValue(value.skillLevel, ['any', 'beginner', 'intermediate', 'advanced'] as const)
     || value.coverId !== undefined && !enumValue(value.coverId, ['day', 'night', 'tournament'] as const) || !enumValue(value.type, ['match', 'tournament'] as const)
     || !enumValue(value.format, ['5', '7', '11'] as const) || !enumValue(value.level, ['amateur', 'professional'] as const)
     || !text(value.city, 1, 100) || !text(value.country, 1, 100) || !timeZone(value.timeZone)
@@ -124,12 +126,16 @@ export function normalizeEvent(value: unknown, documentId?: string): PlayEvent |
       || raw.homeId === raw.awayId || !score(raw.homeScore) || !score(raw.awayScore)
       || (raw.homeScore === null) !== (raw.awayScore === null)
       || raw.awayId === '' && (value.tournamentFormat !== 'knockout' || raw.homeScore !== null)
-      || value.tournamentFormat === 'knockout' && raw.awayId !== '' && raw.homeScore !== null && raw.homeScore === raw.awayScore) return null;
+      || !validPenalties(raw, value.tournamentFormat === 'knockout')
+      || !consistentPlayerTotals(raw)
+      || raw.discipline !== undefined && (!validDiscipline(raw.discipline) || raw.homeScore === null || !raw.awayId)) return null;
+    if (raw.players !== undefined && (!Array.isArray(raw.players) || raw.players.length > 200 || !raw.players.every(validPlayerStats))) return null;
     fixtureIds.add(raw.id);
     if (raw.startAt !== undefined && (!date(raw.startAt) || !timeZone(raw.timeZone) || !text(raw.venue, 1, 200))) return null;
-    fixtures.push({ id: raw.id, round: raw.round, homeId: raw.homeId, awayId: raw.awayId, homeScore: raw.homeScore, awayScore: raw.awayScore, ...(raw.startAt === undefined ? {} : { startAt: raw.startAt as string, timeZone: raw.timeZone as string, venue: raw.venue as string }) });
+    fixtures.push({ id: raw.id, round: raw.round, homeId: raw.homeId, awayId: raw.awayId, homeScore: raw.homeScore, awayScore: raw.awayScore, ...(raw.homePenalties === undefined ? {} : {homePenalties:raw.homePenalties as number,awayPenalties:raw.awayPenalties as number}), ...(raw.discipline === undefined ? {} : {discipline:raw.discipline as Fixture['discipline']}), ...(raw.playerTotals === undefined ? {} : {playerTotals:raw.playerTotals as Fixture['playerTotals'],playerChangeId:raw.playerChangeId as string,playerRevision:raw.playerRevision as number}), ...(raw.players === undefined ? {} : {players:raw.players as Fixture['players']}), ...(raw.startAt === undefined ? {} : { startAt: raw.startAt as string, timeZone: raw.timeZone as string, venue: raw.venue as string }) });
   }
   return { id: value.id, ownerId: value.ownerId, ownerName: value.ownerName, title: value.title, visibility: value.visibility === 'private' ? 'private' : 'public', type: value.type,
+    ...(value.skillLevel === undefined ? {} : { skillLevel: value.skillLevel as PlayEvent['skillLevel'] }),
     ...(value.coverId === undefined ? {} : { coverId: value.coverId as PlayEvent['coverId'] }),
     format: value.format, level: value.level, city: value.city, country: value.country, timeZone: value.timeZone,
     venue: value.venue, startAt: value.startAt, ...(value.startAtMs === undefined ? {} : { startAtMs }),

@@ -8,6 +8,7 @@ import { decodeInvitationQrImage, parseInvitationQr } from '../src/community/inv
 const code = 'DME2M8Z4PFA6GF89';
 const production = 'https://lacantera.web.app';
 const link = `${production}/#/invite/${code}`;
+const customOrigin = 'https://lacantera.com.es';
 
 // qrcode.react produces axis-aligned horizontal module strips. Rasterize that
 // generated SVG only in tests, avoiding DOM, image downloads and new libraries.
@@ -31,7 +32,7 @@ function qrPixels(value: string, scale = 8) {
   return { data, width, height: width };
 }
 
-test('lector acepta códigos legibles y sólo enlaces exactos de Cantera o su origen actual', () => {
+test('lector acepta códigos legibles y solo enlaces exactos de Cantera o su origen actual', () => {
   assert.equal(parseInvitationQr(code), code);
   assert.equal(parseInvitationQr('dme2 m8z4 pfa6 gf89'), code);
   assert.equal(parseInvitationQr('DME2-M8Z4-PFA6-GF89'), code);
@@ -40,6 +41,20 @@ test('lector acepta códigos legibles y sólo enlaces exactos de Cantera o su or
   assert.equal(parseInvitationQr(`http://localhost:3000/#/invite/${code}`, 'http://localhost:3000'), code);
   assert.equal(parseInvitationQr(`https://cantera-preview.example.test/#/invite/${code}`, 'https://cantera-preview.example.test'), code);
   assert.equal(parseInvitationQr(link, 'http://localhost:3000'), code);
+});
+
+test('los QR del dominio propio y del anterior funcionan entre ambas instalaciones', () => {
+  const customLink = `${customOrigin}/#/invite/${code}`;
+  assert.equal(parseInvitationQr(customLink, production), code);
+  assert.equal(parseInvitationQr(link, customOrigin), code);
+  assert.equal(parseInvitationQr(customLink), code);
+  const image = qrPixels(customLink);
+  const decoded = decodeInvitationQrImage(image.data, image.width, image.height);
+  assert.equal(decoded, customLink);
+  assert.equal(parseInvitationQr(decoded!, production), code);
+  for (const origin of ['http://lacantera.com.es', 'https://lacantera.com.es.evil.test', 'https://lacantera.com.es:444', 'https://lacantera.com.es.']) {
+    assert.equal(parseInvitationQr(`${origin}/#/invite/${code}`, production), null, origin);
+  }
 });
 
 test('rechaza QR de otros dominios, puertos, protocolos, credenciales y orígenes aparentes', () => {
@@ -70,7 +85,7 @@ test('rechaza rutas, consultas, controles, escapes y código incrustado en conte
   assert.equal(parseInvitationQr(null as unknown as string), null);
 });
 
-test('decodifica un QR real de qrcode.react y entrega sólo código tras validar el payload', () => {
+test('decodifica un QR real de qrcode.react y entrega solo código tras validar el payload', () => {
   for (const payload of [code, link]) {
     const image = qrPixels(payload);
     const decoded = decodeInvitationQrImage(image.data, image.width, image.height);

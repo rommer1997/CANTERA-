@@ -121,7 +121,7 @@ async function collectAccountSource({ db, auth, uid, projectId, databaseId, Fiel
   collections.communityEventPromotions = [...(collections.communityEventPromotions || []), ...await readAll(db.collection('communityEventPromotions').where('recipientId', '==', uid))];
   // Invitations consumed by the requester are personal records even when
   // another person created the code. Do not read all invitations or accounts.
-  collections.communityInvitations = [...(collections.communityInvitations || []), ...await readAll(db.collection('communityInvitations').where('usedBy', '==', uid))];
+  collections.communityInvitations = [...(collections.communityInvitations || []), ...await readAll(db.collection('communityInvitations').where('usedBy', '==', uid)), ...await readAll(db.collection('communityInvitations').where('recipientId', '==', uid))];
   collections.communityConnections = await readAll(db.collection('communityConnections').doc(uid).collection('members').where('ownerId', '==', uid));
   // A group named "members" may also contain contacts or future team records.
   // The equality query is personal; this exact path gate admits only receipts
@@ -148,6 +148,7 @@ async function collectAccountSource({ db, auth, uid, projectId, databaseId, Fiel
   ];
   for (const [query, rangeField] of eventQueries) events.push(...await readAll(query, rangeField));
   const fixtureRecords = [];
+  const fixturePlayerRecords = [];
   const eventIds = [...new Set(events.map(event => event.id))];
   // Canonical scores and public change records are independent of the parent
   // event's legacy fixtures/cache. Restrict every lookup to a linked event.
@@ -157,6 +158,9 @@ async function collectAccountSource({ db, auth, uid, projectId, databaseId, Fiel
       readAll(db.collection('communityEventChanges').where('eventId', '==', eventId)),
     ]);
     fixtureRecords.push(...fixtures);
+    for (let offset = 0; offset < fixtures.length; offset += 4) await Promise.all(fixtures.slice(offset, offset + 4).map(async fixture => {
+      fixturePlayerRecords.push(...await readAll(db.collection('communityFixtures').doc(fixture.id).collection('playerStats')));
+    }));
     collections.communityEventChanges = [...(collections.communityEventChanges || []), ...changes];
   }));
   const teams = await readAll(db.collection('communityTeams').where('ownerId', '==', uid));
@@ -171,7 +175,7 @@ async function collectAccountSource({ db, auth, uid, projectId, databaseId, Fiel
   return { uid, projectId, databaseId, startedAt, completedAt: new Date().toISOString(), auth: identity,
     privateProfile: direct[0].exists ? record(direct[0]) : null, publicProfile: direct[1].exists ? record(direct[1]) : null,
     moderation: direct[2].exists ? record(direct[2]) : null, legacyProfile: direct[3].exists ? record(direct[3]) : null,
-    collections, events, fixtureRecords, teams, legacyLikes };
+    collections, events, fixtureRecords, fixturePlayerRecords, teams, legacyLikes };
 }
 
 async function main() {

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
 const cli = createRequire(import.meta.url)('../scripts/open-community.cjs');
@@ -11,7 +12,7 @@ function local(extra: any = {}) {
   return { env: { VITE_SERVICE_OPEN: 'true', VITE_ENABLE_PILOT: 'false', VITE_ENABLE_DEMO: 'false', VITE_ENABLE_MEDIA_UPLOADS: 'false', VITE_HOSTING_PROVIDER: 'firebase', VITE_OPERATOR_NAME: 'Persona de ensayo', VITE_OPERATOR_COUNTRY: 'España', VITE_CONTACT_EMAIL: cli.OWNER_EMAIL },
     approval: { projectId: cli.PROJECT_ID, databaseId: cli.DATABASE_ID, approvedAt: new Date().toISOString(), approvedBy: 'Persona de ensayo', checks },
     config: { projectId: cli.PROJECT_ID, firestoreDatabaseId: cli.DATABASE_ID }, firebaseConfig: { firestore: [{ database: cli.DATABASE_ID, rules: 'firestore.rules', indexes: 'firestore.indexes.json' }] },
-    rules: 'rules_version = "2"; // LOCAL TEST ONLY', indexSpec: { indexes: Array.from({ length: 30 }, (_, i) => ({ collectionGroup: `group${i}`, queryScope: 'COLLECTION', fields: [{ fieldPath: 'createdAt', order: 'ASCENDING' }] })), fieldOverrides: [] },
+    rules: 'rules_version = "2"; // LOCAL TEST ONLY', indexSpec: { indexes: Array.from({ length: cli.EXPECTED_INDEXES }, (_, i) => ({ collectionGroup: `group${i}`, queryScope: 'COLLECTION', fields: [{ fieldPath: 'createdAt', order: 'ASCENDING' }] })), fieldOverrides: [] },
     fingerprint: 'a'.repeat(64), releaseCheckPassed: true, ...extra };
 }
 function runtime(status = 'pilot', extra: any = {}) {
@@ -93,15 +94,15 @@ test('acta real y reciente, check-release y flags exactos preceden cualquier API
   const emulator = local(); emulator.env.VITE_FIREBASE_EMULATORS = 'true'; invalid.push(emulator);
   for (const fixture of invalid) { const h = harness({ local: fixture }); await assert.rejects(() => h.run({ apply: true })); assert.equal(h.requests.length, 0); assert.equal(h.releases, 0); assert.equal(h.commits, 0); }
 });
-test('dry-run verifica destinos, reglas30READY, Google y admin sin escritura ni datos privados', async () => {
+test('dry-run verifica destinos, reglas e índices READY, Google y admin sin escritura ni datos privados', async () => {
   const h = harness(); const result = await h.run();
   assert.equal(h.commits, 0); assert.ok(h.requests.every((request: any) => request.method === 'GET'));
   assert.equal(result.mode, 'dry-run'); assert.equal(result.action, 'planned'); assert.equal(result.runtimeOpenObserved, false);
-  assert.equal(result.removedPilotAccounts, 2); assert.equal(result.checks.indexCount, 30); assert.equal(result.checks.googleEnabled, true);
+  assert.equal(result.removedPilotAccounts, 2); assert.equal(result.checks.indexCount, cli.EXPECTED_INDEXES); assert.equal(result.checks.googleEnabled, true);
   assert.deepEqual(h.identities, [{ email: cli.OWNER_EMAIL, uid: undefined }, { email: undefined, uid: 'owner-uid' }]);
   const serialized = JSON.stringify(result); for (const secret of ['SECRET', cli.OWNER_EMAIL, 'owner-uid', 'second-uid', 'test-client']) assert.ok(!serialized.includes(secret));
 });
-test('apply sólo sustituye runtimeopen conCAS, conserva contacto exacto y retira pilotUserIds', async () => {
+test('apply solo sustituye runtimeopen conCAS, conserva contacto exacto y retira pilotUserIds', async () => {
   const h = harness(); const result = await h.run({ apply: true });
   assert.equal(h.commits, 1); assert.equal(result.verified, true); assert.equal(result.action, 'applied');
   assert.deepEqual(Object.keys(h.document.fields).sort(), ['contactEmail', 'mediaUploadsEnabled', 'serviceStatus', 'updatedAt']);
@@ -115,7 +116,7 @@ test('pausa se puede abrir; estadoausente/setup/campos desconocidos/medios activ
   }
   const forbidden = harness({ runtimeStatus: 403 }); await assert.rejects(() => forbidden.run({ apply: true }), /runtime-read-required/); assert.equal(forbidden.commits, 0);
 });
-test('open existente devuelve unchanged sólo después de revisar backend/admin/acta', async () => {
+test('open existente devuelve unchanged solo después de revisar backend/admin/acta', async () => {
   const h = harness({ document: runtime('open') }); const result = await h.run({ apply: true });
   assert.equal(h.commits, 0); assert.equal(result.action, 'unchanged'); assert.equal(result.verified, true); assert.equal(h.identities.length, 2);
   const invalid = harness({ document: runtime('open', { pilotUserIds: { arrayValue: { values: [] } } }) }); await assert.rejects(() => invalid.run());
@@ -125,7 +126,7 @@ test('release y fuente usan igualdad exacta y no aceptan rulesets de otro proyec
     const h = harness(options); await assert.rejects(() => h.run({ apply: true })); assert.equal(h.commits, 0);
   }
 });
-test('se exige30READY y correspondencia biyectiva, sin índices extras/duplicados/unique ooverrides', async () => {
+test('se exige el conjunto exacto de índices READY y correspondencia biyectiva, sin índices extras/duplicados/unique ooverrides', async () => {
   for (const mutate of [(h: any) => h.indexes.pop(), (h: any) => h.indexes.push({ ...h.indexes[0], name: h.indexes[0].name + 'extra' }), (h: any) => h.indexes[0].state = 'CREATING', (h: any) => h.indexes[0].unique = true, (h: any) => h.indexes[1] = structuredClone(h.indexes[0]), (h: any) => h.indexes[0].fields = [{ fieldPath: 'other', order: 'ASCENDING' }], (h: any) => h.fields = [{ name: `${cli.DATABASE_NAME}/collectionGroups/communityPosts/fields/text`, ttlConfig: {} }]]) {
     const h = harness(); mutate(h); await assert.rejects(() => h.run({ apply: true })); assert.equal(h.commits, 0);
   }
@@ -133,7 +134,7 @@ test('se exige30READY y correspondencia biyectiva, sin índices extras/duplicado
 });
 test('listas paginan incluso en página vacía y bloquean ciclos/formato o token no string', async () => {
   const h = harness(); h.indexPage = (request: any) => request.queryParams.pageToken === 'next' ? { status: 200, body: { indexes: h.indexes } } : { status: 200, body: { nextPageToken: 'next' } };
-  assert.equal((await h.run()).checks.indexCount, 30); assert.equal(h.commits, 0);
+  assert.equal((await h.run()).checks.indexCount, cli.EXPECTED_INDEXES); assert.equal(h.commits, 0);
   for (const value of [{ indexes: null }, { indexes: {} }, { nextPageToken: 7 }, { indexes: [], nextPageToken: 'repeat' }]) {
     const api = { request: async () => ({ status: 200, body: value }) }; await assert.rejects(() => cli.paginated(api, 'fixed', 'indexes'));
   }
@@ -169,7 +170,7 @@ test('CLI inválido no imprime secretos ni inicia cloud', () => {
   assert.equal(result.status, 1); assert.equal(result.stdout, ''); assert.ok(!result.stderr.includes('SECRET'));
 });
 
-test('nombre Google numérico sólo se admite tras GET directo que prueba el proyecto exacto', async () => {
+test('nombre Google numérico solo se admite tras GET directo que prueba el proyecto exacto', async () => {
   const h = harness({ google: { name: 'projects/123456789012/defaultSupportedIdpConfigs/google.com' } });
   assert.equal((await h.run()).checks.googleEnabled, true); assert.equal(h.commits, 0);
   for (const projectMetadata of [{ projectId: 'other' }, { projectNumber: '111' }, { projectNumber: 123456789012 }, { projectNumber: 'bad' }]) {
@@ -193,7 +194,7 @@ test('paginación Enterprise conserva pageSize cero, filtro y token sin segundo 
   assert.equal(requests.length, 2); assert.equal(requests[1].queryParams.pageToken, 'second-page');
 });
 
-test('identidad del responsable usa sólo GET con proyección mínima y coincidencia exacta en todas las páginas', async () => {
+test('identidad del responsable usa solo GET con proyección mínima y coincidencia exacta en todas las páginas', async () => {
   const requests: any[] = [];
   const account = { ...owner(), localId: 'owner-uid', passwordHash: 'SECRET_HASH', displayName: 'UNRELATED_NAME' };
   const api = { async request(request: any) {
@@ -224,4 +225,9 @@ test('lectura GET de identidad falla cerrada para destino o búsqueda alternativ
     const identities = cli.readOnlyIdentityApi({ request: async (request: any) => { assert.equal(request.method, 'GET'); return { status: 200, body: value }; } });
     await assert.rejects(() => identities.findUser(cli.PROJECT_ID, cli.OWNER_EMAIL));
   }
+});
+
+test('el control de apertura coincide con los índices reales del repositorio',()=>{
+  const spec=JSON.parse(readFileSync(new URL('../firestore.indexes.json',import.meta.url),'utf8'));
+  assert.equal(spec.indexes.length,cli.EXPECTED_INDEXES);
 });

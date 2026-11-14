@@ -47,7 +47,11 @@ function checkedIdentity(value, expected = {}) {
   const email = normalizeEmail(value.email);
   if (expected.uid !== undefined && value.uid !== expected.uid || expected.email !== undefined && email !== normalizeEmail(expected.email)) reject('identity-mismatch');
   const providers = value.providerUserInfo;
-  if (!Array.isArray(providers) || !providers.some(provider => plain(provider) && provider.providerId === 'google.com' && (!provider.email || normalizeEmail(provider.email) === email))) reject('google-provider-required');
+  // These are trusted Firebase Auth account records, not client-supplied claims.
+  // Linked providers share the Firebase UID but may have a different email.
+  // Keep the verified primary email/expected UID checks above; a provider alias
+  // must neither reject that account nor select/authorize another account.
+  if (!Array.isArray(providers) || !providers.some(provider => plain(provider) && provider.providerId === 'google.com')) reject('google-provider-required');
   let claims = {};
   if (value.customAttributes !== undefined && value.customAttributes !== '') {
     if (typeof value.customAttributes !== 'string') reject('invalid-claims');

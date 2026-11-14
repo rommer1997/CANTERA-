@@ -4,7 +4,7 @@ import { normalizeDemoData, normalizeFollow, normalizePublicProfile } from '../s
 const at = '2026-10-06T12:00:00.000Z';
 const profile = (id: string) => ({ id, name: id, bio: '', city: '', country: '', position: '', team: '', level: 'amateur', verification: 'unverified', entityType: 'individual', createdAt: at, adultConfirmed: true, acceptedTermsVersion: '2026-10-05', acceptedTermsAt: at });
 
-test('proyección pública reconstruye sólo campos deportivos, sin consentimiento, identidad privada ni roles', () => {
+test('proyección pública reconstruye solo campos deportivos, sin consentimiento, identidad privada ni roles', () => {
   const result = normalizePublicProfile({ ...profile('alice'), email: 'private@example.test', role: 'ADMIN' }, 'alice');
   assert.equal(result?.name, 'alice');
   for (const field of ['adultConfirmed', 'acceptedTermsVersion', 'acceptedTermsAt', 'email', 'role']) assert.equal(field in result!, false);

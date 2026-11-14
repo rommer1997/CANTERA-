@@ -56,18 +56,41 @@ service cloud.firestore {
     function freshInvitationState(data) {
       return data.status == 'active' && data.ownerId != request.auth.uid
         && data.createdAt is timestamp && data.createdAt <= request.time
-        && data.createdAt + duration.value(10, 'm') > request.time && pilotPeerAllowed(data.ownerId) && notBlocked(data.ownerId);
+        && (data.get('recipientId', '') == '' ? data.createdAt + duration.value(10, 'm') > request.time
+          : data.recipientId == request.auth.uid && data.createdAt + duration.value(7, 'd') > request.time)
+        && pilotPeerAllowed(data.ownerId) && notBlocked(data.ownerId);
     }
     function freshInvitation(data) { return verifiedActor() && freshInvitationState(data); }
     function validInvitation(data, id) {
       return id.matches('[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{16}')
-        && data.keys().hasAll(['id', 'ownerId', 'kind', 'eventId', 'status', 'createdAt', 'usedBy', 'usedAt'])
-        && data.keys().hasOnly(['id', 'ownerId', 'kind', 'eventId', 'status', 'createdAt', 'usedBy', 'usedAt'])
+        // Every required field is accessed and checked below. hasOnly rejects
+        // extras; missing fields fail closed without a duplicate hasAll scan.
+        && data.keys().hasOnly(['id', 'ownerId', 'kind', 'eventId', 'status', 'createdAt', 'usedBy', 'usedAt', 'recipientId'])
         && data.id == id && text(data.ownerId, 1, 128) && data.kind in ['connection', 'event']
-        && data.status in ['active', 'used', 'revoked'] && data.createdAt is timestamp
+        && data.status in ['active', 'used', 'revoked', 'declined'] && data.createdAt is timestamp
+        && ('recipientId' in data ? text(data.recipientId, 1, 128) && data.recipientId != data.ownerId && data.kind == 'event' : data.status != 'declined')
         && text(data.eventId, 0, 128) && text(data.usedBy, 0, 128)
         && (data.usedAt == '' || data.usedAt is timestamp)
         && (data.kind == 'connection' && data.eventId == '' || data.kind == 'event' && data.eventId != '');
+    }
+    function directInvitationAllowed(data) {
+      let recipient = data.get('recipientId', '');
+      // active() has already checked the sender. Repeating its full profile
+      // predicate here would exceed Firestore's expression budget on creates.
+      return recipient == '' || request.auth.token.get('email_verified', false) == true
+        && recipient.matches('[A-Za-z0-9_-]{1,128}') && request.auth.uid.matches('[A-Za-z0-9_-]{1,128}')
+        && recipient != request.auth.uid && pilotPeerAllowed(recipient)
+        && completedProfile(get(/databases/$(database)/documents/communityProfiles/$(recipient)).data)
+        && messagingAccountAllowed(recipient)
+        && get(/databases/$(database)/documents/communityConnections/$(request.auth.uid)/members/$(recipient)).data.peerId == recipient
+        && get(/databases/$(database)/documents/communityConnections/$(recipient)/members/$(request.auth.uid)).data.peerId == request.auth.uid
+        && notBlocked(recipient);
+    }
+    function invitationCreatorActive() {
+      // Missing profiles fail closed in completedProfile. One get per profile
+      // and moderation record leaves room for both blocks, edges and the event.
+      return signed() && runtimeAvailable() && messagingAccountAllowed(request.auth.uid)
+        && completedProfile(actorProfile());
     }
     function consumedInvitation(code, kind, eventId) {
       let before = get(/databases/$(database)/documents/communityInvitations/$(code)).data;
@@ -78,8 +101,7 @@ service cloud.firestore {
         && after.status == 'used' && after.usedBy == request.auth.uid && after.usedAt == request.time;
     }
     function validConnection(data, ownerUid, peerUid) {
-      return data.keys().hasAll(['ownerId', 'peerId', 'inviteId', 'createdAt'])
-        && data.keys().hasOnly(['ownerId', 'peerId', 'inviteId', 'createdAt'])
+      return data.keys().hasOnly(['ownerId', 'peerId', 'inviteId', 'createdAt'])
         && data.ownerId == ownerUid && data.peerId == peerUid && ownerUid != peerUid
         && text(ownerUid, 1, 128) && text(peerUid, 1, 128)
         && text(data.inviteId, 16, 16) && data.createdAt == request.time;
@@ -197,18 +219,23 @@ service cloud.firestore {
     match /communityInvitations/{code} {
       // No public lookup or listing. A recipient must know the exact random code.
       allow get: if owner(resource.data.ownerId) || admin()
+        || verifiedActor() && resource.data.get('recipientId', '') == request.auth.uid
         || freshInvitation(resource.data)
         || verifiedActor() && resource.data.status == 'used' && owner(resource.data.usedBy);
-      allow list: if owner(resource.data.ownerId) || admin();
-      allow create: if active() && validInvitation(request.resource.data, code)
+      allow list: if owner(resource.data.ownerId) || admin()
+        || verifiedActor() && resource.data.recipientId == request.auth.uid;
+      allow create: if invitationCreatorActive() && validInvitation(request.resource.data, code)
         && request.resource.data.ownerId == request.auth.uid && request.resource.data.status == 'active'
         && request.resource.data.createdAt == request.time && request.resource.data.usedBy == '' && request.resource.data.usedAt == ''
+        && directInvitationAllowed(request.resource.data)
         && (request.resource.data.kind == 'connection'
           || owner(get(/databases/$(database)/documents/communityEvents/$(request.resource.data.eventId)).data.ownerId)
             && get(/databases/$(database)/documents/communityEvents/$(request.resource.data.eventId)).data.get('visibility', 'public') == 'private');
       allow update: if validInvitation(request.resource.data, code)
         && (owner(resource.data.ownerId) && resource.data.status == 'active'
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']) && request.resource.data.status == 'revoked'
+          || verifiedActor() && resource.data.get('recipientId', '') == request.auth.uid && resource.data.status == 'active'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']) && request.resource.data.status == 'declined'
           || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'usedBy', 'usedAt'])
             && request.resource.data.status == 'used' && request.resource.data.usedBy == request.auth.uid && request.resource.data.usedAt == request.time
             && (resource.data.kind == 'connection' && freshInvitation(resource.data) && connectionPair(code, resource.data.ownerId)
@@ -291,7 +318,10 @@ service cloud.firestore {
       allow delete: if false;
     }
     match /communityPublicProfiles/{uid} {
-      allow read: if runtimeAvailable();
+      allow get: if runtimeAvailable();
+      // Individual sporting profiles can be shared publicly. Enumerating the
+      // directory and recommending accounts requires completed registration.
+      allow list: if verifiedActor();
       allow create, update: if (owner(uid) && pilotReadAllowed() || admin())
         && completedProfile(getAfter(/databases/$(database)/documents/communityProfiles/$(uid)).data)
         && publicProjection(request.resource.data, getAfter(/databases/$(database)/documents/communityProfiles/$(uid)).data);
@@ -313,7 +343,7 @@ service cloud.firestore {
     }
     function validEvent(data, id) {
       return data.keys().hasAll(['id', 'ownerId', 'ownerName', 'title', 'type', 'format', 'level', 'city', 'country', 'timeZone', 'venue', 'startAt', 'startAtMs', 'capacity', 'entry', 'description', 'status', 'tournamentFormat', 'participants', 'fixtures', 'createdAt'])
-        && data.keys().hasOnly(['id', 'ownerId', 'ownerName', 'title', 'type', 'format', 'level', 'city', 'country', 'timeZone', 'venue', 'startAt', 'startAtMs', 'capacity', 'entry', 'description', 'status', 'tournamentFormat', 'participants', 'participantIds', 'fixtures', 'fixtureIds', 'createdAt', 'updatedAt', 'revision', 'history', 'rsvps', 'waitlist', 'waitlistOrder', 'result', 'teamId', 'visibility', 'coverId'])
+        && data.keys().hasOnly(['id', 'ownerId', 'ownerName', 'title', 'type', 'format', 'level', 'city', 'country', 'timeZone', 'venue', 'startAt', 'startAtMs', 'capacity', 'entry', 'description', 'status', 'tournamentFormat', 'participants', 'participantIds', 'fixtures', 'fixtureIds', 'createdAt', 'updatedAt', 'revision', 'history', 'rsvps', 'waitlist', 'waitlistOrder', 'result', 'teamId', 'visibility', 'coverId', 'skillLevel'])
         && data.id == id && text(data.ownerId, 1, 128) && text(data.ownerName, 1, 100)
         && text(data.title, 1, 100) && data.type in ['match', 'tournament'] && data.format in ['5', '7', '11']
         && data.level in ['amateur', 'professional'] && text(data.city, 1, 100) && text(data.country, 1, 100)
@@ -327,6 +357,7 @@ service cloud.firestore {
         && data.get('participantIds', data.participants.keys()).size() == data.participants.size()
         && data.get('visibility', 'public') in ['public', 'private']
         && data.get('coverId', 'day') in ['day', 'night', 'tournament']
+        && data.get('skillLevel', 'any') in ['any', 'beginner', 'intermediate', 'advanced']
         && data.fixtures is list && data.fixtures.size() <= 496 && date(data.createdAt)
         && data.get('fixtureIds', []) is list && data.get('fixtureIds', []).size() <= 496 && data.get('fixtureIds', []).size() == data.get('fixtureIds', []).toSet().size()
         && data.get('rsvps', {}) is map && data.get('rsvps', {}).size() <= 128
@@ -355,13 +386,14 @@ service cloud.firestore {
       let waitlistOrder = data.get('waitlistOrder', []);
       let revision = data.get('revision', 0);
       let history = data.get('history', []);
-      return data.keys().hasOnly(['id', 'ownerId', 'ownerName', 'title', 'type', 'format', 'level', 'city', 'country', 'timeZone', 'venue', 'startAt', 'startAtMs', 'capacity', 'entry', 'description', 'status', 'tournamentFormat', 'participants', 'participantIds', 'fixtures', 'fixtureIds', 'createdAt', 'updatedAt', 'revision', 'history', 'rsvps', 'waitlist', 'waitlistOrder', 'result', 'teamId', 'visibility', 'coverId'])
+      return data.keys().hasOnly(['id', 'ownerId', 'ownerName', 'title', 'type', 'format', 'level', 'city', 'country', 'timeZone', 'venue', 'startAt', 'startAtMs', 'capacity', 'entry', 'description', 'status', 'tournamentFormat', 'participants', 'participantIds', 'fixtures', 'fixtureIds', 'createdAt', 'updatedAt', 'revision', 'history', 'rsvps', 'waitlist', 'waitlistOrder', 'result', 'teamId', 'visibility', 'coverId', 'skillLevel'])
         && data.capacity is int && data.capacity >= 2 && data.capacity <= 64 && (data.type != 'tournament' || data.capacity <= 32)
         && data.status in ['open', 'closed', 'cancelled', 'completed']
         && participants is map && participantKeys.size() <= data.capacity
         && participantIds is list && participantIds.toSet() == participantKeys.toSet() && participantIds.size() == participantKeys.size()
         && data.get('visibility', 'public') in ['public', 'private']
         && data.get('coverId', 'day') in ['day', 'night', 'tournament']
+        && data.get('skillLevel', 'any') in ['any', 'beginner', 'intermediate', 'advanced']
         && data.fixtures is list && data.fixtures.size() <= 496 && date(data.createdAt)
         && fixtureIds is list && fixtureIds.size() <= 496 && fixtureIds.size() == fixtureIds.toSet().size()
         && rsvps is map && rsvps.size() <= 128 && waitlist is map && waitlist.size() <= 64
@@ -375,37 +407,157 @@ service cloud.firestore {
           && data.result.homeScore is int && data.result.homeScore >= 0 && data.result.homeScore <= 99
           && data.result.awayScore is int && data.result.awayScore >= 0 && data.result.awayScore <= 99);
     }
+    function validDisciplineSide(side) {
+      return side is map && side.keys().hasAll(['yellowCards', 'redCards', 'fouls']) && side.keys().hasOnly(['yellowCards', 'redCards', 'fouls'])
+        && side.yellowCards is int && side.yellowCards >= 0 && side.yellowCards <= 64
+        && side.redCards is int && side.redCards >= 0 && side.redCards <= 32
+        && side.fouls is int && side.fouls >= 0 && side.fouls <= 199;
+    }
+    function validFixtureDiscipline(data) {
+      return data is map && data.keys().hasAll(['home', 'away']) && data.keys().hasOnly(['home', 'away'])
+        && validDisciplineSide(data.home) && validDisciplineSide(data.away);
+    }
+    function validFixturePenalties(data, format) {
+      let hasPenalties = data.keys().hasAny(['homePenalties', 'awayPenalties']);
+      return !hasPenalties && (format != 'knockout' || data.homeScore == null || data.homeScore != data.awayScore)
+        || format == 'knockout' && data.homeScore != null && data.homeScore == data.awayScore
+          && data.keys().hasAll(['homePenalties', 'awayPenalties'])
+          && data.homePenalties is int && data.homePenalties >= 0 && data.homePenalties <= 99
+          && data.awayPenalties is int && data.awayPenalties >= 0 && data.awayPenalties <= 99
+          && data.homePenalties != data.awayPenalties;
+    }
+    function zeroPlayerStats() { return { 'goals':0, 'yellowCards':0, 'redCards':0, 'fouls':0 }; }
+    function playerTotalsSide(data) {
+      return data is map && data.keys().hasOnly(['goals','yellowCards','redCards','fouls'])
+        && data.keys().hasAll(['goals','yellowCards','redCards','fouls'])
+        && data.goals is int && data.goals >= 0 && data.goals <= 99
+        && validDisciplineSide({'yellowCards':data.yellowCards,'redCards':data.redCards,'fouls':data.fouls});
+    }
+    function validFixturePlayerTotals(data) {
+      let totals = data.get('playerTotals', {'home':zeroPlayerStats(),'away':zeroPlayerStats()});
+      return !('playerTotals' in data) && !('playerChangeId' in data) && !('playerRevision' in data)
+        || totals is map && totals.keys().hasOnly(['home','away']) && totals.keys().hasAll(['home','away'])
+          && playerTotalsSide(totals.home) && playerTotalsSide(totals.away)
+          && data.playerRevision is int && data.playerRevision >= 1 && text(data.playerChangeId, 6, 8) && data.playerChangeId.matches('(home|away)_[0-9]{1,2}')
+          && data.homeScore != null && data.awayScore != null && 'discipline' in data
+          && totals.home.goals <= data.homeScore && totals.away.goals <= data.awayScore
+          && totals.home.yellowCards <= data.discipline.home.yellowCards && totals.away.yellowCards <= data.discipline.away.yellowCards
+          && totals.home.redCards <= data.discipline.home.redCards && totals.away.redCards <= data.discipline.away.redCards
+          && totals.home.fouls <= data.discipline.home.fouls && totals.away.fouls <= data.discipline.away.fouls;
+    }
+    function validPlayerRecord(data, playerId, fixture) {
+      return data.keys().hasAll(['id','eventId','fixtureId','side','jersey','goals','yellowCards','redCards','fouls','revision','createdAt','updatedAt'])
+        && data.keys().hasOnly(['id','eventId','fixtureId','side','jersey','goals','yellowCards','redCards','fouls','revision','createdAt','updatedAt'])
+        && data.id == playerId && data.eventId == fixture.eventId && data.fixtureId == fixture.id
+        && data.side in ['home','away'] && data.jersey is int && data.jersey >= 0 && data.jersey <= 99
+        && playerId == data.side + '_' + string(data.jersey)
+        && data.goals is int && data.goals >= 0 && data.goals <= 99
+        && data.yellowCards is int && data.yellowCards >= 0 && data.yellowCards <= 2
+        && data.redCards is int && data.redCards >= 0 && data.redCards <= 1
+        && data.fouls is int && data.fouls >= 0 && data.fouls <= 99
+        && data.revision is int && data.revision >= 1 && date(data.createdAt) && data.updatedAt == request.time;
+    }
+    function statsDelta(before, after, previous, next) {
+      return after.goals == before.goals - previous.goals + next.goals
+        && after.yellowCards == before.yellowCards - previous.yellowCards + next.yellowCards
+        && after.redCards == before.redCards - previous.redCards + next.redCards
+        && after.fouls == before.fouls - previous.fouls + next.fouls;
+    }
+    function validPlayerDelta(data, original) {
+      let playerPath = /databases/$(database)/documents/communityFixtures/$(data.eventId + '_' + data.id)/playerStats/$(data.playerChangeId);
+      let next = getAfter(playerPath).data;
+      let previous = exists(playerPath) ? get(playerPath).data : zeroPlayerStats();
+      let before = original.get('playerTotals', {'home':zeroPlayerStats(),'away':zeroPlayerStats()});
+      let other = next.side == 'home' ? 'away' : 'home';
+      // The paired player write validates its complete schema. The timestamp proves it is part of this commit.
+      return next.updatedAt == request.time
+        && statsDelta(before[next.side], data.playerTotals[next.side], previous, next)
+        && data.playerTotals[other] == before[other];
+    }
     function fixtureDocument(data, docId) {
       let event = getAfter(/databases/$(database)/documents/communityEvents/$(data.eventId)).data;
       return data.keys().hasAll(['id', 'eventId', 'ownerId', 'round', 'homeId', 'awayId', 'homeScore', 'awayScore', 'kickoffAt', 'timeZone', 'venue', 'createdAt', 'updatedAt'])
-        && data.keys().hasOnly(['id', 'eventId', 'ownerId', 'round', 'homeId', 'awayId', 'homeScore', 'awayScore', 'kickoffAt', 'timeZone', 'venue', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'eventId', 'ownerId', 'round', 'homeId', 'awayId', 'homeScore', 'awayScore', 'kickoffAt', 'timeZone', 'venue', 'createdAt', 'updatedAt', 'homePenalties', 'awayPenalties', 'discipline', 'playerTotals', 'playerChangeId', 'playerRevision'])
         && docId == data.eventId + '_' + data.id && data.ownerId == event.ownerId
         && data.round is int && data.round >= 1 && data.round <= 64 && data.id.matches('r' + string(data.round) + '-[1-9][0-9]*')
         && data.homeId in event.participants && data.homeId != data.awayId
         && (data.awayId in event.participants || data.awayId == '' && event.tournamentFormat == 'knockout')
         && (data.homeScore == null && data.awayScore == null
           || data.awayId != '' && data.homeScore is int && data.awayScore is int && data.homeScore >= 0 && data.homeScore <= 99 && data.awayScore >= 0 && data.awayScore <= 99
-            && (event.tournamentFormat != 'knockout' || data.homeScore != data.awayScore)
             && (data.kickoffAt is timestamp ? data.kickoffAt <= request.time : event.startAtMs <= request.time.toMillis()))
+        && validFixturePlayerTotals(data)
+        && validFixturePenalties(data, event.tournamentFormat)
+        && (!('discipline' in data) || data.homeScore != null && data.awayId != '' && validFixtureDiscipline(data.discipline))
         && (data.kickoffAt == null || data.kickoffAt is timestamp)
         && text(data.timeZone, 1, 100) && text(data.venue, 1, 200) && date(data.createdAt) && date(data.updatedAt)
         && event.updatedAt == request.time && event.get('revision', 0) == get(/databases/$(database)/documents/communityEvents/$(data.eventId)).data.get('revision', 0) + 1
         && data.id in event.get('fixtureIds', []) && event.type == 'tournament' && event.status in ['closed', 'completed'];
     }
+    function compatiblePlayerTotals(data) {
+      let totals = data.get('playerTotals', {'home':zeroPlayerStats(),'away':zeroPlayerStats()});
+      return !('playerTotals' in data) || data.homeScore != null && data.awayScore != null && 'discipline' in data
+        && totals.home.goals <= data.homeScore && totals.away.goals <= data.awayScore
+        && totals.home.yellowCards <= data.discipline.home.yellowCards && totals.away.yellowCards <= data.discipline.away.yellowCards
+        && totals.home.redCards <= data.discipline.home.redCards && totals.away.redCards <= data.discipline.away.redCards
+        && totals.home.fouls <= data.discipline.home.fouls && totals.away.fouls <= data.discipline.away.fouls;
+    }
+    function standardFixtureUpdate() {
+      let data = request.resource.data;
+      let changed = data.diff(resource.data).affectedKeys();
+      let path = /databases/$(database)/documents/communityEvents/$(resource.data.eventId);
+      let event = getAfter(path).data;
+      // The immutable fixture identity and existing aggregate schema remain inherited.
+      return changed.hasOnly(['homeScore','awayScore','homePenalties','awayPenalties','discipline','kickoffAt','timeZone','venue','updatedAt'])
+        && data.updatedAt == request.time && get(path).data.status == 'closed'
+        && event.updatedAt == request.time && event.revision == get(path).data.get('revision',0) + 1
+        && event.status in ['closed','completed']
+        && (!changed.hasAny(['homeScore','awayScore','homePenalties','awayPenalties'])
+          || (data.homeScore == null && data.awayScore == null || data.awayId != ''
+            && data.homeScore is int && data.homeScore >= 0 && data.homeScore <= 99
+            && data.awayScore is int && data.awayScore >= 0 && data.awayScore <= 99
+            && (data.kickoffAt is timestamp ? data.kickoffAt <= request.time : event.startAtMs <= request.time.toMillis()))
+          && validFixturePenalties(data,event.tournamentFormat)
+          && (event.tournamentFormat != 'knockout' || !exists(/databases/$(database)/documents/communityFixtures/$(resource.data.eventId + '_r' + string(resource.data.round + 1) + '-1'))))
+        && (!('discipline' in resource.data) || 'discipline' in data)
+        && (!('discipline' in data) || data.homeScore != null && data.awayId != '')
+        && (!changed.hasAny(['discipline']) || validFixtureDiscipline(data.discipline))
+        && compatiblePlayerTotals(data)
+        && (!changed.hasAny(['kickoffAt','timeZone','venue']) || resource.data.homeScore == null
+          && data.kickoffAt is timestamp && data.kickoffAt > request.time && text(data.timeZone,1,100) && text(data.venue,1,200));
+    }
+    function playerFixtureUpdate() {
+      let data = request.resource.data;
+      let eventPath = /databases/$(database)/documents/communityEvents/$(resource.data.eventId);
+      let event = getAfter(eventPath).data;
+      // All fixture identity, score, schedule and acta fields are immutable on this path.
+      return data.diff(resource.data).affectedKeys().hasOnly(['playerTotals','playerChangeId','playerRevision','updatedAt'])
+        && data.updatedAt == request.time && data.playerRevision == resource.data.get('playerRevision',0) + 1 && validFixturePlayerTotals(data)
+        && validPlayerDelta(data, resource.data)
+        && event.status == 'closed' && event.type == 'tournament' && event.entry == 'teams';
+    }
     match /communityFixtures/{docId} {
       allow read: if relatedEventReadable(resource.data.eventId);
       allow create: if active() && fixtureDocument(request.resource.data, docId) && owner(request.resource.data.ownerId)
-        && request.resource.data.createdAt == request.time && request.resource.data.updatedAt == request.time;
-      allow update: if active() && owner(resource.data.ownerId) && fixtureDocument(request.resource.data, docId)
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['homeScore', 'awayScore', 'kickoffAt', 'timeZone', 'venue', 'updatedAt'])
-        && request.resource.data.updatedAt == request.time
-        && get(/databases/$(database)/documents/communityEvents/$(resource.data.eventId)).data.status == 'closed'
-        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['kickoffAt', 'timeZone', 'venue'])
-          || resource.data.homeScore == null && request.resource.data.kickoffAt is timestamp && request.resource.data.kickoffAt > request.time)
-        && (get(/databases/$(database)/documents/communityEvents/$(resource.data.eventId)).data.tournamentFormat != 'knockout'
-          || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['homeScore', 'awayScore'])
-          || !exists(/databases/$(database)/documents/communityFixtures/$(resource.data.eventId + '_r' + string(resource.data.round + 1) + '-1')));
+        && request.resource.data.createdAt == request.time && request.resource.data.updatedAt == request.time
+        && !request.resource.data.keys().hasAny(['playerTotals','playerChangeId','playerRevision']);
+      allow update: if active() && owner(resource.data.ownerId) && (request.resource.data.diff(resource.data).affectedKeys().hasAny(['playerTotals','playerChangeId','playerRevision']) ? playerFixtureUpdate() : standardFixtureUpdate());
       allow delete: if false;
+      match /playerStats/{playerId} {
+        function parentFixture() { return get(/databases/$(database)/documents/communityFixtures/$(docId)).data; }
+        function canSavePlayer(data) {
+          let fixture = parentFixture();
+          let after = getAfter(/databases/$(database)/documents/communityFixtures/$(docId)).data;
+          return active() && owner(fixture.ownerId) && validPlayerRecord(data, playerId, fixture)
+            && after.updatedAt == request.time && after.playerChangeId == playerId
+            && after.diff(fixture).affectedKeys().hasAny(['playerTotals','playerChangeId','playerRevision'])
+            && fixture.awayId != '' && fixture.homeScore != null && 'discipline' in fixture;
+        }
+        allow read: if relatedEventReadable(parentFixture().eventId);
+        allow create: if canSavePlayer(request.resource.data) && request.resource.data.revision == 1 && request.resource.data.createdAt == request.time;
+        allow update: if canSavePlayer(request.resource.data) && request.resource.data.revision == resource.data.revision + 1 && request.resource.data.createdAt == resource.data.createdAt
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['goals','yellowCards','redCards','fouls','revision','updatedAt']);
+        allow delete: if false;
+      }
     }
 
     function unchangedWaitlist() {
@@ -489,6 +641,7 @@ service cloud.firestore {
         && (!changed.hasAny(['type']) || data.type in ['match', 'tournament'])
         && (!changed.hasAny(['format']) || data.format in ['5', '7', '11'])
         && (!changed.hasAny(['level']) || data.level in ['amateur', 'professional'])
+        && (!changed.hasAny(['skillLevel']) || data.get('skillLevel', 'any') in ['any', 'beginner', 'intermediate', 'advanced'])
         && (!changed.hasAny(['city']) || text(data.city, 1, 100)) && (!changed.hasAny(['country']) || text(data.country, 1, 100))
         && (!changed.hasAny(['timeZone']) || text(data.timeZone, 1, 100)) && (!changed.hasAny(['venue']) || text(data.venue, 1, 200))
         && (!changed.hasAny(['startAt']) || iso(data.startAt)) && (!changed.hasAny(['startAtMs']) || data.startAtMs is int)
@@ -507,14 +660,14 @@ service cloud.firestore {
         && change.eventId == id && change.revision == revision && change.ownerId == request.auth.uid && change.createdAt == request.time
         && data.get('fixtureIds', []).hasAll(resource.data.get('fixtureIds', []))
         && data.get('history', []) == resource.data.get('history', []) && data.fixtures == resource.data.fixtures
-        && changed.hasOnly(['title', 'format', 'level', 'city', 'country', 'timeZone', 'venue', 'startAt', 'startAtMs', 'capacity', 'entry', 'description', 'type', 'tournamentFormat', 'participants', 'participantIds', 'fixtureIds', 'status', 'updatedAt', 'revision', 'waitlist', 'waitlistOrder', 'rsvps', 'result', 'teamId', 'visibility', 'coverId'])
-        && (!changed.hasAny(['title', 'format', 'level', 'city', 'country', 'timeZone', 'venue', 'startAt', 'startAtMs', 'capacity', 'entry', 'description', 'type', 'tournamentFormat', 'coverId']) || validChangedMetadata(data, changed))
+        && changed.hasOnly(['title', 'format', 'level', 'city', 'country', 'timeZone', 'venue', 'startAt', 'startAtMs', 'capacity', 'entry', 'description', 'type', 'tournamentFormat', 'participants', 'participantIds', 'fixtureIds', 'status', 'updatedAt', 'revision', 'waitlist', 'waitlistOrder', 'rsvps', 'result', 'teamId', 'visibility', 'coverId', 'skillLevel'])
+        && (!changed.hasAny(['title', 'format', 'level', 'city', 'country', 'timeZone', 'venue', 'startAt', 'startAtMs', 'capacity', 'entry', 'description', 'type', 'tournamentFormat', 'coverId', 'skillLevel']) || validChangedMetadata(data, changed))
         && (!changed.hasAny(['rsvps']) || promoted && data.get('rsvps', {}).diff(resource.data.get('rsvps', {})).affectedKeys().hasOnly([resource.data.waitlistOrder[0]]) && !(resource.data.waitlistOrder[0] in data.get('rsvps', {})))
         && (!changed.hasAny(['participants']) || organizerParticipants(promoted))
         && (!changed.hasAny(['waitlist', 'waitlistOrder']) || unchangedWaitlist() || changed.hasAny(['participants']) && promoted)
         && (resource.data.participants.size() == 0 || data.type == resource.data.type && data.entry == resource.data.entry)
         && (resource.data.fixtures.size() == 0 && resource.data.get('fixtureIds', []).size() == 0 || data.format == resource.data.format && data.tournamentFormat == resource.data.tournamentFormat && data.type == resource.data.type && data.entry == resource.data.entry)
-        && (!changed.hasAny(['title', 'city', 'country', 'timeZone', 'venue', 'startAt', 'startAtMs', 'capacity', 'description', 'coverId']) || resource.data.status != 'completed' && data.startAtMs > request.time.toMillis())
+        && (!changed.hasAny(['title', 'city', 'country', 'timeZone', 'venue', 'startAt', 'startAtMs', 'capacity', 'description', 'coverId', 'skillLevel']) || resource.data.status != 'completed' && data.startAtMs > request.time.toMillis())
         && (!changed.hasAny(['fixtureIds']) || resource.data.status != 'cancelled' && data.status in ['closed', 'completed'] && data.participants.size() >= 2 && data.participants.size() <= 32)
         && (data.status != 'open' || data.fixtures.size() == 0 && data.get('fixtureIds', []).size() == 0 && data.startAtMs > request.time.toMillis())
         && (data.status != 'completed' || data.startAtMs <= request.time.toMillis() && resource.data.status != 'cancelled' && (data.type != 'match' || 'result' in data))

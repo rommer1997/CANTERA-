@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="es"><meta charset="utf-8"><title>LaCantera · Imagen para compartir</title>
+<style>body{margin:0;background:#e9efec;display:grid;place-items:center;min-height:100vh}canvas{width:min(100vw,1200px);height:auto;box-shadow:0 15px 50px #10251c22}</style>
+<canvas width="1200" height="630" role="img" aria-label="LaCantera. Organiza partidos y torneos. Encuentra equipo. Gratis."></canvas><a id="export" download="og-image.png">Descargar PNG 1200 × 630</a>
+<script type="module">
+const canvas=document.querySelector('canvas'),ctx=canvas.getContext('2d');
+const font=new FontFace('Manrope','url(/node_modules/@fontsource-variable/manrope/files/manrope-latin-wght-normal.woff2)',{weight:'200 800'});
+await font.load();document.fonts.add(font);
+const photo=new Image(),logo=new Image();photo.src='/images/design-2026-10/event-night.webp';logo.src='/icon-192.png';await Promise.all([photo.decode(),logo.decode()]);
+ctx.fillStyle='#f7f9f5';ctx.fillRect(0,0,1200,630);
+// Existing LaCantera imagery and mark, composed at the exact social preview size.
+ctx.save();ctx.beginPath();ctx.roundRect(756,28,416,574,24);ctx.clip();
+const scale=Math.max(416/photo.width,574/photo.height);ctx.drawImage(photo,756+(416-photo.width*scale)/2,28+(574-photo.height*scale)/2,photo.width*scale,photo.height*scale);
+const fade=ctx.createLinearGradient(756,28,756,602);fade.addColorStop(0,'#003e2a11');fade.addColorStop(1,'#002b20dd');ctx.fillStyle=fade;ctx.fillRect(756,28,416,574);ctx.restore();
+ctx.drawImage(logo,54,47,62,62);ctx.fillStyle='#0d2420';ctx.font='800 38px Manrope';ctx.fillText('LaCantera',132,92);
+ctx.fillStyle='#006747';ctx.font='800 16px Manrope';ctx.fillText('Del barrio al mundo',56,167);
+ctx.fillStyle='#0d2420';ctx.font='800 65px Manrope';ctx.fillText('Tu próximo partido',51,254);ctx.fillText('empieza aquí.',51,332);
+ctx.fillStyle='#4e625c';ctx.font='500 25px Manrope';ctx.fillText('Organiza partidos y torneos.',55,397);ctx.fillText('Encuentra equipo. Comparte tu fútbol.',55,435);
+ctx.fillStyle='#006747';ctx.beginPath();ctx.roundRect(54,480,203,64,16);ctx.fill();ctx.fillStyle='#fff';ctx.font='800 24px Manrope';ctx.fillText('Juega gratis',79,520);
+ctx.fillStyle='#50615b';ctx.font='600 19px Manrope';ctx.fillText('lacantera.com.es',281,520);
+ctx.fillStyle='#d6fb61';ctx.beginPath();ctx.roundRect(783,504,201,44,22);ctx.fill();ctx.fillStyle='#123329';ctx.font='800 17px Manrope';ctx.fillText('Fútbol gratis',801,533);
+ctx.fillStyle='#76867f';ctx.font='500 15px Manrope';ctx.fillText('Comunidad para mayores de 18 años.',55,588);
+canvas.dataset.ready='true';document.querySelector('#export').href=canvas.toDataURL('image/png');
+</script></html>

@@ -31,7 +31,8 @@ test('supresión sobre esquema y transacciones Firestore reales: preserva texto 
     'communityConfiguration/runtime': { serviceStatus: 'paused', mediaUploadsEnabled: false, contactEmail: '', updatedAt: at },
     'communityProfiles/alice': profile('alice'), 'communityProfiles/bob': profile('bob'),
     'communityEvents/history': event,
-    'communityFixtures/history_game': { id: 'game', eventId: 'history', ownerId: 'bob', round: 1, homeId: 'alice', awayId: 'bob', homeScore: 2, awayScore: 1, kickoffAt: '', timeZone: '', venue: '', createdAt: at, updatedAt: at },
+    'communityFixtures/history_game': { id: 'game', eventId: 'history', ownerId: 'bob', round: 1, homeId: 'alice', awayId: 'bob', homeScore: 2, awayScore: 1, discipline:{home:{yellowCards:1,redCards:0,fouls:3},away:{yellowCards:0,redCards:0,fouls:2}}, playerTotals:{home:{goals:1,yellowCards:1,redCards:0,fouls:2},away:{goals:0,yellowCards:0,redCards:0,fouls:0}},playerChangeId:'home_7',playerRevision:1,kickoffAt: '', timeZone: '', venue: '', createdAt: at, updatedAt: at },
+    'communityFixtures/history_game/playerStats/home_7': {id:'home_7',eventId:'history',fixtureId:'game',side:'home',jersey:7,goals:1,yellowCards:1,redCards:0,fouls:2,revision:1,createdAt:at,updatedAt:at},
     'communityEventChanges/history_1': { id: 'history_1', eventId: 'history', ownerId: 'bob', revision: 1, summary: 'Horario confirmado', title: event.title, createdAt: at, audienceIds: ['alice', 'bob'] },
     'communityFollows/bob_alice': { followerId: 'bob', followingId: 'alice', createdAt: at },
     'communityBlocks/bob_alice': { ownerId: 'bob', blockedId: 'alice', createdAt: at },
@@ -65,6 +66,7 @@ test('supresión sobre esquema y transacciones Firestore reales: preserva texto 
   assert.equal(exported.counts.communityMessages, 1); assert.equal(exported.collections.communityMessages[0].text, 'Mi mensaje privado debe conservarse');
   assert.ok(!JSON.stringify(exported.collections.communityMessages).includes('alice'));
   await erase('bob'); assert.equal(identities.has('bob'), false);
+  assert.equal((await db.doc('communityFixtures/history_game/playerStats/home_7').get()).data().jersey,7);
   assert.equal((await db.doc(archivePath).get()).exists, false); assert.equal((await db.collection('communityConversations').doc(archivePath.split('/')[1]).collection('messages').get()).size, 0);
 });
 

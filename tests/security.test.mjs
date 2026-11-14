@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { assertFails, assertSucceeds, initializeTestEnvironment } from '@firebase/rules-unit-testing';
 import { initializeApp, deleteApp } from 'firebase/app';
-import { arrayUnion, collection, serverTimestamp, Timestamp, connectFirestoreEmulator, deleteDoc, doc, getDoc, getDocs, getFirestore, limit, orderBy, query, runTransaction, setDoc, updateDoc, where, getCountFromServer, writeBatch } from 'firebase/firestore';
+import { arrayUnion, collection, serverTimestamp, Timestamp, connectFirestoreEmulator, deleteDoc, deleteField, doc, getDoc, getDocs, getFirestore, limit, orderBy, query, runTransaction, setDoc, updateDoc, where, getCountFromServer, writeBatch } from 'firebase/firestore';
 import { makeFixtures } from '../src/community/logic.ts';
 import { fixtureFields } from '../src/community/fixtureRecords.ts';
 import { commitDeliveryBatches } from '../src/community/deliveryBatches.ts';
@@ -40,7 +40,7 @@ const verifiedDb = uid => env.authenticatedContext(uid, { email_verified: true }
 const media = uid => context(uid).storage();
 async function seed(path, value) { await env.withSecurityRulesDisabled(ctx => setDoc(doc(ctx.firestore(), path), value)); }
 
-async function ownerUpdate(target, changes, summary = 'El organizador modifica el encuentro.') {
+async function ownerUpdate(target, changes, summary = 'El organizador modifica el partido.') {
   return runTransaction(target.firestore, async tx => {
     const current = (await tx.get(target)).data(); const revision = (current.revision || 0) + 1;
     tx.update(target, { ...changes, revision, updatedAt: stamp() });
@@ -65,6 +65,16 @@ beforeEach(async () => {
 after(async () => { await env?.cleanup(); });
 
 describe('Identidad, consentimiento y datos privados', { concurrency: false }, () => {
+  test('el directorio no se enumera antes de completar registro ni con correo sin verificar', async () => {
+    const directory = client => query(collection(client, 'communityPublicProfiles'), orderBy('createdAt', 'desc'), limit(20));
+    for (const client of [db(), db('alice'), verifiedDb('newcomer'), verifiedDb('inactive'), verifiedDb('minor')]) {
+      await assertFails(getDocs(directory(client)));
+      await assertFails(getCountFromServer(directory(client)));
+    }
+    await assertSucceeds(getDocs(directory(verifiedDb('alice'))));
+    await seed('communityAccountModeration/alice', { status: 'suspended' });
+    await assertFails(getDocs(directory(verifiedDb('alice'))));
+  });
   test('perfil deportivo, eventos y publicaciones son públicos; visitante no escribe', async () => {
     await seed('communityEvents/event', event('event', { participants: { alice: 'alice', bob: 'bob' } }));
     await seed('communityPosts/post', post());
@@ -312,7 +322,7 @@ describe('Publicaciones e interacciones', { concurrency: false }, () => {
     await env.withSecurityRulesDisabled(async ctx => assert.equal((await getDoc(doc(ctx.firestore(), 'communityConfiguration/runtime'))).data().serviceStatus, 'pilot'));
   });
 
-  test('asociar un post escrito conserva la restricción a encuentros públicos existentes', async () => {
+  test('asociar un post escrito conserva la restricción a partidos públicos existentes', async () => {
     await seed('communityEvents/public', event('public', { visibility: 'public' }));
     await seed('communityEvents/private', event('private', { visibility: 'private' }));
     const alice = db('alice');
@@ -505,7 +515,26 @@ describe('Storage: pausa de cargas exigida por el servidor', { concurrency: fals
 });
 
 describe('Gestión segura de convocatorias y derechos', { concurrency: false }, () => {
-  test('portada genérica permite crear y editar sólo al organizador, con historial, manteniendo RSVP', async () => {
+  test('nivel deportivo es opcional y solo el organizador puede cambiarlo con historial', async () => {
+    const alice = db('alice');
+    for (const [index, skillLevel] of ['any', 'beginner', 'intermediate', 'advanced'].entries()) {
+      await assertSucceeds(setDoc(doc(alice, `communityEvents/skill-${index}`), event(`skill-${index}`, { skillLevel })));
+    }
+    for (const [index, skillLevel] of ['', null, 'professional', 'expert', 3].entries()) {
+      await assertFails(setDoc(doc(alice, `communityEvents/bad-skill-${index}`), event(`bad-skill-${index}`, { skillLevel })));
+    }
+    await seed('communityEvents/legacy-skill', event('legacy-skill'));
+    const target = doc(alice, 'communityEvents/legacy-skill');
+    await assertFails(updateDoc(target, { skillLevel: 'beginner' }));
+    await assertSucceeds(ownerUpdate(target, { skillLevel: 'beginner' }));
+    await assertFails(ownerUpdate(target, { skillLevel: 'expert' }));
+    await assertFails(ownerUpdate(doc(db('bob'), 'communityEvents/legacy-skill'), { skillLevel: 'advanced' }));
+    await assertFails(updateDoc(doc(db('bob'), 'communityEvents/legacy-skill'), { participants: { bob: 'bob' }, participantIds: ['bob'], skillLevel: 'advanced' }));
+    await assertSucceeds(updateDoc(doc(db('bob'), 'communityEvents/legacy-skill'), { participants: { bob: 'bob' }, participantIds: ['bob'], rsvps: { bob: 'yes' } }));
+    assert.equal((await getDoc(target)).data().skillLevel, 'beginner');
+  });
+
+  test('portada genérica permite crear y editar solo al organizador, con historial, manteniendo RSVP', async () => {
     const alice = db('alice'); const target = doc(alice, 'communityEvents/cover');
     await assertSucceeds(setDoc(target, event('cover', { coverId: 'day' })));
     await assertFails(updateDoc(target, { coverId: 'night' }));
@@ -541,7 +570,7 @@ describe('Gestión segura de convocatorias y derechos', { concurrency: false }, 
     await assertFails(updateDoc(doc(db('alice'), 'communityEventChanges/edit_1'), { summary: 'Reescrito' }));
     await assertFails(deleteDoc(doc(db('alice'), 'communityEventChanges/edit_1')));
   });
-  test('lista de espera preserva orden y retirada promociona sólo primero, con aviso privado', async () => {
+  test('lista de espera preserva orden y retirada promociona solo primero, con aviso privado', async () => {
     await seed('communityEvents/queue', event('queue', { capacity: 2, participants: { alice: 'alice', bob: 'bob' }, participantIds: ['alice', 'bob'], waitlist: {}, waitlistOrder: [], rsvps: { bob: 'yes' } }));
     const carol = db('carol'); const target = doc(carol, 'communityEvents/queue');
     await assertSucceeds(updateDoc(target, { waitlist: { carol: { name: 'carol', joinedAt: stamp() } }, waitlistOrder: ['carol'] }));
@@ -644,7 +673,7 @@ describe('Gestión segura de convocatorias y derechos', { concurrency: false }, 
     await assertFails(setDoc(doc(client, 'communityEventNotices/notices_1_carol'), { id: 'notices_1_carol', eventId: 'notices', recipientId: 'carol', revision, summary, title: 'Partido de la comunidad', createdAt: stamp(), readAt: '' }));
     await assertFails(ownerUpdate(target, { history: [{ revision: 0, summary: 'Historial inventado', changedAt: '2000-01-01T00:00:00.000Z' }] }));
   });
-  test('recuperación crea sólo avisos pendientes con recibos inmutables, sin acceso a lectura privada', async () => {
+  test('recuperación crea solo avisos pendientes con recibos inmutables, sin acceso a lectura privada', async () => {
     await seed('communityEvents/replay', event('replay', { participants: { bob: 'bob' }, participantIds: ['bob'] }));
     const alice = db('alice'); const bob = db('bob');
     await assertSucceeds(ownerUpdate(doc(alice, 'communityEvents/replay'), { venue: 'Nuevo campo' }));
@@ -804,6 +833,45 @@ describe('Cruces canónicos con validación individual', { concurrency: false },
 });
 
 const invitation = (id = '23456789ABCDEFGH', overrides = {}) => ({ id, ownerId: 'alice', kind: 'connection', eventId: '', status: 'active', createdAt: stamp(), usedBy: '', usedAt: '', ...overrides });
+describe('Invitaciones directas a conexiones', {concurrency:false},()=>{
+  const code='23456789ABCDEFGH';
+  const direct=(extra={})=>invitation(code,{kind:'event',eventId:'direct-private',recipientId:'bob',...extra});
+  async function setup(){
+    await seed('communityEvents/direct-private',event('direct-private',{visibility:'private',participants:{}}));
+    await seed('communityConnections/alice/members/bob',{ownerId:'alice',peerId:'bob',inviteId:code,createdAt:stamp()});
+    await seed('communityConnections/bob/members/alice',{ownerId:'bob',peerId:'alice',inviteId:code,createdAt:stamp()});
+  }
+  test('solo el organizador invita a una conexión; el destinatario consulta su bandeja sin ver el evento privado',async()=>{
+    await setup();const alice=verifiedDb('alice');const bob=verifiedDb('bob');const carol=verifiedDb('carol');
+    await assertSucceeds(setDoc(doc(alice,'communityInvitations',code),direct()));
+    await assertSucceeds(getDoc(doc(bob,'communityInvitations',code)));
+    await assertSucceeds(getDocs(query(collection(bob,'communityInvitations'),where('recipientId','==','bob'),orderBy('createdAt','desc'),limit(100))));
+    await assertFails(getDocs(collection(bob,'communityInvitations')));
+    await assertFails(getDoc(doc(carol,'communityInvitations',code)));
+    await assertFails(getDoc(doc(bob,'communityEvents/direct-private')));
+    await assertFails(setDoc(doc(alice,'communityInvitations/23456789ABCDEFGJ'),{...direct(),id:'23456789ABCDEFGJ',recipientId:'carol'}));
+    await assertFails(updateDoc(doc(alice,'communityInvitations',code),{recipientId:'carol'}));
+  });
+  test('admisión directa acepta a la cuenta elegida después de diez minutos y rechaza un tercero',async()=>{
+    await setup();await seed(`communityInvitations/${code}`,direct({createdAt:Timestamp.fromMillis(Date.now()-3600_000)}));
+    await assertFails(admitWithCode(verifiedDb('carol'),'carol',code));
+    await assertSucceeds(admitWithCode(verifiedDb('bob'),'bob',code));
+    await assertSucceeds(getDoc(doc(verifiedDb('bob'),'communityEvents/direct-private')));
+    await assertFails(getDoc(doc(verifiedDb('carol'),'communityEvents/direct-private')));
+  });
+  test('siete días, bloqueo y rechazo cierran el acceso sin consumir una plaza',async()=>{
+    await setup();const bob=verifiedDb('bob');const alice=verifiedDb('alice');
+    await assertSucceeds(setDoc(doc(alice,'communityInvitations',code),direct()));
+    await assertSucceeds(updateDoc(doc(bob,'communityInvitations',code),{status:'declined'}));
+    await assertFails(admitWithCode(bob,'bob',code));
+    await assertFails(updateDoc(doc(bob,'communityInvitations',code),{status:'active'}));
+    await seed(`communityInvitations/${code}`,direct({createdAt:Timestamp.fromMillis(Date.now()-7*86400000-1)}));
+    await assertFails(admitWithCode(bob,'bob',code));
+    await seed(`communityInvitations/${code}`,direct());await seed('communityBlocks/alice_bob',{ownerId:'alice',blockedId:'bob',createdAt:stamp()});
+    await assertFails(admitWithCode(bob,'bob',code));
+    await assertFails(setDoc(doc(alice,'communityInvitations/23456789ABCDEFGJ'),{...direct(),id:'23456789ABCDEFGJ'}));
+  });
+});
 async function connectWithCode(client, uid, code = '23456789ABCDEFGH') {
   return runTransaction(client, async tx => {
     const token = doc(client, 'communityInvitations', code); const current = (await tx.get(token)).data();
@@ -841,7 +909,7 @@ async function admitWithCode(client, uid, code = '23456789ABCDEFGH', overrides =
   });
 }
 describe('Códigos de un uso, conexiones y eventos privados', { concurrency: false }, () => {
-  test('alta de código sólo usa entropía/formato admitidos y hora de servidor; propietario puede revocar tras caducar', async () => {
+  test('alta de código solo usa entropía/formato admitidos y hora de servidor; propietario puede revocar tras caducar', async () => {
     const alice = verifiedDb('alice');
     await assertSucceeds(setDoc(doc(alice, 'communityInvitations/23456789ABCDEFGH'), invitation()));
     await assertFails(setDoc(doc(alice, 'communityInvitations/short'), invitation('short')));
@@ -894,7 +962,7 @@ describe('Códigos de un uso, conexiones y eventos privados', { concurrency: fal
     assert.equal((await getDoc(doc(bob, 'communityConnections/alice/members/bob'))).data().inviteId, code);
     assert.equal((await getDoc(doc(bob, 'communityConnections/bob/members/alice'))).data().inviteId, code);
   });
-  test('dos receptores simultáneos sólo consumen un código una vez y retirada requiere borrar ambas aristas incluso en pausa', async () => {
+  test('dos receptores simultáneos solo consumen un código una vez y retirada requiere borrar ambas aristas incluso en pausa', async () => {
     const alice = verifiedDb('alice'); await setDoc(doc(alice, 'communityInvitations/23456789ABCDEFGH'), invitation());
     const results = await Promise.allSettled([connectWithCode(verifiedDb('bob'), 'bob'), connectWithCode(verifiedDb('carol'), 'carol')]);
     assert.equal(results.filter(result => result.status === 'fulfilled').length, 1);
@@ -1012,7 +1080,7 @@ describe('Códigos de un uso, conexiones y eventos privados', { concurrency: fal
     await assertFails(admitWithCode(bob, 'bob', '23456789ABCDEFGJ'));
     await assertSucceeds(updateDoc(doc(alice, 'communityEvents/private-invite'), { 'participants.alice': 'alice', participantIds: arrayUnion('alice'), 'rsvps.alice': 'yes' }));
   });
-  test('avisos privados sólo se entregan a participantes actuales; una entrega previa sigue accesible a su destinatario', async () => {
+  test('avisos privados solo se entregan a participantes actuales; una entrega previa sigue accesible a su destinatario', async () => {
     const alice = verifiedDb('alice'); const bob = verifiedDb('bob');
     await seed('communityEvents/secret-notice', event('secret-notice', { visibility: 'private', participantIds: [], revision: 1 }));
     await seed('communityEventChanges/secret-notice_1', { id: 'secret-notice_1', eventId: 'secret-notice', ownerId: 'alice', title: 'Reunión privada', summary: 'Cambio de campo', revision: 1, audienceIds: ['alice', 'bob'], createdAt: Timestamp.fromMillis(Date.now() - 1000) });
@@ -1026,4 +1094,40 @@ describe('Códigos de un uso, conexiones y eventos privados', { concurrency: fal
     await assertSucceeds(getDocs(query(collection(bob, 'communityEventNotices'), where('recipientId', '==', 'bob'), orderBy('createdAt', 'desc'))));
     await assertFails(getDoc(doc(verifiedDb('carol'), 'communityEventNotices/secret-notice_1_bob')));
   });
+});
+
+async function playerActaWrite(client,eventId,playerId,input,totals,options={}) {
+  return runTransaction(client,async tx=>{
+    const fr=doc(client,'communityFixtures',`${eventId}_r1-1`),pr=doc(client,'communityFixtures',`${eventId}_r1-1`,'playerStats',playerId);
+    const [fs,ps]=await Promise.all([tx.get(fr),tx.get(pr)]);
+    if(!options.skipFixture)tx.update(fr,{playerTotals:totals,playerChangeId:playerId,playerRevision:(fs.data().playerRevision||0)+1,updatedAt:stamp()});
+    tx.set(pr,{id:playerId,eventId,fixtureId:'r1-1',side:'home',jersey:Number(playerId.split('_')[1]),goals:1,yellowCards:1,redCards:0,fouls:2,...input,revision:ps.exists()?ps.data().revision+1:1,createdAt:ps.exists()?ps.data().createdAt:stamp(),updatedAt:stamp()});
+  });
+}
+describe('Actas de torneo y estadísticas por dorsal', {concurrency:false},()=>{
+  const discipline={home:{yellowCards:2,redCards:1,fouls:8},away:{yellowCards:1,redCards:0,fouls:4}};
+  const totals={home:{goals:1,yellowCards:1,redCards:0,fouls:2},away:{goals:0,yellowCards:0,redCards:0,fouls:0}};
+  async function prepare(id='acta',visibility='public') {const value=event(id,{visibility,entry:'teams',startAt:new Date(Date.now()-3600000).toISOString(),startAtMs:Date.now()-3600000,type:'tournament',participants:{alice:'alice',bob:'bob'},participantIds:['alice','bob'],revision:0,history:[]});await seed(`communityEvents/${id}`,value);await assertSucceeds(canonicalGeneration(db('alice'),value,[fixture]));await assertSucceeds(canonicalUpdate(db('alice'),id,fixture.id,{homeScore:2,awayScore:1,discipline}));return value;}
+  test('la organización registra y corrige un dorsal con acumulados atómicos',async()=>{await prepare();await assertSucceeds(playerActaWrite(db('alice'),'acta','home_7',{},totals));const fr=await getDoc(doc(db('alice'),'communityFixtures/acta_r1-1'));assert.equal(fr.data().playerTotals.home.goals,1);await assertSucceeds(playerActaWrite(db('alice'),'acta','home_7',{goals:2},{...totals,home:{...totals.home,goals:2}}));assert.equal((await getDoc(doc(db('alice'),'communityFixtures/acta_r1-1/playerStats/home_7'))).data().goals,2);await assertSucceeds(canonicalUpdate(db('alice'),'acta',fixture.id,{homeScore:3,awayScore:1,discipline:{...discipline,home:{...discipline.home,fouls:9}}}));});
+  test('los participantes no pueden alterar actas y los totales falsos se rechazan',async()=>{await prepare();await assertFails(playerActaWrite(db('bob'),'acta','home_7',{},totals));await assertFails(playerActaWrite(db('alice'),'acta','home_7',{}, {...totals,home:{...totals.home,goals:2}}));await assertFails(playerActaWrite(db('alice'),'acta','home_7',{},totals,{skipFixture:true}));await assertSucceeds(playerActaWrite(db('alice'),'acta','home_7',{},totals));await assertFails(canonicalUpdate(db('alice'),'acta',fixture.id,{homeScore:0,awayScore:1}));await assertFails(canonicalUpdate(db('alice'),'acta',fixture.id,{discipline:{...discipline,home:{...discipline.home,yellowCards:0}}}));});
+  test('el servidor limita las estadísticas y rechaza datos personales o campos extra',async()=>{await prepare();for(const input of [{goals:-1},{goals:1.5},{yellowCards:3},{redCards:2},{fouls:100},{playerName:'No permitido'}])await assertFails(playerActaWrite(db('alice'),'acta','home_7',input,totals));});
+  test('las actas privadas heredan el acceso del torneo, también para consultas vacías',async()=>{await prepare('private-acta','private');await assertSucceeds(getDoc(doc(db('alice'),'communityFixtures/private-acta_r1-1/playerStats/home_7')));await assertSucceeds(playerActaWrite(db('alice'),'private-acta','home_7',{},totals));await assertSucceeds(getDocs(collection(db('bob'),'communityFixtures/private-acta_r1-1/playerStats')));await assertFails(getDocs(collection(db(),'communityFixtures/private-acta_r1-1/playerStats')));await assertFails(getDocs(collection(db('carol'),'communityFixtures/private-acta_r1-1/playerStats')));});
+  test('las actas no se borran y los acumulados no pueden cambiar sin la fila del jugador',async()=>{
+    await prepare(); const alice=db('alice');
+    await assertFails(canonicalUpdate(alice,'acta',fixture.id,{discipline:deleteField()}));
+    await assertFails(updateDoc(doc(alice,'communityFixtures/acta_r1-1'),{playerTotals:totals,playerChangeId:'home_7',playerRevision:1,updatedAt:stamp()}));
+    await assertFails(playerActaWrite(alice,'acta','home_7',{}, {...totals,away:{...totals.away,fouls:1}}));
+    await assertSucceeds(playerActaWrite(alice,'acta','home_7',{},totals));
+    await assertFails(deleteDoc(doc(alice,'communityFixtures/acta_r1-1/playerStats/home_7')));
+    await seed('communityEvents/acta',{...event('acta'),entry:'teams',type:'tournament',status:'completed'});
+    await assertFails(playerActaWrite(alice,'acta','home_7',{goals:2},{...totals,home:{...totals.home,goals:2}}));
+  });
+  test('los dorsales se reservan a torneos por equipos y requieren resultado y acta',async()=>{
+    await prepare(); await seed('communityEvents/acta',{...event('acta'),entry:'players',type:'tournament',status:'closed'});
+    await assertFails(playerActaWrite(db('alice'),'acta','home_7',{},totals));
+    await prepare('no-acta');
+    await env.withSecurityRulesDisabled(async context=>{await updateDoc(doc(context.firestore(),'communityFixtures/no-acta_r1-1'),{discipline:deleteField()});});
+    await assertFails(playerActaWrite(db('alice'),'no-acta','home_7',{},totals));
+  });
+  test('los penaltis solo resuelven un empate de eliminatoria',async()=>{const value=event('penalties',{startAt:new Date(Date.now()-3600000).toISOString(),startAtMs:Date.now()-3600000,type:'tournament',tournamentFormat:'knockout',participants:{alice:'alice',bob:'bob'},participantIds:['alice','bob'],revision:0,history:[]});await seed('communityEvents/penalties',value);await assertSucceeds(canonicalGeneration(db('alice'),value,[fixture]));await assertFails(canonicalUpdate(db('alice'),'penalties',fixture.id,{homeScore:1,awayScore:1,homePenalties:4,awayPenalties:4}));await assertSucceeds(canonicalUpdate(db('alice'),'penalties',fixture.id,{homeScore:1,awayScore:1,homePenalties:5,awayPenalties:4}));});
 });

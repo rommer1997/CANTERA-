@@ -5,7 +5,7 @@ import { assertFails, assertSucceeds, initializeTestEnvironment } from '@firebas
 import { collection, collectionGroup, deleteDoc, doc, getDoc, getDocs, limit, onSnapshot, orderBy, query, serverTimestamp, setDoc, startAfter, Timestamp, updateDoc, where, writeBatch } from 'firebase/firestore';
 
 const projectId = `${process.env.GCLOUD_PROJECT || 'demo-cantera'}-messaging`;
-if (!projectId.startsWith('demo-') || !process.env.FIRESTORE_EMULATOR_HOST) throw new Error('Ejecuta sólo dentro de Firebase Emulator Suite con un proyecto demo-.');
+if (!projectId.startsWith('demo-') || !process.env.FIRESTORE_EMULATOR_HOST) throw new Error('Ejecuta solo dentro de Firebase Emulator Suite con un proyecto demo-.');
 const at = () => serverTimestamp();
 const terms = '2026-10-08';
 const pair = 'alice:bob';
@@ -36,7 +36,7 @@ beforeEach(async () => {
 });
 after(async () => { await env?.cleanup(); });
 
-test('chat privado real permite sólo ambos contactos verificados y no tiene bypass administrador', async () => {
+test('chat privado real permite solo ambos contactos verificados y no tiene bypass administrador', async () => {
   await setupThread();
   for (const uid of ['alice', 'bob']) {
     await assertSucceeds(getDoc(doc(client(uid), 'communityConversations', pair)));
@@ -181,7 +181,7 @@ test('bloquear cuentas sin conexión funciona y la carrera con una nueva invitac
   await assertFails(setDoc(doc(bob, 'communityConversations', pair), conversation()));
 });
 
-test('lectura se sincroniza sólo para su titular; tercero, admin, futuro y retroceso están prohibidos', async () => {
+test('lectura se sincroniza solo para su titular; tercero, admin, futuro y retroceso están prohibidos', async () => {
   await setupThread(); const alice = client('alice'); const bob = client('bob');
   const target = doc(alice, 'communityMessageReads', 'alice:alice:bob');
   const older = Timestamp.fromMillis(Date.now() - 60000);

@@ -4,10 +4,14 @@ const { readFileSync } = require('node:fs');
 const { resolve } = require('node:path');
 const { createRequire } = require('node:module');
 const PAGE_SIZE = 200;
+const PROJECT_ID = 'gen-lang-client-0853130215';
 const DATABASE_ID = 'ai-studio-647af55f-499b-43f3-9268-9bf5f62701bb';
 const usage = 'Uso: node scripts/migrate-community.cjs [--dry-run | --apply] [--collection=communityEvents]';
 let planner;
 async function getPlanner() { return planner ||= import('./migration-plan.ts'); }
+function validateMigrationTarget(config) {
+  if (config?.projectId !== PROJECT_ID || config?.firestoreDatabaseId !== DATABASE_ID) throw new Error('La configuración no apunta al proyecto y base autorizados de LaCantera; migración detenida.');
+}
 
 async function parseArguments(args) {
   const { MIGRATION_COLLECTIONS } = await getPlanner();
@@ -71,7 +75,7 @@ async function main() {
   const options = await parseArguments(process.argv.slice(2));
   if (options.help) { console.log(`${usage}\nPor defecto sólo lee y calcula cambios. No ejecuta despliegues. Lotes de lectura: ${PAGE_SIZE}.`); return; }
   const config = JSON.parse(readFileSync(resolve(__dirname, '../firebase-applet-config.json'), 'utf8'));
-  if (!config.projectId || config.firestoreDatabaseId !== DATABASE_ID) throw new Error('La configuración no apunta a la base nombrada de Cantera; migración detenida.');
+  validateMigrationTarget(config);
   const requireFunctions = createRequire(resolve(__dirname, '../functions/package.json'));
   const { initializeApp, applicationDefault } = requireFunctions('firebase-admin/app');
   const { getFirestore, FieldPath, Timestamp } = requireFunctions('firebase-admin/firestore');
@@ -83,5 +87,5 @@ async function main() {
   if (!options.apply) console.log('Sólo lectura. Ningún documento modificado.');
 }
 
-module.exports = { PAGE_SIZE, DATABASE_ID, parseArguments, migrateDocument, runMigration };
+module.exports = { PAGE_SIZE, PROJECT_ID, DATABASE_ID, validateMigrationTarget, parseArguments, migrateDocument, runMigration };
 if (require.main === module) main().catch(error => { console.error(error.message); process.exitCode = 1; });

@@ -53,7 +53,18 @@ test('Firebase Hosting sirve la SPA y actualiza la PWA con la política de cach�
       }
     });
 
-    await t.test('sólo los archivos con hash reciben un año de caché inmutable', async () => {
+    await t.test('el documento y los assets rechazan enmarcado, sniffing y permisos no utilizados', async () => {
+      for (const path of ['/', '/assets/index-Ab12Cd_3.js']) {
+        const response = await fetch(`${origin}${path}`);
+        assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+        assert.equal(response.headers.get('x-frame-options'), 'DENY');
+        assert.equal(response.headers.get('referrer-policy'), 'strict-origin-when-cross-origin');
+        assert.equal(response.headers.get('content-security-policy'), "frame-ancestors 'none'; base-uri 'self'; object-src 'none'");
+        assert.equal(response.headers.get('permissions-policy'), 'camera=(self), geolocation=(self), microphone=()');
+      }
+    });
+
+    await t.test('solo los archivos con hash reciben un año de caché inmutable', async () => {
       for (const path of ['/assets/index-Ab12Cd_3.js', '/assets/manrope-latin-wght-normal-HI8z8_Pq.woff2']) {
         const response = await fetch(`${origin}${path}`);
         assert.equal(response.status, 200, path);
@@ -62,6 +73,14 @@ test('Firebase Hosting sirve la SPA y actualiza la PWA con la política de cach�
       const response = await fetch(`${origin}/assets/unversioned.js`);
       assert.equal(response.status, 200);
       assert.equal(response.headers.get('cache-control'), 'no-cache, max-age=0, must-revalidate');
+    });
+
+    await t.test('documentos internos retirados no se sirven ni reciben el fallback de la SPA', async () => {
+      for (const path of ['/Cantera-Whitepaper.pdf', '/whitepaper.md']) {
+        const response = await fetch(`${origin}${path}`);
+        assert.equal(response.status, 404, path);
+        assert.notEqual(await response.text(), shell, path);
+      }
     });
 
     await t.test('un asset retirado devuelve 404 y no HTML guardable como JavaScript', async () => {
